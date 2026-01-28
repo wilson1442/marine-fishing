@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Explorer — Marine Fishing Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+    --bg:#030810;
+    --bg-card:rgba(255,255,255,0.02);
+    --bg-card-hover:rgba(255,255,255,0.04);
+    --border:rgba(76,201,240,0.08);
+    --border-strong:rgba(76,201,240,0.18);
+    --text:#c0cddf;
+    --text-dim:#5a6a80;
+    --text-bright:#eaf0ff;
+    --cyan:#4cc9f0;
+    --green:#3dffa2;
+    --red:#ff6b6b;
+    --amber:#f0a500;
+    --font-mono:'JetBrains Mono',monospace;
+    --font-head:'Outfit',sans-serif;
+}
+html{height:100%;scrollbar-color:rgba(76,201,240,0.15) transparent}
+body{
+    min-height:100%;font-family:var(--font-mono);font-size:12px;
+    background:var(--bg);color:var(--text);
+    -webkit-font-smoothing:antialiased;line-height:1.5;
+}
+
+/* ===== TOPBAR ===== */
+.topbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:16px 32px;
+    border-bottom:1px solid var(--border);
+    background:rgba(3,8,16,0.9);
+    backdrop-filter:blur(12px);
+    position:sticky;top:0;z-index:100;
+}
+.topbar__brand{display:flex;align-items:center;gap:10px}
+.topbar__brand svg{color:var(--cyan);opacity:0.7}
+.topbar__title{
+    font-family:var(--font-head);font-size:16px;font-weight:600;
+    color:var(--text-bright);letter-spacing:0.5px;
+}
+.topbar__tag{
+    font-size:9px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;
+    color:var(--cyan);opacity:0.6;
+    border:1px solid rgba(76,201,240,0.15);border-radius:3px;
+    padding:2px 8px;margin-left:4px;
+}
+.topbar__right{display:flex;align-items:center;gap:20px}
+.topbar__nav{display:flex;gap:24px;list-style:none}
+.topbar__nav a{
+    font-size:10px;font-weight:400;letter-spacing:1.5px;text-transform:uppercase;
+    color:var(--text-dim);text-decoration:none;transition:color 0.2s;
+}
+.topbar__nav a:hover{color:var(--cyan)}
+.topbar__user{display:flex;align-items:center;gap:12px;font-size:11px;color:var(--text-dim)}
+.topbar__username{color:var(--text);font-weight:500}
+.topbar__logout{
+    font-family:var(--font-mono);font-size:9px;font-weight:500;
+    letter-spacing:1px;text-transform:uppercase;
+    color:var(--text-dim);background:none;border:1px solid var(--border);
+    border-radius:3px;padding:4px 10px;cursor:pointer;transition:all 0.2s;
+}
+.topbar__logout:hover{color:var(--red);border-color:rgba(255,107,107,0.3)}
+
+/* ===== LAYOUT ===== */
+.page{max-width:1500px;margin:0 auto;padding:24px 32px 64px}
+
+/* ===== FILTER BAR ===== */
+.filter-bar{
+    display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;
+    background:var(--bg-card);border:1px solid var(--border);border-radius:6px;
+    padding:16px 20px;margin-bottom:20px;
+}
+.filter-field{display:flex;flex-direction:column;gap:4px}
+.filter-field--grow{flex:1;min-width:140px}
+.filter-label{
+    font-size:9px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;
+    color:var(--text-dim);
+}
+.filter-input{
+    font-family:var(--font-mono);font-size:11px;
+    background:rgba(255,255,255,0.03);color:var(--text-bright);
+    border:1px solid var(--border);border-radius:4px;
+    padding:7px 10px;outline:none;transition:border-color 0.2s;
+    min-width:0;
+}
+.filter-input:focus{border-color:var(--cyan)}
+select.filter-input{cursor:pointer}
+select.filter-input option{background:var(--bg);color:var(--text)}
+input[type="date"].filter-input{width:145px}
+input[type="date"].filter-input::-webkit-calendar-picker-indicator{filter:invert(0.6)}
+.filter-actions{display:flex;gap:8px;align-items:flex-end}
+.btn{
+    font-family:var(--font-mono);font-size:10px;font-weight:500;
+    letter-spacing:1px;text-transform:uppercase;
+    border:none;border-radius:4px;padding:8px 16px;
+    cursor:pointer;transition:all 0.2s;display:inline-flex;align-items:center;gap:6px;
+    white-space:nowrap;
+}
+.btn--primary{background:var(--cyan);color:var(--bg)}
+.btn--primary:hover{background:#38b0d8;box-shadow:0 0 16px rgba(76,201,240,0.25)}
+.btn--ghost{background:transparent;color:var(--text-dim);border:1px solid var(--border)}
+.btn--ghost:hover{border-color:var(--border-strong);color:var(--text)}
+
+/* ===== SUMMARY ===== */
+.summary{
+    display:flex;align-items:center;justify-content:space-between;
+    margin-bottom:12px;padding:0 4px;
+}
+.summary__text{font-size:11px;color:var(--text-dim)}
+.summary__text strong{color:var(--text);font-weight:600}
+
+/* ===== TABLE ===== */
+.tbl-wrap{
+    overflow-x:auto;border:1px solid var(--border);border-radius:6px;
+    background:var(--bg-card);
+}
+table{width:100%;border-collapse:collapse;font-size:11px}
+thead{border-bottom:1px solid var(--border)}
+th{
+    font-size:9px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;
+    color:var(--text-dim);text-align:left;
+    padding:10px 14px;white-space:nowrap;
+    cursor:pointer;user-select:none;transition:color 0.15s;
+}
+th:hover{color:var(--text)}
+th.sorted{color:var(--cyan)}
+th .sort-arrow{font-size:8px;margin-left:3px;opacity:0.5}
+th.sorted .sort-arrow{opacity:1}
+td{
+    padding:9px 14px;border-top:1px solid rgba(255,255,255,0.02);
+    color:var(--text);vertical-align:middle;white-space:nowrap;
+}
+tbody tr{transition:background 0.15s}
+tbody tr:hover{background:rgba(76,201,240,0.03)}
+td:first-child{color:var(--text-bright);font-weight:500}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+
+/* ===== PAGINATION ===== */
+.pagination{
+    display:flex;align-items:center;justify-content:center;
+    gap:16px;margin-top:16px;
+}
+.pagination__btn{
+    font-family:var(--font-mono);font-size:10px;font-weight:500;
+    letter-spacing:1px;text-transform:uppercase;
+    color:var(--text-dim);background:none;
+    border:1px solid var(--border);border-radius:4px;
+    padding:6px 14px;cursor:pointer;transition:all 0.2s;
+}
+.pagination__btn:hover:not(:disabled){border-color:var(--border-strong);color:var(--text)}
+.pagination__btn:disabled{opacity:0.3;cursor:not-allowed}
+.pagination__info{font-size:11px;color:var(--text-dim)}
+
+/* ===== EMPTY STATE ===== */
+.empty{text-align:center;padding:40px;color:var(--text-dim);font-size:11px;letter-spacing:0.5px}
+
+/* ===== TOAST ===== */
+.toast-container{
+    position:fixed;top:72px;right:24px;z-index:200;
+    display:flex;flex-direction:column;gap:8px;pointer-events:none;
+}
+.toast{
+    font-family:var(--font-mono);font-size:11px;
+    padding:10px 18px;border-radius:5px;pointer-events:auto;
+    animation:toast-in 0.3s ease forwards;max-width:360px;
+}
+.toast--err{background:rgba(255,107,107,0.1);border:1px solid rgba(255,107,107,0.25);color:var(--red)}
+.toast--out{animation:toast-out 0.3s ease forwards}
+@keyframes toast-in{0%{opacity:0;transform:translateX(20px)}100%{opacity:1;transform:translateX(0)}}
+@keyframes toast-out{0%{opacity:1;transform:translateX(0)}100%{opacity:0;transform:translateX(20px)}}
+
+/* ===== LOADING ===== */
+.loading-row td{color:var(--text-dim);text-align:center;padding:40px}
+
+/* ===== RESPONSIVE ===== */
+@media(max-width:768px){
+    .topbar{padding:14px 18px;flex-wrap:wrap;gap:10px}
+    .page{padding:18px 16px 48px}
+    .filter-bar{flex-direction:column;align-items:stretch}
+    .filter-field--grow{min-width:auto}
+    input[type="date"].filter-input{width:100%}
+}
+</style>
+</head>
+<body>
+
+<!-- Topbar -->
+<header class="topbar">
+    <div class="topbar__brand">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 17c1.5-2 3-3 5-3s3.5 1 5 3 3 3 5 3 3.5-1 5-3"/><path d="M3 12c1.5-2 3-3 5-3s3.5 1 5 3 3 3 5 3 3.5-1 5-3"/></svg>
+        <span class="topbar__title">Data Explorer</span>
+        <span class="topbar__tag">MFI</span>
+    </div>
+    <div class="topbar__right">
+        <nav>
+            <ul class="topbar__nav">
+                <li><a href="/">Home</a></li>
+                <li><a href="/map">Live Map</a></li>
+                <li><a href="/admin">Admin</a></li>
+                <li><a href="/api/docs">API Docs</a></li>
+            </ul>
+        </nav>
+        <div class="topbar__user">
+            <span class="topbar__username" id="topbar-username"></span>
+            <button class="topbar__logout" onclick="doLogout()">Logout</button>
+        </div>
+    </div>
+</header>
+
+<div class="toast-container" id="toast-container"></div>
+
+<div class="page" id="page-content" style="display:none">
+
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+        <div class="filter-field">
+            <label class="filter-label">Date From</label>
+            <input type="date" class="filter-input" id="f-date-from">
+        </div>
+        <div class="filter-field">
+            <label class="filter-label">Date To</label>
+            <input type="date" class="filter-input" id="f-date-to">
+        </div>
+        <div class="filter-field filter-field--grow">
+            <label class="filter-label">Species</label>
+            <select class="filter-input" id="f-species" multiple size="1">
+                <option value="">All Species</option>
+            </select>
+        </div>
+        <div class="filter-field filter-field--grow">
+            <label class="filter-label">Vessel</label>
+            <select class="filter-input" id="f-vessel">
+                <option value="">All Vessels</option>
+            </select>
+        </div>
+        <div class="filter-field">
+            <label class="filter-label">Source</label>
+            <select class="filter-input" id="f-source">
+                <option value="">All Sources</option>
+            </select>
+        </div>
+        <div class="filter-field">
+            <label class="filter-label">Method</label>
+            <select class="filter-input" id="f-method">
+                <option value="">All Methods</option>
+            </select>
+        </div>
+        <div class="filter-actions">
+            <button class="btn btn--primary" onclick="applyFilters()">Apply</button>
+            <button class="btn btn--ghost" onclick="resetFilters()">Reset</button>
+        </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="summary">
+        <div class="summary__text" id="summary-text">Loading...</div>
+    </div>
+
+    <!-- Results Table -->
+    <div class="tbl-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th data-sort="catch_date" class="sorted" onclick="toggleSort('catch_date')">Date <span class="sort-arrow">&#9660;</span></th>
+                    <th data-sort="species_name" onclick="toggleSort('species_name')">Species <span class="sort-arrow">&#9660;</span></th>
+                    <th data-sort="weight_lbs" onclick="toggleSort('weight_lbs')">Weight (lbs) <span class="sort-arrow">&#9660;</span></th>
+                    <th>Qty</th>
+                    <th>Vessel</th>
+                    <th>Method</th>
+                    <th>Source</th>
+                    <th>Lat</th>
+                    <th>Lon</th>
+                    <th>Depth (ftm)</th>
+                    <th>Water Temp</th>
+                </tr>
+            </thead>
+            <tbody id="results-tbody">
+                <tr class="loading-row"><td colspan="11">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination">
+        <button class="pagination__btn" id="btn-prev" onclick="prevPage()" disabled>Prev</button>
+        <span class="pagination__info" id="page-info">Page 1</span>
+        <button class="pagination__btn" id="btn-next" onclick="nextPage()" disabled>Next</button>
+    </div>
+
+</div>
+
+<script>
+var API = '/api/v1/admin';
+var EXPLORER = API + '/explorer';
+var PAGE_SIZE = 100;
+var currentOffset = 0;
+var currentTotal = 0;
+var currentSortBy = 'catch_date';
+var currentSortDir = 'desc';
+
+// ===== Auth =====
+
+async function checkAuth() {
+    try {
+        var resp = await fetch(API + '/me', { credentials: 'same-origin' });
+        if (resp.ok) {
+            var user = await resp.json();
+            document.getElementById('topbar-username').textContent = user.display_name || user.username;
+            document.getElementById('page-content').style.display = '';
+            loadFilters();
+            loadCatches();
+            return;
+        }
+    } catch (e) {}
+    window.location.href = '/admin';
+}
+
+async function doLogout() {
+    try { await fetch(API + '/logout', { method: 'POST', credentials: 'same-origin' }); } catch (e) {}
+    window.location.href = '/admin';
+}
+
+function authFetch(url, opts) {
+    opts = opts || {};
+    opts.credentials = 'same-origin';
+    return fetch(url, opts).then(function(resp) {
+        if (resp.status === 401) { window.location.href = '/admin'; }
+        return resp;
+    });
+}
+
+// ===== Filters =====
+
+async function loadFilters() {
+    try {
+        var resp = await authFetch(EXPLORER + '/filters');
+        var data = await resp.json();
+
+        // Species
+        var specSel = document.getElementById('f-species');
+        specSel.innerHTML = '<option value="">All Species</option>';
+        data.species.forEach(function(s) {
+            var opt = document.createElement('option');
+            opt.value = s.species_code;
+            opt.textContent = s.common_name;
+            specSel.appendChild(opt);
+        });
+
+        // Vessels
+        var vesselSel = document.getElementById('f-vessel');
+        vesselSel.innerHTML = '<option value="">All Vessels</option>';
+        data.vessels.forEach(function(v) {
+            var opt = document.createElement('option');
+            opt.value = v.id;
+            opt.textContent = v.vessel_name + (v.mmsi ? ' (' + v.mmsi + ')' : '');
+            vesselSel.appendChild(opt);
+        });
+
+        // Sources
+        var srcSel = document.getElementById('f-source');
+        srcSel.innerHTML = '<option value="">All Sources</option>';
+        data.sources.forEach(function(s) {
+            var opt = document.createElement('option');
+            opt.value = s;
+            opt.textContent = s;
+            srcSel.appendChild(opt);
+        });
+
+        // Methods
+        var methSel = document.getElementById('f-method');
+        methSel.innerHTML = '<option value="">All Methods</option>';
+        data.fishing_methods.forEach(function(m) {
+            var opt = document.createElement('option');
+            opt.value = m;
+            opt.textContent = m;
+            methSel.appendChild(opt);
+        });
+
+        // Date range defaults
+        if (data.date_range.min) {
+            document.getElementById('f-date-from').min = data.date_range.min;
+            document.getElementById('f-date-to').min = data.date_range.min;
+        }
+        if (data.date_range.max) {
+            document.getElementById('f-date-from').max = data.date_range.max;
+            document.getElementById('f-date-to').max = data.date_range.max;
+        }
+    } catch (e) {
+        showToast('Failed to load filters');
+    }
+}
+
+// ===== Catches =====
+
+function buildQueryString() {
+    var params = [];
+    var dateFrom = document.getElementById('f-date-from').value;
+    var dateTo = document.getElementById('f-date-to').value;
+    var vessel = document.getElementById('f-vessel').value;
+    var source = document.getElementById('f-source').value;
+    var method = document.getElementById('f-method').value;
+
+    // Species multi-select
+    var specSel = document.getElementById('f-species');
+    var selectedSpecies = [];
+    for (var i = 0; i < specSel.options.length; i++) {
+        if (specSel.options[i].selected && specSel.options[i].value) {
+            selectedSpecies.push(specSel.options[i].value);
+        }
+    }
+
+    if (dateFrom) params.push('date_from=' + dateFrom);
+    if (dateTo) params.push('date_to=' + dateTo);
+    if (selectedSpecies.length > 0) params.push('species=' + selectedSpecies.join(','));
+    if (vessel) params.push('vessel_id=' + vessel);
+    if (source) params.push('source=' + encodeURIComponent(source));
+    if (method) params.push('fishing_method=' + encodeURIComponent(method));
+    params.push('sort_by=' + currentSortBy);
+    params.push('sort_dir=' + currentSortDir);
+    params.push('limit=' + PAGE_SIZE);
+    params.push('offset=' + currentOffset);
+
+    return params.join('&');
+}
+
+async function loadCatches() {
+    var tbody = document.getElementById('results-tbody');
+    tbody.innerHTML = '<tr class="loading-row"><td colspan="11">Loading...</td></tr>';
+
+    try {
+        var qs = buildQueryString();
+        var resp = await authFetch(EXPLORER + '/catches?' + qs);
+        var data = await resp.json();
+        currentTotal = data.total;
+
+        // Summary
+        var summaryEl = document.getElementById('summary-text');
+        var from = data.offset + 1;
+        var to = Math.min(data.offset + data.limit, data.total);
+        if (data.total === 0) {
+            summaryEl.innerHTML = 'No results found';
+        } else {
+            summaryEl.innerHTML = 'Showing <strong>' + from.toLocaleString() + ' – ' + to.toLocaleString() + '</strong> of <strong>' + data.total.toLocaleString() + '</strong> catches';
+        }
+
+        // Table
+        if (!data.catches || data.catches.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="11" class="empty">No catches match the current filters</td></tr>';
+        } else {
+            var html = '';
+            data.catches.forEach(function(c) {
+                html += '<tr>' +
+                    '<td>' + (c.catch_date || '—') + '</td>' +
+                    '<td>' + esc(c.species_name || '—') + '</td>' +
+                    '<td class="num">' + (c.weight_lbs != null ? c.weight_lbs.toLocaleString(undefined, {minimumFractionDigits:1, maximumFractionDigits:1}) : '—') + '</td>' +
+                    '<td class="num">' + (c.quantity != null ? c.quantity : '—') + '</td>' +
+                    '<td>' + esc(c.vessel_name || '—') + '</td>' +
+                    '<td>' + esc(c.fishing_method || '—') + '</td>' +
+                    '<td>' + esc(c.source || '—') + '</td>' +
+                    '<td class="num">' + (c.latitude != null ? c.latitude.toFixed(3) : '—') + '</td>' +
+                    '<td class="num">' + (c.longitude != null ? c.longitude.toFixed(3) : '—') + '</td>' +
+                    '<td class="num">' + (c.depth_fathoms != null ? c.depth_fathoms : '—') + '</td>' +
+                    '<td class="num">' + (c.water_temp_f != null ? c.water_temp_f.toFixed(1) + '°F' : '—') + '</td>' +
+                    '</tr>';
+            });
+            tbody.innerHTML = html;
+        }
+
+        updatePagination();
+    } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="11" class="empty">Failed to load data</td></tr>';
+    }
+}
+
+// ===== Sort =====
+
+function toggleSort(col) {
+    if (currentSortBy === col) {
+        currentSortDir = currentSortDir === 'desc' ? 'asc' : 'desc';
+    } else {
+        currentSortBy = col;
+        currentSortDir = 'desc';
+    }
+    // Update header styles
+    document.querySelectorAll('th[data-sort]').forEach(function(th) {
+        th.classList.remove('sorted');
+        th.querySelector('.sort-arrow').innerHTML = '&#9660;';
+    });
+    var activeTh = document.querySelector('th[data-sort="' + col + '"]');
+    activeTh.classList.add('sorted');
+    activeTh.querySelector('.sort-arrow').innerHTML = currentSortDir === 'desc' ? '&#9660;' : '&#9650;';
+
+    currentOffset = 0;
+    loadCatches();
+}
+
+// ===== Pagination =====
+
+function updatePagination() {
+    var totalPages = Math.max(1, Math.ceil(currentTotal / PAGE_SIZE));
+    var currentPage = Math.floor(currentOffset / PAGE_SIZE) + 1;
+
+    document.getElementById('page-info').textContent = 'Page ' + currentPage + ' of ' + totalPages;
+    document.getElementById('btn-prev').disabled = currentOffset <= 0;
+    document.getElementById('btn-next').disabled = currentOffset + PAGE_SIZE >= currentTotal;
+}
+
+function prevPage() {
+    currentOffset = Math.max(0, currentOffset - PAGE_SIZE);
+    loadCatches();
+}
+
+function nextPage() {
+    if (currentOffset + PAGE_SIZE < currentTotal) {
+        currentOffset += PAGE_SIZE;
+        loadCatches();
+    }
+}
+
+// ===== Filter Actions =====
+
+function applyFilters() {
+    currentOffset = 0;
+    loadCatches();
+}
+
+function resetFilters() {
+    document.getElementById('f-date-from').value = '';
+    document.getElementById('f-date-to').value = '';
+    var specSel = document.getElementById('f-species');
+    for (var i = 0; i < specSel.options.length; i++) specSel.options[i].selected = false;
+    document.getElementById('f-vessel').value = '';
+    document.getElementById('f-source').value = '';
+    document.getElementById('f-method').value = '';
+    currentOffset = 0;
+    currentSortBy = 'catch_date';
+    currentSortDir = 'desc';
+    document.querySelectorAll('th[data-sort]').forEach(function(th) {
+        th.classList.remove('sorted');
+        th.querySelector('.sort-arrow').innerHTML = '&#9660;';
+    });
+    document.querySelector('th[data-sort="catch_date"]').classList.add('sorted');
+    loadCatches();
+}
+
+// ===== Helpers =====
+
+function esc(str) {
+    if (!str) return '';
+    var div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+function showToast(message) {
+    var container = document.getElementById('toast-container');
+    var toast = document.createElement('div');
+    toast.className = 'toast toast--err';
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(function() {
+        toast.classList.add('toast--out');
+        setTimeout(function() { toast.remove(); }, 300);
+    }, 3500);
+}
+
+// ===== Init =====
+document.addEventListener('DOMContentLoaded', checkAuth);
+</script>
+</body>
+</html>

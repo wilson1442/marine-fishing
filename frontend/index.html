@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marine Fishing Intelligence Platform</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="/css/vendor/leaflet.css" />
+    <link rel="stylesheet" href="/css/vendor/MarkerCluster.css" />
+    <link rel="stylesheet" href="/css/vendor/MarkerCluster.Default.css" />
+
+    <link rel="stylesheet" href="/css/style.css?v=6" />
+</head>
+<body>
+    <div class="scanline-overlay"></div>
+
+    <div class="app-shell">
+        <!-- Left: Filter Panel -->
+        <aside class="panel panel--filters" id="filter-panel">
+            <div class="panel__header">
+                <div class="panel__title-group">
+                    <span class="panel__sigil">&#9670;</span>
+                    <h2 class="panel__title">Filters</h2>
+                </div>
+                <button class="panel__collapse" id="collapse-filters" aria-label="Collapse filters">&lsaquo;</button>
+            </div>
+
+            <div class="panel__body">
+                <fieldset class="field">
+                    <legend class="field__label">Buoy Station</legend>
+                    <select id="buoy-select" class="field__input">
+                        <option value="">Any Station</option>
+                    </select>
+                </fieldset>
+
+                <fieldset class="field">
+                    <legend class="field__label">Date Lookup</legend>
+                    <input type="date" id="date-select" class="field__input" />
+                    <button id="show-date-weather" class="btn btn--ghost">Load Weather</button>
+                </fieldset>
+
+                <fieldset class="field">
+                    <legend class="field__label">Date Range</legend>
+                    <div class="field__row">
+                        <input type="date" id="date-from" class="field__input" />
+                        <span class="field__separator">&mdash;</span>
+                        <input type="date" id="date-to" class="field__input" />
+                    </div>
+                </fieldset>
+
+                <fieldset class="field">
+                    <legend class="field__label">Year</legend>
+                    <select id="year-select" class="field__input">
+                        <option value="">All Years</option>
+                    </select>
+                </fieldset>
+
+                <fieldset class="field">
+                    <legend class="field__label">Species</legend>
+                    <select id="species-select" class="field__input" multiple>
+                        <option value="">All Species</option>
+                    </select>
+                </fieldset>
+
+                <fieldset class="field">
+                    <legend class="field__label">Conditions</legend>
+                    <select id="conditions-select" class="field__input">
+                        <option value="">All</option>
+                        <option value="excellent">Excellent</option>
+                        <option value="good">Good</option>
+                        <option value="fair">Fair</option>
+                        <option value="poor">Poor</option>
+                    </select>
+                </fieldset>
+
+                <div class="field__actions">
+                    <button id="apply-filters" class="btn btn--primary">Apply</button>
+                    <button id="reset-filters" class="btn btn--ghost">Reset</button>
+                </div>
+
+                <div class="readout" id="stats-readout">
+                    <div class="readout__row">
+                        <span class="readout__label">Catches</span>
+                        <span class="readout__value" id="catch-count">0</span>
+                    </div>
+                    <div class="readout__row">
+                        <span class="readout__label">Days</span>
+                        <span class="readout__value" id="fishing-days">0</span>
+                    </div>
+                    <div class="readout__row">
+                        <span class="readout__label">Species</span>
+                        <span class="readout__value" id="species-count-readout">0</span>
+                    </div>
+                </div>
+
+                <!-- GFW Data Layers -->
+                <div class="gfw-panel">
+                    <div class="gfw-panel__header">
+                        <span class="gfw-panel__badge" id="gfw-source-badge">GFW</span>
+                        <span class="gfw-panel__title">Global Fishing Watch</span>
+                    </div>
+                    <div class="gfw-panel__layers">
+                        <label class="gfw-layer">
+                            <input type="checkbox" class="gfw-layer-toggle" data-layer="fishing_events" />
+                            <span class="gfw-layer__swatch" style="background:#ff6b35"></span>
+                            <span class="gfw-layer__name">Fishing Events</span>
+                            <span class="gfw-layer__count" id="gfw-count-fishing_events"></span>
+                        </label>
+                        <label class="gfw-layer">
+                            <input type="checkbox" class="gfw-layer-toggle" data-layer="loitering" />
+                            <span class="gfw-layer__swatch" style="background:#ffd166"></span>
+                            <span class="gfw-layer__name">Loitering</span>
+                            <span class="gfw-layer__count" id="gfw-count-loitering"></span>
+                        </label>
+                        <label class="gfw-layer">
+                            <input type="checkbox" class="gfw-layer-toggle" data-layer="sar_detections" />
+                            <span class="gfw-layer__swatch" style="background:#ef476f"></span>
+                            <span class="gfw-layer__name">SAR Detections</span>
+                            <span class="gfw-layer__count" id="gfw-count-sar_detections"></span>
+                        </label>
+                        <label class="gfw-layer">
+                            <input type="checkbox" class="gfw-layer-toggle" data-layer="infrastructure" />
+                            <span class="gfw-layer__swatch" style="background:#06d6a0"></span>
+                            <span class="gfw-layer__name">Infrastructure</span>
+                            <span class="gfw-layer__count" id="gfw-count-infrastructure"></span>
+                        </label>
+                        <label class="gfw-layer">
+                            <input type="checkbox" class="gfw-layer-toggle" data-layer="ais_presence" />
+                            <span class="gfw-layer__swatch" style="background:#118ab2"></span>
+                            <span class="gfw-layer__name">AIS Presence</span>
+                            <span class="gfw-layer__count" id="gfw-count-ais_presence"></span>
+                        </label>
+                        <label class="gfw-layer">
+                            <input type="checkbox" class="gfw-layer-toggle" data-layer="effort_heatmap" />
+                            <span class="gfw-layer__swatch" style="background:#ff9f1c"></span>
+                            <span class="gfw-layer__name">Effort Heatmap</span>
+                            <span class="gfw-layer__count" id="gfw-count-effort_heatmap"></span>
+                        </label>
+                    </div>
+                    <div class="gfw-panel__stats">
+                        <div class="gfw-stat">
+                            <span class="gfw-stat__val" id="gfw-fishing-events-total">0</span>
+                            <span class="gfw-stat__label">Events</span>
+                        </div>
+                        <div class="gfw-stat">
+                            <span class="gfw-stat__val" id="gfw-vessels-total">0</span>
+                            <span class="gfw-stat__label">Vessels</span>
+                        </div>
+                        <div class="gfw-stat">
+                            <span class="gfw-stat__val" id="gfw-fishing-hours">0</span>
+                            <span class="gfw-stat__label">Fish Hrs</span>
+                        </div>
+                        <div class="gfw-stat">
+                            <span class="gfw-stat__val" id="gfw-effort-total">0</span>
+                            <span class="gfw-stat__label">Effort</span>
+                        </div>
+                    </div>
+                    <!-- Hidden stats for JS to write to -->
+                    <span id="gfw-loitering-total" style="display:none"></span>
+                    <span id="gfw-sar-total" style="display:none"></span>
+                    <span id="gfw-infra-total" style="display:none"></span>
+                    <span id="gfw-presence-total" style="display:none"></span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Center: Map + Header + Weather -->
+        <main class="main-stage">
+            <header class="topbar">
+                <div class="topbar__brand">
+                    <svg class="topbar__icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 17c1.5-2 3-3 5-3s3.5 1 5 3 3 3 5 3 3.5-1 5-3"/><path d="M3 12c1.5-2 3-3 5-3s3.5 1 5 3 3 3 5 3 3.5-1 5-3"/><path d="M12 2v5M12 22v-3"/></svg>
+                    <span class="topbar__name">Marine Fishing Intelligence</span>
+                </div>
+                <div class="topbar__stats">
+                    <div class="topbar__stat">
+                        <span class="topbar__stat-label">Dataset</span>
+                        <span class="topbar__stat-value" id="dataset-range">&mdash;</span>
+                    </div>
+                    <div class="topbar__stat">
+                        <span class="topbar__stat-label">Fishing Days</span>
+                        <span class="topbar__stat-value" id="total-fishing-days">&mdash;</span>
+                    </div>
+                    <div class="topbar__stat">
+                        <span class="topbar__stat-label">Total Catches</span>
+                        <span class="topbar__stat-value" id="total-catches">&mdash;</span>
+                    </div>
+                    <div class="topbar__stat">
+                        <span class="topbar__stat-label">Species</span>
+                        <span class="topbar__stat-value" id="species-count">&mdash;</span>
+                    </div>
+                </div>
+                <button class="topbar__toggle" id="toggle-filters" aria-label="Toggle filters">
+                    <svg viewBox="0 0 20 20" width="18" height="18" fill="currentColor"><path d="M3 5h14M3 10h10M3 15h6"/></svg>
+                </button>
+            </header>
+
+            <div class="map-wrap">
+                <div id="map"></div>
+                <div class="map-loading" id="map-loading">
+                    <div class="map-loading__spinner"></div>
+                    <span>Loading catches&hellip;</span>
+                </div>
+                <!-- Species legend overlay at bottom of map -->
+                <div class="species-overlay" id="species-overlay">
+                    <span class="species-overlay__label">Species</span>
+                    <div class="species-overlay__items" id="legend-items"></div>
+                </div>
+            </div>
+
+            <section class="weather-bar" id="weather-bar">
+                <div class="weather-bar__header">
+                    <h3 class="weather-bar__title">Marine Conditions</h3>
+                    <span class="weather-bar__station" id="weather-station">Select a date or viewing latest</span>
+                </div>
+                <div class="weather-bar__grid">
+                    <div class="wx-cell">
+                        <span class="wx-cell__icon">
+                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 9a4 4 0 100 8 4 4 0 000-8z"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>
+                        </span>
+                        <span class="wx-cell__label">Air Temp</span>
+                        <span class="wx-cell__value" id="air-temp">&mdash;</span>
+                    </div>
+                    <div class="wx-cell">
+                        <span class="wx-cell__icon">
+                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2v6l3 3M3 17c1.5-2 3-3 5-3s3.5 1 5 3 3 3 5 3 3.5-1 5-3"/></svg>
+                        </span>
+                        <span class="wx-cell__label">Water Temp</span>
+                        <span class="wx-cell__value" id="water-temp">&mdash;</span>
+                    </div>
+                    <div class="wx-cell">
+                        <span class="wx-cell__icon">
+                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.59 4.59A2 2 0 1111 8H2m10.59 11.41A2 2 0 1014 16H2m15.73-8.27A2.5 2.5 0 1119.5 12H2"/></svg>
+                        </span>
+                        <span class="wx-cell__label">Wind</span>
+                        <span class="wx-cell__value" id="wind-speed">&mdash;</span>
+                    </div>
+                    <div class="wx-cell">
+                        <span class="wx-cell__icon">
+                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 12c2-3 4-4 6-4s4 1 6 4 4 4 6 4 4-1 6-4"/><path d="M2 6c2-3 4-4 6-4s4 1 6 4 4 4 6 4 4-1 6-4"/><path d="M2 18c2-3 4-4 6-4s4 1 6 4 4 4 6 4 4-1 6-4"/></svg>
+                        </span>
+                        <span class="wx-cell__label">Waves</span>
+                        <span class="wx-cell__value" id="wave-height">&mdash;</span>
+                    </div>
+                    <div class="wx-cell">
+                        <span class="wx-cell__icon">
+                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z"/><path d="M12 6v6l4 2"/></svg>
+                        </span>
+                        <span class="wx-cell__label">Pressure</span>
+                        <span class="wx-cell__value" id="pressure">&mdash;</span>
+                    </div>
+                    <div class="wx-cell">
+                        <span class="wx-cell__icon">
+                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3a9 9 0 110 18c-4.97 0-9-4.03-9-9h9V3z"/></svg>
+                        </span>
+                        <span class="wx-cell__label">Moon</span>
+                        <span class="wx-cell__value" id="moon-phase">&mdash;</span>
+                    </div>
+                    <div class="wx-cell">
+                        <span class="wx-cell__icon">
+                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 18h20M5 14v4M9 12v6M13 10v8M17 8v10M21 6v12"/></svg>
+                        </span>
+                        <span class="wx-cell__label">Fishing Score</span>
+                        <span class="wx-cell__value" id="fishing-score">&mdash;</span>
+                    </div>
+                    <div class="wx-cell">
+                        <span class="wx-cell__icon">
+                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </span>
+                        <span class="wx-cell__label">Visibility</span>
+                        <span class="wx-cell__value" id="visibility">&mdash;</span>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+    </div>
+
+    <script src="/js/vendor/leaflet.js"></script>
+    <script src="/js/vendor/leaflet.markercluster.js"></script>
+    <script src="/js/config.js?v=6"></script>
+    <script src="/js/app.js?v=6"></script>
+</body>
+</html>
