@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Query, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import Optional
@@ -7,6 +7,13 @@ from pydantic import BaseModel
 import hashlib
 import json
 import secrets
+import subprocess
+import shutil
+import os
+import re
+import gzip
+from datetime import datetime
+from urllib.parse import urlparse
 
 from app.api.deps import get_db, get_current_admin, _create_token, _verify_token
 from app.config import get_settings
@@ -45,6 +52,10 @@ class AdminUserCreate(BaseModel):
 class LoginRequest(BaseModel):
     username: str
     password: str
+
+
+class ScheduledBackupUpdate(BaseModel):
+    enabled: bool
 
 
 # ---------- Auth Endpoints ----------
@@ -450,3 +461,518 @@ def delete_admin_user(user_id: int, current_user: dict = Depends(get_current_adm
         raise HTTPException(status_code=404, detail=f"User ID {user_id} not found")
 
     return {"id": user_id, "message": "Admin user deactivated"}
+
+
+# ---------- Database Backup Helpers ----------
+
+def _find_executable(name: str) -> str:
+    """Find the full path to an executable, checking common locations."""
+    path = shutil.which(name)
+    if path:
+        return path
+    for d in ["/usr/bin", "/usr/local/bin", "/bin", "/usr/lib/postgresql/16/bin"]:
+        candidate = os.path.join(d, name)
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+    raise FileNotFoundError(f"'{name}' not found on this system")
+
+
+def _parse_database_url(url: str) -> dict:
+    """Parse DATABASE_URL into components for pg_dump."""
+    parsed = urlparse(url)
+    return {
+        "host": parsed.hostname or "localhost",
+        "port": str(parsed.port or 5432),
+        "dbname": (parsed.path or "/marine_fishing").lstrip("/"),
+        "user": parsed.username or "marine_user",
+        "password": parsed.password or "",
+    }
+
+
+def _validate_backup_filename(filename: str) -> bool:
+    """Validate backup filename to prevent path traversal."""
+    return bool(re.match(r'^marine_fishing_\d{8}_\d{6}\.sql\.gz$', filename))
+
+
+def _format_file_size(size_bytes: int) -> str:
+    """Format bytes into human-readable size."""
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+    elif size_bytes < 1024 * 1024:
+        return f"{size_bytes / 1024:.1f} KB"
+    elif size_bytes < 1024 * 1024 * 1024:
+        return f"{size_bytes / (1024 * 1024):.1f} MB"
+    else:
+        return f"{size_bytes / (1024 * 1024 * 1024):.2f} GB"
+
+
+# ---------- Local Backups ----------
+
+@router.post("/backups/local")
+def create_local_backup(current_user: dict = Depends(get_current_admin)):
+    """Create a local database backup using pg_dump."""
+    settings = get_settings()
+    db_info = _parse_database_url(settings.database_url)
+
+    os.makedirs(settings.backup_dir, exist_ok=True)
+
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    filename = f"marine_fishing_{timestamp}.sql.gz"
+    filepath = os.path.join(settings.backup_dir, filename)
+
+    env = os.environ.copy()
+    env["PGPASSWORD"] = db_info["password"]
+
+    try:
+        # Run pg_dump and pipe through gzip
+        pg_dump_bin = _find_executable("pg_dump")
+        gzip_bin = _find_executable("gzip")
+
+        pg_dump_cmd = [
+            pg_dump_bin,
+            "-h", db_info["host"],
+            "-p", db_info["port"],
+            "-U", db_info["user"],
+            "-d", db_info["dbname"],
+            "--no-password",
+        ]
+        dump_proc = subprocess.Popen(
+            pg_dump_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=env,
+        )
+
+        with open(filepath, "wb") as f:
+            gzip_proc = subprocess.Popen(
+                [gzip_bin],
+                stdin=dump_proc.stdout,
+                stdout=f,
+                stderr=subprocess.PIPE,
+            )
+            # Close pg_dump's stdout in parent so gzip sees EOF when pg_dump finishes
+            dump_proc.stdout.close()
+            gzip_proc.wait(timeout=600)
+
+        dump_proc.wait(timeout=600)
+
+        if dump_proc.returncode != 0:
+            stderr = dump_proc.stderr.read().decode("utf-8", errors="replace")
+            if os.path.exists(filepath):
+                os.remove(filepath)
+            raise HTTPException(status_code=500, detail=f"pg_dump failed: {stderr[:500]}")
+
+        file_size = os.path.getsize(filepath)
+        return {
+            "filename": filename,
+            "size": file_size,
+            "size_formatted": _format_file_size(file_size),
+            "download_url": f"/api/v1/admin/backups/download/{filename}",
+            "message": "Backup created successfully",
+        }
+
+    except subprocess.TimeoutExpired:
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        raise HTTPException(status_code=500, detail="Backup timed out")
+    except HTTPException:
+        raise
+    except Exception as e:
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        raise HTTPException(status_code=500, detail=f"Backup failed: {str(e)}")
+
+
+@router.get("/backups")
+def list_backups(current_user: dict = Depends(get_current_admin)):
+    """List all local backup files."""
+    settings = get_settings()
+    backup_dir = settings.backup_dir
+
+    if not os.path.exists(backup_dir):
+        return {"backups": [], "total": 0}
+
+    backups = []
+    for fname in sorted(os.listdir(backup_dir), reverse=True):
+        if not _validate_backup_filename(fname):
+            continue
+        fpath = os.path.join(backup_dir, fname)
+        stat = os.stat(fpath)
+        backups.append({
+            "filename": fname,
+            "size": stat.st_size,
+            "size_formatted": _format_file_size(stat.st_size),
+            "created_at": datetime.utcfromtimestamp(stat.st_mtime).isoformat(),
+            "download_url": f"/api/v1/admin/backups/download/{fname}",
+        })
+
+    return {"backups": backups, "total": len(backups)}
+
+
+@router.get("/backups/download/{filename}")
+def download_backup(filename: str, current_user: dict = Depends(get_current_admin)):
+    """Download a backup file."""
+    if not _validate_backup_filename(filename):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    settings = get_settings()
+    filepath = os.path.join(settings.backup_dir, filename)
+
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="Backup file not found")
+
+    return FileResponse(
+        path=filepath,
+        filename=filename,
+        media_type="application/gzip",
+    )
+
+
+@router.delete("/backups/{filename}")
+def delete_backup(filename: str, current_user: dict = Depends(get_current_admin)):
+    """Delete a local backup file."""
+    if not _validate_backup_filename(filename):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    settings = get_settings()
+    filepath = os.path.join(settings.backup_dir, filename)
+
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="Backup file not found")
+
+    os.remove(filepath)
+    return {"filename": filename, "message": "Backup deleted"}
+
+
+# ---------- Scheduled Backup ----------
+
+def _read_schedule_file() -> dict:
+    """Read the backup schedule config from disk."""
+    settings = get_settings()
+    path = settings.backup_schedule_file
+    if os.path.exists(path):
+        with open(path, "r") as f:
+            return json.load(f)
+    return {"daily_enabled": False}
+
+
+def _write_schedule_file(data: dict):
+    """Write the backup schedule config to disk."""
+    settings = get_settings()
+    os.makedirs(os.path.dirname(settings.backup_schedule_file), exist_ok=True)
+    with open(settings.backup_schedule_file, "w") as f:
+        json.dump(data, f)
+
+
+def run_scheduled_backup():
+    """Execute a local backup (called by APScheduler at midnight)."""
+    settings = get_settings()
+    db_info = _parse_database_url(settings.database_url)
+
+    os.makedirs(settings.backup_dir, exist_ok=True)
+
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    filename = f"marine_fishing_{timestamp}.sql.gz"
+    filepath = os.path.join(settings.backup_dir, filename)
+
+    env = os.environ.copy()
+    env["PGPASSWORD"] = db_info["password"]
+
+    try:
+        pg_dump_bin = _find_executable("pg_dump")
+        gzip_bin = _find_executable("gzip")
+
+        pg_dump_cmd = [
+            pg_dump_bin,
+            "-h", db_info["host"],
+            "-p", db_info["port"],
+            "-U", db_info["user"],
+            "-d", db_info["dbname"],
+            "--no-password",
+        ]
+        dump_proc = subprocess.Popen(
+            pg_dump_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=env,
+        )
+
+        with open(filepath, "wb") as f:
+            gzip_proc = subprocess.Popen(
+                [gzip_bin],
+                stdin=dump_proc.stdout,
+                stdout=f,
+                stderr=subprocess.PIPE,
+            )
+            dump_proc.stdout.close()
+            gzip_proc.wait(timeout=600)
+
+        dump_proc.wait(timeout=600)
+
+        if dump_proc.returncode != 0:
+            stderr = dump_proc.stderr.read().decode("utf-8", errors="replace")
+            if os.path.exists(filepath):
+                os.remove(filepath)
+            print(f"[scheduled-backup] pg_dump failed: {stderr[:500]}")
+            return
+
+        file_size = os.path.getsize(filepath)
+        print(f"[scheduled-backup] Created {filename} ({_format_file_size(file_size)})")
+
+    except Exception as e:
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        print(f"[scheduled-backup] Failed: {e}")
+
+
+@router.get("/backups/schedule")
+def get_backup_schedule(current_user: dict = Depends(get_current_admin)):
+    """Get the current daily backup schedule status."""
+    data = _read_schedule_file()
+    return {"daily_enabled": data.get("daily_enabled", False)}
+
+
+@router.put("/backups/schedule")
+def set_backup_schedule(body: ScheduledBackupUpdate, current_user: dict = Depends(get_current_admin)):
+    """Enable or disable the daily midnight backup."""
+    from app.scheduler import set_daily_backup
+
+    data = _read_schedule_file()
+    data["daily_enabled"] = body.enabled
+    _write_schedule_file(data)
+
+    set_daily_backup(body.enabled)
+
+    return {
+        "daily_enabled": body.enabled,
+        "message": "Daily backup enabled" if body.enabled else "Daily backup disabled",
+    }
+
+
+# ---------- SSH Key Management ----------
+
+@router.post("/backups/ssh-keygen")
+def generate_ssh_key(current_user: dict = Depends(get_current_admin)):
+    """Generate an SSH keypair for remote backups."""
+    settings = get_settings()
+    ssh_dir = settings.ssh_key_dir
+    key_path = os.path.join(ssh_dir, "backup_key")
+    pub_path = key_path + ".pub"
+
+    os.makedirs(ssh_dir, exist_ok=True)
+
+    if os.path.exists(key_path):
+        # Key already exists, return the public key
+        with open(pub_path, "r") as f:
+            pub_key = f.read().strip()
+        return {"public_key": pub_key, "message": "SSH key already exists", "exists": True}
+
+    try:
+        result = subprocess.run(
+            [
+                "ssh-keygen",
+                "-t", "ed25519",
+                "-f", key_path,
+                "-N", "",  # no passphrase
+                "-C", "marine-fishing-backup",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode != 0:
+            raise HTTPException(status_code=500, detail=f"ssh-keygen failed: {result.stderr[:500]}")
+
+        # Set correct permissions
+        os.chmod(key_path, 0o600)
+        os.chmod(pub_path, 0o644)
+
+        with open(pub_path, "r") as f:
+            pub_key = f.read().strip()
+
+        return {"public_key": pub_key, "message": "SSH key generated", "exists": False}
+
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=500, detail="ssh-keygen timed out")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Key generation failed: {str(e)}")
+
+
+@router.get("/backups/ssh-pubkey")
+def get_ssh_pubkey(current_user: dict = Depends(get_current_admin)):
+    """Get the current SSH public key."""
+    settings = get_settings()
+    pub_path = os.path.join(settings.ssh_key_dir, "backup_key.pub")
+
+    if not os.path.exists(pub_path):
+        raise HTTPException(status_code=404, detail="No SSH key generated yet")
+
+    with open(pub_path, "r") as f:
+        pub_key = f.read().strip()
+
+    return {"public_key": pub_key}
+
+
+# ---------- Remote Backups ----------
+
+class RemoteBackupRequest(BaseModel):
+    host: str
+    port: int = 22
+    remote_path: str
+
+
+class RemoteTestRequest(BaseModel):
+    host: str
+    port: int = 22
+
+
+@router.post("/backups/remote/test")
+def test_remote_connection(req: RemoteTestRequest, current_user: dict = Depends(get_current_admin)):
+    """Test SSH connectivity to a remote host."""
+    settings = get_settings()
+    key_path = os.path.join(settings.ssh_key_dir, "backup_key")
+
+    if not os.path.exists(key_path):
+        raise HTTPException(status_code=400, detail="No SSH key generated. Generate one first.")
+
+    # Validate host - basic check to prevent injection
+    if not re.match(r'^[a-zA-Z0-9._\-]+$', req.host):
+        raise HTTPException(status_code=400, detail="Invalid hostname")
+    if not (1 <= req.port <= 65535):
+        raise HTTPException(status_code=400, detail="Invalid port number")
+
+    try:
+        result = subprocess.run(
+            [
+                "ssh",
+                "-i", key_path,
+                "-o", "StrictHostKeyChecking=accept-new",
+                "-o", "ConnectTimeout=10",
+                "-o", "BatchMode=yes",
+                "-p", str(req.port),
+                f"root@{req.host}",
+                "echo", "connection_ok",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+
+        if result.returncode == 0 and "connection_ok" in result.stdout:
+            return {"status": "ok", "message": "Connection successful"}
+        else:
+            detail = result.stderr.strip()[:500] if result.stderr else "Connection failed"
+            return {"status": "failed", "message": detail}
+
+    except subprocess.TimeoutExpired:
+        return {"status": "failed", "message": "Connection timed out"}
+    except Exception as e:
+        return {"status": "failed", "message": str(e)}
+
+
+@router.post("/backups/remote")
+def create_remote_backup(req: RemoteBackupRequest, current_user: dict = Depends(get_current_admin)):
+    """Create a database backup and send it to a remote server via SCP."""
+    settings = get_settings()
+    key_path = os.path.join(settings.ssh_key_dir, "backup_key")
+    db_info = _parse_database_url(settings.database_url)
+
+    if not os.path.exists(key_path):
+        raise HTTPException(status_code=400, detail="No SSH key generated. Generate one first.")
+
+    # Validate inputs
+    if not re.match(r'^[a-zA-Z0-9._\-]+$', req.host):
+        raise HTTPException(status_code=400, detail="Invalid hostname")
+    if not (1 <= req.port <= 65535):
+        raise HTTPException(status_code=400, detail="Invalid port number")
+    if not req.remote_path or ".." in req.remote_path:
+        raise HTTPException(status_code=400, detail="Invalid remote path")
+
+    os.makedirs(settings.backup_dir, exist_ok=True)
+
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    filename = f"marine_fishing_{timestamp}.sql.gz"
+    filepath = os.path.join(settings.backup_dir, filename)
+
+    env = os.environ.copy()
+    env["PGPASSWORD"] = db_info["password"]
+
+    try:
+        # Step 1: Create local backup
+        pg_dump_bin = _find_executable("pg_dump")
+        gzip_bin = _find_executable("gzip")
+
+        pg_dump_cmd = [
+            pg_dump_bin,
+            "-h", db_info["host"],
+            "-p", db_info["port"],
+            "-U", db_info["user"],
+            "-d", db_info["dbname"],
+            "--no-password",
+        ]
+        dump_proc = subprocess.Popen(
+            pg_dump_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=env,
+        )
+
+        with open(filepath, "wb") as f:
+            gzip_proc = subprocess.Popen(
+                [gzip_bin],
+                stdin=dump_proc.stdout,
+                stdout=f,
+                stderr=subprocess.PIPE,
+            )
+            dump_proc.stdout.close()
+            gzip_proc.wait(timeout=600)
+
+        dump_proc.wait(timeout=600)
+
+        if dump_proc.returncode != 0:
+            stderr = dump_proc.stderr.read().decode("utf-8", errors="replace")
+            if os.path.exists(filepath):
+                os.remove(filepath)
+            raise HTTPException(status_code=500, detail=f"pg_dump failed: {stderr[:500]}")
+
+        file_size = os.path.getsize(filepath)
+
+        # Step 2: SCP to remote
+        remote_dest = req.remote_path.rstrip("/") + "/" + filename
+        scp_result = subprocess.run(
+            [
+                "scp",
+                "-i", key_path,
+                "-o", "StrictHostKeyChecking=accept-new",
+                "-o", "ConnectTimeout=15",
+                "-o", "BatchMode=yes",
+                "-P", str(req.port),
+                filepath,
+                f"root@{req.host}:{remote_dest}",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=600,
+        )
+
+        if scp_result.returncode != 0:
+            detail = scp_result.stderr.strip()[:500] if scp_result.stderr else "SCP transfer failed"
+            raise HTTPException(status_code=500, detail=f"SCP failed: {detail}")
+
+        return {
+            "filename": filename,
+            "size": file_size,
+            "size_formatted": _format_file_size(file_size),
+            "remote_host": req.host,
+            "remote_path": remote_dest,
+            "message": "Backup sent to remote server successfully",
+        }
+
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=500, detail="Operation timed out")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Remote backup failed: {str(e)}")

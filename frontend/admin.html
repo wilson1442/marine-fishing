@@ -319,6 +319,24 @@ textarea.field__input{resize:vertical;min-height:60px}
     font-size:11px;letter-spacing:0.5px;
 }
 
+/* ===== TOGGLE SWITCH ===== */
+.toggle{display:inline-flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
+.toggle__label{font-size:10px;font-weight:500;letter-spacing:0.5px;color:var(--text-dim)}
+.toggle__track{
+    position:relative;width:36px;height:20px;
+    background:rgba(255,255,255,0.06);border:1px solid var(--border);
+    border-radius:10px;transition:all 0.25s;
+}
+.toggle__track::after{
+    content:'';position:absolute;top:2px;left:2px;
+    width:14px;height:14px;border-radius:50%;
+    background:var(--text-dim);transition:all 0.25s;
+}
+.toggle--on .toggle__track{background:rgba(61,255,162,0.15);border-color:rgba(61,255,162,0.3)}
+.toggle--on .toggle__track::after{left:18px;background:var(--green)}
+.toggle__status{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim)}
+.toggle--on .toggle__status{color:var(--green)}
+
 /* ===== RESPONSIVE ===== */
 @media(max-width:1100px){
     .cards{grid-template-columns:repeat(3,1fr)}
@@ -521,6 +539,75 @@ textarea.field__input{resize:vertical;min-height:60px}
                     <tr><td colspan="9" class="empty">Loading...</td></tr>
                 </tbody>
             </table>
+        </div>
+    </section>
+
+    <!-- Database Backups -->
+    <section class="section">
+        <div class="section__head">
+            <h2 class="section__title">Database Backups</h2>
+            <div class="section__actions">
+                <div class="toggle" id="daily-backup-toggle" onclick="toggleDailyBackup()">
+                    <span class="toggle__label">Daily Backup (Midnight)</span>
+                    <div class="toggle__track"></div>
+                    <span class="toggle__status">Off</span>
+                </div>
+                <button class="btn btn--primary btn--sm" id="local-backup-btn" onclick="createLocalBackup()">Create Local Backup</button>
+            </div>
+        </div>
+        <div class="tbl-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Filename</th>
+                        <th>Size</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="backups-tbody">
+                    <tr><td colspan="4" class="empty">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Remote Backup Panel -->
+        <div class="form-panel" data-collapsed="true" id="remote-backup-panel">
+            <button class="form-panel__toggle" onclick="togglePanel('remote-backup-panel')">
+                <span>Remote Backup (SSH)</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="form-panel__body">
+                <!-- SSH Key -->
+                <div style="margin-top:14px;margin-bottom:18px;padding:14px;border:1px solid var(--border);border-radius:6px;background:rgba(255,255,255,0.01)">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                        <span class="field__label" style="margin:0">SSH Public Key</span>
+                        <button class="btn btn--ghost btn--sm" id="ssh-keygen-btn" onclick="generateSSHKey()">Generate Key</button>
+                    </div>
+                    <textarea class="field__input" id="ssh-pubkey" readonly rows="3" placeholder="No SSH key generated yet. Click 'Generate Key' to create one." style="font-size:10px;resize:none;cursor:text"></textarea>
+                    <div style="font-size:10px;color:var(--text-dim);margin-top:6px">Add this public key to the remote server's <code style="color:var(--cyan)">~/.ssh/authorized_keys</code></div>
+                </div>
+
+                <!-- Remote Config -->
+                <div class="form-grid">
+                    <div class="field">
+                        <label class="field__label">Host / IP</label>
+                        <input type="text" class="field__input" id="remote-host" placeholder="e.g. 192.168.1.100 or backup.example.com">
+                    </div>
+                    <div class="field">
+                        <label class="field__label">Port</label>
+                        <input type="number" class="field__input" id="remote-port" value="22" min="1" max="65535">
+                    </div>
+                    <div class="field field--full">
+                        <label class="field__label">Remote Path</label>
+                        <input type="text" class="field__input" id="remote-path" placeholder="e.g. /backups/ or /home/user/backups/">
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn btn--ghost" id="test-conn-btn" onclick="testRemoteConnection()">Test Connection</button>
+                        <button class="btn btn--primary" id="remote-backup-btn" onclick="createRemoteBackup()">Send Backup</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </section>
 
@@ -840,13 +927,23 @@ async function loadAll() {
         authFetch(API + '/dashboard').then(function(r) { return r.json(); }),
         authFetch(API + '/sources').then(function(r) { return r.json(); }),
         authFetch(API + '/sync-history?limit=20').then(function(r) { return r.json(); }),
-        authFetch(API + '/users').then(function(r) { return r.json(); })
+        authFetch(API + '/users').then(function(r) { return r.json(); }),
+        authFetch(API + '/backups').then(function(r) { return r.json(); }),
+        authFetch(API + '/backups/ssh-pubkey').then(function(r) { return r.ok ? r.json() : null; }),
+        authFetch(API + '/backups/schedule').then(function(r) { return r.ok ? r.json() : null; })
     ]);
 
     if (results[0].status === 'fulfilled') populateDashboard(results[0].value);
     if (results[1].status === 'fulfilled') populateSources(results[1].value);
     if (results[2].status === 'fulfilled') populateSyncHistory(results[2].value);
     if (results[3].status === 'fulfilled') populateUsers(results[3].value);
+    if (results[4].status === 'fulfilled') populateBackups(results[4].value);
+    if (results[5].status === 'fulfilled' && results[5].value) {
+        document.getElementById('ssh-pubkey').value = results[5].value.public_key;
+    }
+    if (results[6].status === 'fulfilled' && results[6].value) {
+        setDailyBackupToggle(results[6].value.daily_enabled);
+    }
 }
 
 // ===== Populate Functions =====
@@ -1045,6 +1142,231 @@ async function createAdminUser() {
         populateUsers(data);
     } catch (err) {
         if (err.message !== 'Session expired') showToast('Network error: ' + err.message, 'error');
+    }
+}
+
+// ===== Backup Functions =====
+
+function populateBackups(data) {
+    var tbody = document.getElementById('backups-tbody');
+    if (!data.backups || data.backups.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="empty">No backups yet. Click "Create Local Backup" to get started.</td></tr>';
+        return;
+    }
+    var html = '';
+    data.backups.forEach(function(b) {
+        html += '<tr>' +
+            '<td>' + escHtml(b.filename) + '</td>' +
+            '<td>' + escHtml(b.size_formatted) + '</td>' +
+            '<td style="white-space:nowrap">' + formatDateTime(b.created_at) + '</td>' +
+            '<td>' +
+                '<button class="btn btn--ghost btn--sm" style="margin-right:6px" onclick="downloadBackup(\'' + escHtml(b.filename) + '\')">Download</button>' +
+                '<button class="btn btn--danger btn--sm" onclick="deleteBackup(\'' + escHtml(b.filename) + '\')">Delete</button>' +
+            '</td>' +
+            '</tr>';
+    });
+    tbody.innerHTML = html;
+}
+
+async function downloadBackup(filename) {
+    try {
+        var resp = await authFetch(API + '/backups/download/' + encodeURIComponent(filename));
+        if (!resp.ok) {
+            showToast('Download failed', 'error');
+            return;
+        }
+        var blob = await resp.blob();
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    } catch (err) {
+        if (err.message !== 'Session expired') showToast('Download failed: ' + err.message, 'error');
+    }
+}
+
+async function createLocalBackup() {
+    var btn = document.getElementById('local-backup-btn');
+    btn.disabled = true;
+    btn.textContent = 'Creating backup...';
+
+    try {
+        var resp = await authFetch(API + '/backups/local', { method: 'POST' });
+        var result = await resp.json();
+        if (!resp.ok) {
+            showToast(result.detail || 'Backup failed', 'error');
+            return;
+        }
+        showToast('Backup created: ' + result.filename + ' (' + result.size_formatted + ')', 'ok');
+        // Refresh backup list
+        var data = await authFetch(API + '/backups').then(function(r) { return r.json(); });
+        populateBackups(data);
+    } catch (err) {
+        if (err.message !== 'Session expired') showToast('Backup failed: ' + err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Create Local Backup';
+    }
+}
+
+async function deleteBackup(filename) {
+    if (!confirm('Delete backup ' + filename + '?')) return;
+
+    try {
+        var resp = await authFetch(API + '/backups/' + encodeURIComponent(filename), { method: 'DELETE' });
+        var result = await resp.json();
+        if (!resp.ok) {
+            showToast(result.detail || 'Delete failed', 'error');
+            return;
+        }
+        showToast('Backup deleted', 'ok');
+        var data = await authFetch(API + '/backups').then(function(r) { return r.json(); });
+        populateBackups(data);
+    } catch (err) {
+        if (err.message !== 'Session expired') showToast('Delete failed: ' + err.message, 'error');
+    }
+}
+
+async function generateSSHKey() {
+    var btn = document.getElementById('ssh-keygen-btn');
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+
+    try {
+        var resp = await authFetch(API + '/backups/ssh-keygen', { method: 'POST' });
+        var result = await resp.json();
+        if (!resp.ok) {
+            showToast(result.detail || 'Key generation failed', 'error');
+            return;
+        }
+        document.getElementById('ssh-pubkey').value = result.public_key;
+        showToast(result.exists ? 'SSH key already exists' : 'SSH key generated', 'ok');
+    } catch (err) {
+        if (err.message !== 'Session expired') showToast('Key generation failed: ' + err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Generate Key';
+    }
+}
+
+async function testRemoteConnection() {
+    var host = document.getElementById('remote-host').value.trim();
+    var port = parseInt(document.getElementById('remote-port').value) || 22;
+    var btn = document.getElementById('test-conn-btn');
+
+    if (!host) {
+        showToast('Host is required', 'error');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Testing...';
+
+    try {
+        var resp = await authFetch(API + '/backups/remote/test', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ host: host, port: port })
+        });
+        var result = await resp.json();
+        if (!resp.ok) {
+            showToast(result.detail || 'Test failed', 'error');
+            return;
+        }
+        if (result.status === 'ok') {
+            showToast('Connection successful', 'ok');
+        } else {
+            showToast('Connection failed: ' + result.message, 'error');
+        }
+    } catch (err) {
+        if (err.message !== 'Session expired') showToast('Test failed: ' + err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Test Connection';
+    }
+}
+
+async function createRemoteBackup() {
+    var host = document.getElementById('remote-host').value.trim();
+    var port = parseInt(document.getElementById('remote-port').value) || 22;
+    var remotePath = document.getElementById('remote-path').value.trim();
+    var btn = document.getElementById('remote-backup-btn');
+
+    if (!host || !remotePath) {
+        showToast('Host and remote path are required', 'error');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Sending backup...';
+
+    try {
+        var resp = await authFetch(API + '/backups/remote', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ host: host, port: port, remote_path: remotePath })
+        });
+        var result = await resp.json();
+        if (!resp.ok) {
+            showToast(result.detail || 'Remote backup failed', 'error');
+            return;
+        }
+        showToast('Backup sent to ' + result.remote_host + ':' + result.remote_path + ' (' + result.size_formatted + ')', 'ok');
+        // Refresh backup list since a local copy was also created
+        var data = await authFetch(API + '/backups').then(function(r) { return r.json(); });
+        populateBackups(data);
+    } catch (err) {
+        if (err.message !== 'Session expired') showToast('Remote backup failed: ' + err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Send Backup';
+    }
+}
+
+// ===== Daily Backup Toggle =====
+
+function setDailyBackupToggle(enabled) {
+    var el = document.getElementById('daily-backup-toggle');
+    var statusEl = el.querySelector('.toggle__status');
+    if (enabled) {
+        el.classList.add('toggle--on');
+        statusEl.textContent = 'On';
+    } else {
+        el.classList.remove('toggle--on');
+        statusEl.textContent = 'Off';
+    }
+    el.dataset.enabled = enabled ? 'true' : 'false';
+}
+
+async function toggleDailyBackup() {
+    var el = document.getElementById('daily-backup-toggle');
+    var currentlyOn = el.dataset.enabled === 'true';
+    var newState = !currentlyOn;
+
+    // Optimistically update the UI
+    setDailyBackupToggle(newState);
+
+    try {
+        var resp = await authFetch(API + '/backups/schedule', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: newState })
+        });
+        var result = await resp.json();
+        if (!resp.ok) {
+            // Revert on failure
+            setDailyBackupToggle(currentlyOn);
+            showToast(result.detail || 'Failed to update schedule', 'error');
+            return;
+        }
+        showToast(newState ? 'Daily midnight backup enabled' : 'Daily midnight backup disabled', 'ok');
+    } catch (err) {
+        setDailyBackupToggle(currentlyOn);
+        if (err.message !== 'Session expired') showToast('Failed to update schedule: ' + err.message, 'error');
     }
 }
 

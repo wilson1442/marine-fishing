@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     admin_secret_key: str = secrets.token_hex(32)
     admin_token_expiry_hours: int = 24
 
+    # Backups
+    backup_dir: str = "/opt/marine-fishing/backups"
+    ssh_key_dir: str = "/opt/marine-fishing/.ssh"
+    backup_schedule_file: str = "/opt/marine-fishing/backups/.schedule.json"
+
     class Config:
         env_file = "/opt/marine-fishing/api/.env"
         env_file_encoding = "utf-8"

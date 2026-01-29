@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -6,8 +8,17 @@ import os
 
 from app.config import get_settings
 from app.api.routes import catches, species, weather, admin, explorer, gfw
+from app.scheduler import init_scheduler, shutdown_scheduler
 
 settings = get_settings()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_scheduler()
+    yield
+    shutdown_scheduler()
+
 
 app = FastAPI(
     title="Marine Fishing Intelligence Platform",
@@ -15,7 +26,8 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
-    openapi_url="/api/openapi.json"
+    openapi_url="/api/openapi.json",
+    lifespan=lifespan,
 )
 
 # CORS middleware
