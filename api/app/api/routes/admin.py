@@ -58,6 +58,34 @@ class ScheduledBackupUpdate(BaseModel):
     enabled: bool
 
 
+class RegistrationCreate(BaseModel):
+    first_name: str
+    last_name: str
+    email: str
+    password: str
+
+
+# ---------- Registered Users Table ----------
+
+def _ensure_registered_users_table(db: Session):
+    """Create the registered_users table if it doesn't exist."""
+    db.execute(text("""
+        CREATE TABLE IF NOT EXISTS registered_users (
+            id SERIAL PRIMARY KEY,
+            first_name VARCHAR(100) NOT NULL,
+            last_name VARCHAR(100) NOT NULL,
+            email VARCHAR(255) UNIQUE NOT NULL,
+            password_hash VARCHAR(128) NOT NULL,
+            salt VARCHAR(64) NOT NULL,
+            status VARCHAR(20) DEFAULT 'pending',
+            reviewed_by INTEGER REFERENCES admin_users(id),
+            reviewed_at TIMESTAMP,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+    """))
+    db.commit()
+
+
 # ---------- Auth Endpoints ----------
 
 @router.get("/setup-status")
@@ -976,3 +1004,167 @@ def create_remote_backup(req: RemoteBackupRequest, current_user: dict = Depends(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Remote backup failed: {str(e)}")
+
+
+# ---------- Public Registration ----------
+
+@router.post("/register")
+def register_user(reg: RegistrationCreate, db: Session = Depends(get_db)):
+    """Public endpoint: submit a registration request (pending admin approval)."""
+    _ensure_registered_users_table(db)
+
+    # Validate email format
+    if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', reg.email):
+        raise HTTPException(status_code=400, detail="Invalid email format")
+
+    # Validate required fields
+    if not reg.first_name.strip() or not reg.last_name.strip():
+        raise HTTPException(status_code=400, detail="First name and last name are required")
+    if len(reg.password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+
+    # Check duplicate email
+    existing = db.execute(
+        text("SELECT id FROM registered_users WHERE email = :email"),
+        {"email": reg.email.strip().lower()}
+    ).fetchone()
+    if existing:
+        raise HTTPException(status_code=409, detail="An account with this email already exists")
+
+    salt = secrets.token_hex(32)
+    password_hash = _hash_password(reg.password, salt)
+
+    result = db.execute(text("""
+        INSERT INTO registered_users (first_name, last_name, email, password_hash, salt, status)
+        VALUES (:first_name, :last_name, :email, :password_hash, :salt, 'pending')
+        RETURNING id
+    """), {
+        "first_name": reg.first_name.strip(),
+        "last_name": reg.last_name.strip(),
+        "email": reg.email.strip().lower(),
+        "password_hash": password_hash,
+        "salt": salt,
+    })
+    db.commit()
+    new_id = result.fetchone().id
+
+    return {"id": new_id, "message": "Registration submitted. Awaiting admin approval."}
+
+
+# ---------- Admin Registration Management ----------
+
+@router.get("/registrations")
+def list_registrations(
+    status: Optional[str] = Query(None, description="Filter by status: pending, approved, denied"),
+    current_user: dict = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    """List all registered users, optionally filtered by status."""
+    _ensure_registered_users_table(db)
+
+    query = """
+        SELECT r.id, r.first_name, r.last_name, r.email, r.status,
+               r.created_at, r.reviewed_at,
+               a.username as reviewed_by_username
+        FROM registered_users r
+        LEFT JOIN admin_users a ON r.reviewed_by = a.id
+    """
+    params = {}
+    if status and status in ("pending", "approved", "denied"):
+        query += " WHERE r.status = :status"
+        params["status"] = status
+    query += " ORDER BY r.created_at DESC"
+
+    rows = db.execute(text(query), params).fetchall()
+
+    registrations = []
+    for row in rows:
+        registrations.append({
+            "id": row.id,
+            "first_name": row.first_name,
+            "last_name": row.last_name,
+            "email": row.email,
+            "status": row.status,
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+            "reviewed_at": row.reviewed_at.isoformat() if row.reviewed_at else None,
+            "reviewed_by": row.reviewed_by_username,
+        })
+
+    return {"registrations": registrations, "total": len(registrations)}
+
+
+@router.put("/registrations/{reg_id}/approve")
+def approve_registration(reg_id: int, current_user: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
+    """Approve a pending registration."""
+    _ensure_registered_users_table(db)
+
+    row = db.execute(
+        text("SELECT id, status FROM registered_users WHERE id = :id"),
+        {"id": reg_id}
+    ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Registration not found")
+    if row.status != "pending":
+        raise HTTPException(status_code=400, detail=f"Registration is already {row.status}")
+
+    db.execute(text("""
+        UPDATE registered_users
+        SET status = 'approved', reviewed_by = :admin_id, reviewed_at = NOW()
+        WHERE id = :id
+    """), {"id": reg_id, "admin_id": current_user["user_id"]})
+    db.commit()
+
+    return {"id": reg_id, "status": "approved", "message": "Registration approved"}
+
+
+@router.put("/registrations/{reg_id}/deny")
+def deny_registration(reg_id: int, current_user: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
+    """Deny a pending registration."""
+    _ensure_registered_users_table(db)
+
+    row = db.execute(
+        text("SELECT id, status FROM registered_users WHERE id = :id"),
+        {"id": reg_id}
+    ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Registration not found")
+    if row.status != "pending":
+        raise HTTPException(status_code=400, detail=f"Registration is already {row.status}")
+
+    db.execute(text("""
+        UPDATE registered_users
+        SET status = 'denied', reviewed_by = :admin_id, reviewed_at = NOW()
+        WHERE id = :id
+    """), {"id": reg_id, "admin_id": current_user["user_id"]})
+    db.commit()
+
+    return {"id": reg_id, "status": "denied", "message": "Registration denied"}
+
+
+# ---------- Admin User Password Reset ----------
+
+@router.put("/users/{user_id}/reset-password")
+def reset_admin_password(user_id: int, current_user: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
+    """Reset an admin user's password. Generates a random password and returns it."""
+    row = db.execute(
+        text("SELECT id, username FROM admin_users WHERE id = :id"),
+        {"id": user_id}
+    ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    new_password = secrets.token_urlsafe(12)
+    salt = secrets.token_hex(32)
+    password_hash = _hash_password(new_password, salt)
+
+    db.execute(text("""
+        UPDATE admin_users SET password_hash = :hash, salt = :salt WHERE id = :id
+    """), {"hash": password_hash, "salt": salt, "id": user_id})
+    db.commit()
+
+    return {
+        "id": user_id,
+        "username": row.username,
+        "new_password": new_password,
+        "message": f"Password reset for '{row.username}'. Share the new password securely.",
+    }

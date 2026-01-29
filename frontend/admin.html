@@ -337,6 +337,18 @@ textarea.field__input{resize:vertical;min-height:60px}
 .toggle__status{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim)}
 .toggle--on .toggle__status{color:var(--green)}
 
+/* ===== REGISTRATION TABS ===== */
+.reg-tab.active{background:var(--cyan);color:var(--bg);border-color:var(--cyan)}
+.btn--approve{background:rgba(61,255,162,0.1);color:var(--green);border:1px solid rgba(61,255,162,0.2)}
+.btn--approve:hover{background:rgba(61,255,162,0.2)}
+.btn--deny{background:rgba(255,107,107,0.08);color:var(--red);border:1px solid rgba(255,107,107,0.2)}
+.btn--deny:hover{background:rgba(255,107,107,0.15)}
+.badge--pending{color:var(--amber);background:rgba(240,165,0,0.08);border:1px solid rgba(240,165,0,0.15)}
+.badge--approved{color:var(--green);background:rgba(61,255,162,0.08);border:1px solid rgba(61,255,162,0.15)}
+.badge--denied{color:var(--red);background:rgba(255,107,107,0.08);border:1px solid rgba(255,107,107,0.15)}
+.btn--reset{background:rgba(76,201,240,0.08);color:var(--cyan);border:1px solid rgba(76,201,240,0.2)}
+.btn--reset:hover{background:rgba(76,201,240,0.15)}
+
 /* ===== RESPONSIVE ===== */
 @media(max-width:1100px){
     .cards{grid-template-columns:repeat(3,1fr)}
@@ -611,6 +623,38 @@ textarea.field__input{resize:vertical;min-height:60px}
         </div>
     </section>
 
+    <!-- Registrations -->
+    <section class="section">
+        <div class="section__head">
+            <h2 class="section__title">Pending Registrations <span class="badge badge--run" id="reg-count-badge" style="display:none;margin-left:8px">0</span></h2>
+            <div class="section__actions">
+                <div class="reg-filter-tabs" style="display:flex;gap:4px">
+                    <button class="btn btn--sm btn--ghost reg-tab active" data-status="" onclick="filterRegistrations(this,'')">All</button>
+                    <button class="btn btn--sm btn--ghost reg-tab" data-status="pending" onclick="filterRegistrations(this,'pending')">Pending</button>
+                    <button class="btn btn--sm btn--ghost reg-tab" data-status="approved" onclick="filterRegistrations(this,'approved')">Approved</button>
+                    <button class="btn btn--sm btn--ghost reg-tab" data-status="denied" onclick="filterRegistrations(this,'denied')">Denied</button>
+                </div>
+            </div>
+        </div>
+        <div class="tbl-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Submitted</th>
+                        <th>Status</th>
+                        <th>Reviewed By</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="registrations-tbody">
+                    <tr><td colspan="6" class="empty">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
     <!-- Admin Users -->
     <section class="section">
         <div class="section__head">
@@ -626,6 +670,7 @@ textarea.field__input{resize:vertical;min-height:60px}
                         <th>Status</th>
                         <th>Last Login</th>
                         <th>Created</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody id="users-tbody">
@@ -930,7 +975,8 @@ async function loadAll() {
         authFetch(API + '/users').then(function(r) { return r.json(); }),
         authFetch(API + '/backups').then(function(r) { return r.json(); }),
         authFetch(API + '/backups/ssh-pubkey').then(function(r) { return r.ok ? r.json() : null; }),
-        authFetch(API + '/backups/schedule').then(function(r) { return r.ok ? r.json() : null; })
+        authFetch(API + '/backups/schedule').then(function(r) { return r.ok ? r.json() : null; }),
+        authFetch(API + '/registrations').then(function(r) { return r.json(); })
     ]);
 
     if (results[0].status === 'fulfilled') populateDashboard(results[0].value);
@@ -944,6 +990,7 @@ async function loadAll() {
     if (results[6].status === 'fulfilled' && results[6].value) {
         setDailyBackupToggle(results[6].value.daily_enabled);
     }
+    if (results[7].status === 'fulfilled') populateRegistrations(results[7].value);
 }
 
 // ===== Populate Functions =====
@@ -1045,7 +1092,7 @@ function populateSyncHistory(data) {
 function populateUsers(data) {
     var tbody = document.getElementById('users-tbody');
     if (!data.users || data.users.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="empty">No admin users created yet</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="empty">No admin users created yet</td></tr>';
         return;
     }
     var html = '';
@@ -1057,6 +1104,7 @@ function populateUsers(data) {
             '<td>' + (u.is_active ? '<span class="badge badge--active">Active</span>' : '<span class="badge badge--inactive">Inactive</span>') + '</td>' +
             '<td>' + (u.last_login ? formatDateTime(u.last_login) : '<span style="color:var(--text-dim)">Never</span>') + '</td>' +
             '<td>' + formatDate(u.created_at) + '</td>' +
+            '<td><button class="btn btn--sm btn--reset" onclick="resetUserPassword(' + u.id + ',\'' + escHtml(u.username) + '\')">Reset Password</button></td>' +
             '</tr>';
     });
     tbody.innerHTML = html;
@@ -1367,6 +1415,119 @@ async function toggleDailyBackup() {
     } catch (err) {
         setDailyBackupToggle(currentlyOn);
         if (err.message !== 'Session expired') showToast('Failed to update schedule: ' + err.message, 'error');
+    }
+}
+
+// ===== Registrations =====
+
+var currentRegFilter = '';
+
+function populateRegistrations(data) {
+    var tbody = document.getElementById('registrations-tbody');
+    var regs = data.registrations || [];
+
+    // Update pending count badge
+    var pendingCount = regs.filter(function(r) { return r.status === 'pending'; }).length;
+    var badge = document.getElementById('reg-count-badge');
+    if (pendingCount > 0) {
+        badge.textContent = pendingCount;
+        badge.style.display = '';
+    } else {
+        badge.style.display = 'none';
+    }
+
+    if (regs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty">No registrations found</td></tr>';
+        return;
+    }
+    var html = '';
+    regs.forEach(function(r) {
+        var statusClass = r.status === 'approved' ? 'approved' : r.status === 'denied' ? 'denied' : 'pending';
+        var actions = '';
+        if (r.status === 'pending') {
+            actions =
+                '<button class="btn btn--sm btn--approve" onclick="approveRegistration(' + r.id + ')">Approve</button> ' +
+                '<button class="btn btn--sm btn--deny" onclick="denyRegistration(' + r.id + ')">Deny</button>';
+        } else {
+            actions = '<span style="color:var(--text-dim);font-size:10px">—</span>';
+        }
+        html += '<tr>' +
+            '<td>' + escHtml(r.first_name + ' ' + r.last_name) + '</td>' +
+            '<td>' + escHtml(r.email) + '</td>' +
+            '<td style="white-space:nowrap">' + timeAgo(r.created_at) + '</td>' +
+            '<td><span class="badge badge--' + statusClass + '">' + escHtml(r.status) + '</span></td>' +
+            '<td>' + (r.reviewed_by ? escHtml(r.reviewed_by) : '<span style="color:var(--text-dim)">—</span>') + '</td>' +
+            '<td>' + actions + '</td>' +
+            '</tr>';
+    });
+    tbody.innerHTML = html;
+}
+
+function filterRegistrations(btn, status) {
+    document.querySelectorAll('.reg-tab').forEach(function(t) { t.classList.remove('active'); });
+    btn.classList.add('active');
+    currentRegFilter = status;
+    loadRegistrations(status);
+}
+
+async function loadRegistrations(status) {
+    try {
+        var url = API + '/registrations';
+        if (status) url += '?status=' + status;
+        var resp = await authFetch(url);
+        var data = await resp.json();
+        populateRegistrations(data);
+    } catch (err) {
+        if (err.message !== 'Session expired') showToast('Failed to load registrations', 'error');
+    }
+}
+
+async function approveRegistration(id) {
+    if (!confirm('Approve this registration?')) return;
+    try {
+        var resp = await authFetch(API + '/registrations/' + id + '/approve', { method: 'PUT' });
+        var data = await resp.json();
+        if (!resp.ok) {
+            showToast(data.detail || 'Approval failed', 'error');
+            return;
+        }
+        showToast('Registration approved', 'ok');
+        loadRegistrations(currentRegFilter);
+    } catch (err) {
+        if (err.message !== 'Session expired') showToast('Approval failed: ' + err.message, 'error');
+    }
+}
+
+async function denyRegistration(id) {
+    if (!confirm('Deny this registration?')) return;
+    try {
+        var resp = await authFetch(API + '/registrations/' + id + '/deny', { method: 'PUT' });
+        var data = await resp.json();
+        if (!resp.ok) {
+            showToast(data.detail || 'Denial failed', 'error');
+            return;
+        }
+        showToast('Registration denied', 'ok');
+        loadRegistrations(currentRegFilter);
+    } catch (err) {
+        if (err.message !== 'Session expired') showToast('Denial failed: ' + err.message, 'error');
+    }
+}
+
+// ===== Reset Password =====
+
+async function resetUserPassword(userId, username) {
+    if (!confirm('Reset password for "' + username + '"? A new random password will be generated.')) return;
+    try {
+        var resp = await authFetch(API + '/users/' + userId + '/reset-password', { method: 'PUT' });
+        var data = await resp.json();
+        if (!resp.ok) {
+            showToast(data.detail || 'Password reset failed', 'error');
+            return;
+        }
+        showToast('New password for ' + data.username + ': ' + data.new_password, 'ok');
+    } catch (err) {
+        if (err.message !== 'Session expired') showToast('Password reset failed: ' + err.message, 'error');
     }
 }
 

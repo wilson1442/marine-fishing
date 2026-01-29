@@ -78,6 +78,7 @@ body{
 .nav__links{display:flex;gap:32px;list-style:none}
 .nav__links a{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:400;letter-spacing:1.5px;text-transform:uppercase;color:#5a6a80;text-decoration:none;transition:color 0.3s}
 .nav__links a:hover{color:#4cc9f0}
+.nav-register:hover{box-shadow:0 0 20px rgba(76,201,240,0.35)}
 
 /* ===== LIVE STATS — TOP OF PAGE ===== */
 .stats{
@@ -296,6 +297,112 @@ body{
     .stat__value{font-size:20px}
     .nav__links{display:none}
 }
+
+/* ===== REGISTRATION MODAL ===== */
+.reg-overlay{
+    position:fixed;inset:0;z-index:1000;
+    display:none;align-items:center;justify-content:center;
+    background:rgba(3,8,16,0.85);
+    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    opacity:0;transition:opacity 0.3s ease;
+}
+.reg-overlay.open{display:flex;opacity:1}
+.reg-overlay.opening{display:flex}
+
+.reg-card{
+    width:100%;max-width:440px;
+    background:rgba(10,20,40,0.7);
+    border:1px solid rgba(76,201,240,0.12);
+    border-radius:12px;padding:40px 36px;
+    backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    box-shadow:0 0 60px rgba(76,201,240,0.06),0 20px 60px rgba(0,0,0,0.4);
+    transform:translateY(30px);opacity:0;
+    transition:transform 0.4s cubic-bezier(0.4,0,0.2,1),opacity 0.4s ease;
+    position:relative;
+}
+.reg-overlay.open .reg-card{transform:translateY(0);opacity:1}
+
+.reg-card__close{
+    position:absolute;top:16px;right:16px;
+    background:none;border:none;color:#5a6a80;cursor:pointer;
+    padding:4px;transition:color 0.2s;
+}
+.reg-card__close:hover{color:#4cc9f0}
+
+.reg-card__title{
+    font-family:'Instrument Serif',Georgia,serif;
+    font-size:28px;font-weight:400;color:#eaf0ff;
+    text-align:center;margin-bottom:4px;
+}
+.reg-card__sub{
+    font-family:'DM Sans',sans-serif;font-size:13px;font-weight:300;
+    color:#6a7f9a;text-align:center;margin-bottom:28px;
+}
+.reg-field{margin-bottom:16px}
+.reg-field__label{
+    display:block;font-family:'JetBrains Mono',monospace;
+    font-size:9px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;
+    color:#5a6a80;margin-bottom:5px;
+}
+.reg-field__input{
+    width:100%;font-family:'JetBrains Mono',monospace;font-size:12px;
+    background:rgba(255,255,255,0.03);color:#eaf0ff;
+    border:1px solid rgba(76,201,240,0.1);border-radius:6px;
+    padding:11px 14px;outline:none;transition:border-color 0.25s,box-shadow 0.25s;
+}
+.reg-field__input:focus{
+    border-color:rgba(76,201,240,0.4);
+    box-shadow:0 0 12px rgba(76,201,240,0.1);
+}
+.reg-field__input::placeholder{color:#3a4a60}
+.reg-field__input.error{border-color:rgba(255,107,107,0.5)}
+.reg-field__error{
+    font-family:'DM Sans',sans-serif;font-size:11px;color:#ff6b6b;
+    margin-top:4px;display:none;
+}
+.reg-field__error.show{display:block}
+
+.reg-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+
+.reg-btn{
+    width:100%;margin-top:8px;
+    font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;
+    letter-spacing:1px;text-transform:uppercase;
+    color:#060b18;background:linear-gradient(135deg,#4cc9f0 0%,#38b0d8 100%);
+    border:none;border-radius:6px;padding:14px;cursor:pointer;
+    transition:all 0.3s;position:relative;overflow:hidden;
+}
+.reg-btn:hover{box-shadow:0 0 30px rgba(76,201,240,0.3);transform:translateY(-1px)}
+.reg-btn:disabled{opacity:0.5;cursor:not-allowed;transform:none;box-shadow:none}
+
+.reg-error-msg{
+    font-family:'DM Sans',sans-serif;font-size:12px;color:#ff6b6b;
+    text-align:center;margin-top:14px;display:none;
+}
+.reg-error-msg.show{display:block}
+
+/* Success state */
+.reg-success{
+    display:none;text-align:center;padding:20px 0;
+}
+.reg-success.show{display:block}
+.reg-success__check{
+    width:64px;height:64px;margin:0 auto 20px;
+    border-radius:50%;background:rgba(61,255,162,0.1);
+    border:2px solid rgba(61,255,162,0.3);
+    display:flex;align-items:center;justify-content:center;
+    animation:check-pop 0.5s cubic-bezier(0.4,0,0.2,1);
+}
+.reg-success__check svg{color:#3dffa2}
+@keyframes check-pop{0%{transform:scale(0);opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
+.reg-success__title{
+    font-family:'Instrument Serif',Georgia,serif;
+    font-size:22px;color:#eaf0ff;margin-bottom:8px;
+}
+.reg-success__msg{
+    font-family:'DM Sans',sans-serif;font-size:13px;font-weight:300;
+    color:#6a7f9a;line-height:1.6;
+}
 </style>
 </head>
 <body>
@@ -336,11 +443,14 @@ body{
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 17c1.5-2 3-3 5-3s3.5 1 5 3 3 3 5 3 3.5-1 5-3"/><path d="M3 12c1.5-2 3-3 5-3s3.5 1 5 3 3 3 5 3 3.5-1 5-3"/></svg>
             MFI Platform
         </div>
-        <ul class="nav__links">
-            <li><a href="/map">Live Map</a></li>
-            <li><a href="/admin">Admin</a></li>
-            <li><a href="/api/docs">API</a></li>
-        </ul>
+        <div style="display:flex;align-items:center;gap:24px">
+            <ul class="nav__links">
+                <li><a href="/map">Live Map</a></li>
+                <li><a href="/admin">Admin</a></li>
+                <li><a href="/api/docs">API</a></li>
+            </ul>
+            <a href="#" class="nav-register" onclick="openRegisterModal(event)" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;text-decoration:none;color:#060b18;background:linear-gradient(135deg,#4cc9f0,#38b0d8);padding:7px 18px;border-radius:4px;font-weight:500;transition:all 0.3s">Register</a>
+        </div>
     </nav>
 
     <!-- Live Stats — Top -->
@@ -382,6 +492,7 @@ body{
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                 </a>
                 <a href="/api/docs" class="btn-api">API Docs</a>
+                <a href="#" class="btn-api" onclick="openRegisterModal(event)" style="border-bottom:1px solid rgba(76,201,240,0.3);color:rgba(76,201,240,0.7)">Register</a>
             </div>
         </div>
     </section>
@@ -541,6 +652,176 @@ function countUp(el, target, duration) {
         });
     } catch(e) { console.error(e); }
 })();
+</script>
+
+<!-- Registration Modal -->
+<div class="reg-overlay" id="reg-overlay">
+    <div class="reg-card">
+        <button class="reg-card__close" onclick="closeRegisterModal()" aria-label="Close">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+
+        <div id="reg-form-area">
+            <div class="reg-card__title">Create Account</div>
+            <div class="reg-card__sub">Register for access — admin approval required</div>
+
+            <div class="reg-row">
+                <div class="reg-field">
+                    <label class="reg-field__label">First Name</label>
+                    <input type="text" class="reg-field__input" id="reg-first" placeholder="Jane">
+                    <div class="reg-field__error" id="reg-first-err"></div>
+                </div>
+                <div class="reg-field">
+                    <label class="reg-field__label">Last Name</label>
+                    <input type="text" class="reg-field__input" id="reg-last" placeholder="Doe">
+                    <div class="reg-field__error" id="reg-last-err"></div>
+                </div>
+            </div>
+            <div class="reg-field">
+                <label class="reg-field__label">Email</label>
+                <input type="email" class="reg-field__input" id="reg-email" placeholder="jane@example.com">
+                <div class="reg-field__error" id="reg-email-err"></div>
+            </div>
+            <div class="reg-field">
+                <label class="reg-field__label">Password</label>
+                <input type="password" class="reg-field__input" id="reg-pass" placeholder="Min. 6 characters">
+                <div class="reg-field__error" id="reg-pass-err"></div>
+            </div>
+            <div class="reg-field">
+                <label class="reg-field__label">Confirm Password</label>
+                <input type="password" class="reg-field__input" id="reg-pass2" placeholder="Re-enter password">
+                <div class="reg-field__error" id="reg-pass2-err"></div>
+            </div>
+            <button class="reg-btn" id="reg-btn" onclick="submitRegistration()">Register</button>
+            <div class="reg-error-msg" id="reg-error-msg"></div>
+        </div>
+
+        <div class="reg-success" id="reg-success">
+            <div class="reg-success__check">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <div class="reg-success__title">Registration Submitted</div>
+            <div class="reg-success__msg">Your registration is pending admin approval.<br>You will be notified once your account is reviewed.</div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ===== Registration Modal =====
+function openRegisterModal(e) {
+    if (e) e.preventDefault();
+    var overlay = document.getElementById('reg-overlay');
+    overlay.classList.add('opening');
+    requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+            overlay.classList.add('open');
+            overlay.classList.remove('opening');
+        });
+    });
+}
+
+function closeRegisterModal() {
+    var overlay = document.getElementById('reg-overlay');
+    overlay.classList.remove('open');
+    setTimeout(function() {
+        // Reset form
+        document.getElementById('reg-form-area').style.display = '';
+        document.getElementById('reg-success').classList.remove('show');
+        ['reg-first','reg-last','reg-email','reg-pass','reg-pass2'].forEach(function(id) {
+            var el = document.getElementById(id);
+            el.value = '';
+            el.classList.remove('error');
+        });
+        ['reg-first-err','reg-last-err','reg-email-err','reg-pass-err','reg-pass2-err'].forEach(function(id) {
+            var el = document.getElementById(id);
+            el.textContent = '';
+            el.classList.remove('show');
+        });
+        document.getElementById('reg-error-msg').classList.remove('show');
+    }, 300);
+}
+
+// Close on overlay click (not card)
+document.getElementById('reg-overlay').addEventListener('click', function(e) {
+    if (e.target === this) closeRegisterModal();
+});
+
+// Close on Escape
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && document.getElementById('reg-overlay').classList.contains('open')) {
+        closeRegisterModal();
+    }
+});
+
+function clearRegErrors() {
+    ['reg-first','reg-last','reg-email','reg-pass','reg-pass2'].forEach(function(id) {
+        document.getElementById(id).classList.remove('error');
+    });
+    ['reg-first-err','reg-last-err','reg-email-err','reg-pass-err','reg-pass2-err'].forEach(function(id) {
+        var el = document.getElementById(id);
+        el.textContent = '';
+        el.classList.remove('show');
+    });
+    document.getElementById('reg-error-msg').classList.remove('show');
+}
+
+function setRegFieldError(fieldId, errId, msg) {
+    document.getElementById(fieldId).classList.add('error');
+    var errEl = document.getElementById(errId);
+    errEl.textContent = msg;
+    errEl.classList.add('show');
+}
+
+async function submitRegistration() {
+    clearRegErrors();
+    var first = document.getElementById('reg-first').value.trim();
+    var last = document.getElementById('reg-last').value.trim();
+    var email = document.getElementById('reg-email').value.trim();
+    var pass = document.getElementById('reg-pass').value;
+    var pass2 = document.getElementById('reg-pass2').value;
+    var btn = document.getElementById('reg-btn');
+    var valid = true;
+
+    if (!first) { setRegFieldError('reg-first','reg-first-err','Required'); valid = false; }
+    if (!last) { setRegFieldError('reg-last','reg-last-err','Required'); valid = false; }
+    if (!email) { setRegFieldError('reg-email','reg-email-err','Required'); valid = false; }
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setRegFieldError('reg-email','reg-email-err','Invalid email format'); valid = false; }
+    if (!pass) { setRegFieldError('reg-pass','reg-pass-err','Required'); valid = false; }
+    else if (pass.length < 6) { setRegFieldError('reg-pass','reg-pass-err','Min. 6 characters'); valid = false; }
+    if (pass !== pass2) { setRegFieldError('reg-pass2','reg-pass2-err','Passwords do not match'); valid = false; }
+
+    if (!valid) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Submitting...';
+
+    try {
+        var resp = await fetch('/api/v1/admin/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ first_name: first, last_name: last, email: email, password: pass })
+        });
+        var data = await resp.json();
+
+        if (!resp.ok) {
+            var errMsg = document.getElementById('reg-error-msg');
+            errMsg.textContent = data.detail || 'Registration failed';
+            errMsg.classList.add('show');
+            return;
+        }
+
+        // Show success state
+        document.getElementById('reg-form-area').style.display = 'none';
+        document.getElementById('reg-success').classList.add('show');
+    } catch (e) {
+        var errMsg = document.getElementById('reg-error-msg');
+        errMsg.textContent = 'Network error. Please try again.';
+        errMsg.classList.add('show');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Register';
+    }
+}
 </script>
 </body>
 </html>
