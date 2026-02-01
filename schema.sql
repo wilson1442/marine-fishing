@@ -66,7 +66,7 @@ CREATE TABLE vessels (
     length_meters DECIMAL(6,2),
     gross_tonnage INTEGER,
     gear_type VARCHAR(100),
-    source VARCHAR(50), -- 'gfw', 'marine_cadastre', 'user'
+    source VARCHAR(50), -- 'aisstream', 'marine_cadastre', 'user'
     last_position GEOMETRY(Point, 4326),
     last_seen TIMESTAMP,
     metadata JSONB,
@@ -127,7 +127,7 @@ CREATE INDEX idx_weather_buoy ON weather_observations(buoy_id);
 -- Main catch records table
 CREATE TABLE catches (
     id SERIAL PRIMARY KEY,
-    source VARCHAR(50) NOT NULL, -- 'gfw', 'noaa_commercial', 'noaa_mrip', 'user'
+    source VARCHAR(50) NOT NULL, -- 'aisstream', 'noaa_commercial', 'noaa_mrip', 'user'
     source_id VARCHAR(100),
 
     -- Species
@@ -176,7 +176,7 @@ CREATE INDEX idx_catches_species ON catches(species_id);
 CREATE INDEX idx_catches_source ON catches(source);
 CREATE INDEX idx_catches_source_id ON catches(source, source_id);
 
--- Fishing effort/activity grid (from GFW)
+-- Fishing effort/activity grid
 CREATE TABLE fishing_effort (
     id SERIAL PRIMARY KEY,
     cell_id VARCHAR(50),
@@ -188,12 +188,57 @@ CREATE TABLE fishing_effort (
     vessel_count INTEGER,
     gear_type VARCHAR(50),
     flag_country VARCHAR(3),
-    source VARCHAR(50) DEFAULT 'gfw',
+    source VARCHAR(50) DEFAULT 'aisstream',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_effort_location ON fishing_effort USING GIST(location);
 CREATE INDEX idx_effort_date ON fishing_effort(date);
+
+-- ============================================
+-- AIS VESSEL TRACKING TABLES
+-- ============================================
+
+-- Track vessel position history
+CREATE TABLE vessel_positions (
+    id BIGSERIAL PRIMARY KEY,
+    mmsi VARCHAR(20) NOT NULL,
+    location GEOMETRY(POINT, 4326) NOT NULL,
+    speed_knots NUMERIC(5,1),
+    course NUMERIC(5,1),
+    heading NUMERIC(5,1),
+    nav_status INTEGER,
+    received_at TIMESTAMPTZ DEFAULT NOW(),
+    FOREIGN KEY (mmsi) REFERENCES vessels(mmsi)
+);
+CREATE INDEX idx_vessel_positions_mmsi ON vessel_positions(mmsi);
+CREATE INDEX idx_vessel_positions_time ON vessel_positions(received_at);
+CREATE INDEX idx_vessel_positions_location ON vessel_positions USING GIST(location);
+
+-- Detected fishing activity from AIS behavior analysis
+CREATE TABLE detected_fishing_events (
+    id BIGSERIAL PRIMARY KEY,
+    mmsi VARCHAR(20) NOT NULL,
+    start_time TIMESTAMPTZ NOT NULL,
+    end_time TIMESTAMPTZ,
+    location GEOMETRY(POINT, 4326),
+    avg_speed_knots NUMERIC(5,1),
+    duration_hours NUMERIC(8,2),
+    detection_method VARCHAR(50) DEFAULT 'speed_pattern',
+    FOREIGN KEY (mmsi) REFERENCES vessels(mmsi)
+);
+
+-- Detected loitering from AIS behavior analysis
+CREATE TABLE detected_loitering_events (
+    id BIGSERIAL PRIMARY KEY,
+    mmsi VARCHAR(20) NOT NULL,
+    start_time TIMESTAMPTZ NOT NULL,
+    end_time TIMESTAMPTZ,
+    location GEOMETRY(POINT, 4326),
+    avg_speed_knots NUMERIC(5,1),
+    duration_hours NUMERIC(8,2),
+    FOREIGN KEY (mmsi) REFERENCES vessels(mmsi)
+);
 
 -- ============================================
 -- BUOY STATIONS (for weather reference)

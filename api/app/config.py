@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
 
     # API Keys
-    gfw_api_key: str = ""
+    aisstream_api_key: str = ""
 
     # App config
     api_host: str = "0.0.0.0"

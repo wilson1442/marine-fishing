@@ -3,6 +3,7 @@ Base Harvester Class
 Common functionality for all data harvesters
 """
 
+import io
 import logging
 from datetime import datetime
 from typing import Dict, Optional
@@ -19,6 +20,28 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+
+
+class LogCaptureHandler(logging.Handler):
+    """Captures log messages into a StringIO buffer for database storage."""
+
+    def __init__(self):
+        super().__init__()
+        self.buffer = io.StringIO()
+        self.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
+
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            self.buffer.write(msg + '\n')
+        except Exception:
+            self.handleError(record)
+
+    def get_logs(self) -> str:
+        return self.buffer.getvalue()
+
+    def clear(self):
+        self.buffer = io.StringIO()
 
 
 class BaseHarvester(ABC):
@@ -76,8 +99,9 @@ class BaseHarvester(ABC):
         self.logger.info(f"Started sync log #{self.sync_log_id}")
         return self.sync_log_id
 
-    def complete_sync_log(self, stats: Dict, status: str = 'completed', error_message: str = None):
-        """Update sync log with completion status"""
+    def complete_sync_log(self, stats: Dict, status: str = 'completed',
+                          error_message: str = None, log_messages: str = None):
+        """Update sync log with completion status and captured log messages"""
         if not self.sync_log_id:
             return
 
@@ -91,7 +115,8 @@ class BaseHarvester(ABC):
                     records_updated = %s,
                     records_skipped = %s,
                     status = %s,
-                    error_message = %s
+                    error_message = %s,
+                    log_messages = %s
                 WHERE id = %s
             """, (
                 stats.get('processed', 0),
@@ -100,6 +125,7 @@ class BaseHarvester(ABC):
                 stats.get('skipped', 0),
                 status,
                 error_message,
+                log_messages,
                 self.sync_log_id
             ))
             self.conn.commit()
@@ -127,20 +153,27 @@ class BaseHarvester(ABC):
 
     def run(self, **kwargs) -> Dict:
         """Main entry point for running the harvester"""
-        self.logger.info(f"Starting {self.source_name} harvester")
         stats = {'processed': 0, 'inserted': 0, 'updated': 0, 'skipped': 0}
 
+        # Attach log capture handler for this sync run
+        capture_handler = LogCaptureHandler()
+        self.logger.addHandler(capture_handler)
+
         try:
+            self.logger.info(f"Starting {self.source_name} harvester")
             self.connect_db()
             self.start_sync_log(kwargs.get('sync_type', 'incremental'))
             stats = self.sync(**kwargs)
-            self.complete_sync_log(stats, 'completed')
             self.logger.info(f"Sync completed: {stats}")
+            self.complete_sync_log(stats, 'completed',
+                                   log_messages=capture_handler.get_logs())
         except Exception as e:
             self.logger.error(f"Sync failed: {e}")
-            self.complete_sync_log(stats, 'failed', str(e))
+            self.complete_sync_log(stats, 'failed', str(e),
+                                   log_messages=capture_handler.get_logs())
             raise
         finally:
+            self.logger.removeHandler(capture_handler)
             self.close_db()
 
         return stats

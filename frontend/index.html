@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="/css/vendor/MarkerCluster.css" />
     <link rel="stylesheet" href="/css/vendor/MarkerCluster.Default.css" />
 
-    <link rel="stylesheet" href="/css/style.css?v=6" />
+    <link rel="stylesheet" href="/css/style.css?v=8" />
 </head>
 <body>
     <div class="scanline-overlay"></div>
@@ -97,73 +97,30 @@
                     </div>
                 </div>
 
-                <!-- GFW Data Layers -->
+                <!-- AIS Vessel Stats -->
                 <div class="gfw-panel">
                     <div class="gfw-panel__header">
-                        <span class="gfw-panel__badge" id="gfw-source-badge">GFW</span>
-                        <span class="gfw-panel__title">Global Fishing Watch</span>
-                    </div>
-                    <div class="gfw-panel__layers">
-                        <label class="gfw-layer">
-                            <input type="checkbox" class="gfw-layer-toggle" data-layer="fishing_events" />
-                            <span class="gfw-layer__swatch" style="background:#ff6b35"></span>
-                            <span class="gfw-layer__name">Fishing Events</span>
-                            <span class="gfw-layer__count" id="gfw-count-fishing_events"></span>
-                        </label>
-                        <label class="gfw-layer">
-                            <input type="checkbox" class="gfw-layer-toggle" data-layer="loitering" />
-                            <span class="gfw-layer__swatch" style="background:#ffd166"></span>
-                            <span class="gfw-layer__name">Loitering</span>
-                            <span class="gfw-layer__count" id="gfw-count-loitering"></span>
-                        </label>
-                        <label class="gfw-layer">
-                            <input type="checkbox" class="gfw-layer-toggle" data-layer="sar_detections" />
-                            <span class="gfw-layer__swatch" style="background:#ef476f"></span>
-                            <span class="gfw-layer__name">SAR Detections</span>
-                            <span class="gfw-layer__count" id="gfw-count-sar_detections"></span>
-                        </label>
-                        <label class="gfw-layer">
-                            <input type="checkbox" class="gfw-layer-toggle" data-layer="infrastructure" />
-                            <span class="gfw-layer__swatch" style="background:#06d6a0"></span>
-                            <span class="gfw-layer__name">Infrastructure</span>
-                            <span class="gfw-layer__count" id="gfw-count-infrastructure"></span>
-                        </label>
-                        <label class="gfw-layer">
-                            <input type="checkbox" class="gfw-layer-toggle" data-layer="ais_presence" />
-                            <span class="gfw-layer__swatch" style="background:#118ab2"></span>
-                            <span class="gfw-layer__name">AIS Presence</span>
-                            <span class="gfw-layer__count" id="gfw-count-ais_presence"></span>
-                        </label>
-                        <label class="gfw-layer">
-                            <input type="checkbox" class="gfw-layer-toggle" data-layer="effort_heatmap" />
-                            <span class="gfw-layer__swatch" style="background:#ff9f1c"></span>
-                            <span class="gfw-layer__name">Effort Heatmap</span>
-                            <span class="gfw-layer__count" id="gfw-count-effort_heatmap"></span>
-                        </label>
+                        <span class="gfw-panel__badge" id="ais-source-badge">AIS</span>
+                        <span class="gfw-panel__title">Vessel Stats</span>
                     </div>
                     <div class="gfw-panel__stats">
                         <div class="gfw-stat">
-                            <span class="gfw-stat__val" id="gfw-fishing-events-total">0</span>
-                            <span class="gfw-stat__label">Events</span>
+                            <span class="gfw-stat__val" id="ais-live-vessels-total">0</span>
+                            <span class="gfw-stat__label">Live</span>
                         </div>
                         <div class="gfw-stat">
-                            <span class="gfw-stat__val" id="gfw-vessels-total">0</span>
+                            <span class="gfw-stat__val" id="ais-vessels-total">0</span>
                             <span class="gfw-stat__label">Vessels</span>
                         </div>
                         <div class="gfw-stat">
-                            <span class="gfw-stat__val" id="gfw-fishing-hours">0</span>
+                            <span class="gfw-stat__val" id="ais-fishing-hours">0</span>
                             <span class="gfw-stat__label">Fish Hrs</span>
                         </div>
                         <div class="gfw-stat">
-                            <span class="gfw-stat__val" id="gfw-effort-total">0</span>
+                            <span class="gfw-stat__val" id="ais-effort-total">0</span>
                             <span class="gfw-stat__label">Effort</span>
                         </div>
                     </div>
-                    <!-- Hidden stats for JS to write to -->
-                    <span id="gfw-loitering-total" style="display:none"></span>
-                    <span id="gfw-sar-total" style="display:none"></span>
-                    <span id="gfw-infra-total" style="display:none"></span>
-                    <span id="gfw-presence-total" style="display:none"></span>
                 </div>
             </div>
         </aside>
@@ -203,6 +160,43 @@
                 <div class="map-loading" id="map-loading">
                     <div class="map-loading__spinner"></div>
                     <span>Loading catches&hellip;</span>
+                </div>
+                <!-- Map layer toggles overlay (top-left) -->
+                <div class="map-layer-toggles" id="map-layer-toggles">
+                    <div class="map-layer-toggles__header">
+                        <span class="map-layer-toggles__badge" id="ais-source-badge-map">AIS</span>
+                        <span class="map-layer-toggles__title">Live Layers</span>
+                    </div>
+                    <label class="map-layer-toggle">
+                        <input type="checkbox" class="gfw-layer-toggle" data-layer="live_vessels" />
+                        <span class="map-layer-toggle__swatch" style="background:#ff6b35"></span>
+                        <span class="map-layer-toggle__name">Live Vessels</span>
+                        <span class="map-layer-toggle__count" id="gfw-count-live_vessels"></span>
+                    </label>
+                    <label class="map-layer-toggle">
+                        <input type="checkbox" class="gfw-layer-toggle" data-layer="fishing_activity" />
+                        <span class="map-layer-toggle__swatch" style="background:#ff6b35"></span>
+                        <span class="map-layer-toggle__name">Fishing Activity</span>
+                        <span class="map-layer-toggle__count" id="gfw-count-fishing_activity"></span>
+                    </label>
+                    <label class="map-layer-toggle">
+                        <input type="checkbox" class="gfw-layer-toggle" data-layer="loitering" />
+                        <span class="map-layer-toggle__swatch" style="background:#ffd166"></span>
+                        <span class="map-layer-toggle__name">Loitering</span>
+                        <span class="map-layer-toggle__count" id="gfw-count-loitering"></span>
+                    </label>
+                    <label class="map-layer-toggle">
+                        <input type="checkbox" class="gfw-layer-toggle" data-layer="ais_presence" />
+                        <span class="map-layer-toggle__swatch" style="background:#118ab2"></span>
+                        <span class="map-layer-toggle__name">AIS Presence</span>
+                        <span class="map-layer-toggle__count" id="gfw-count-ais_presence"></span>
+                    </label>
+                    <label class="map-layer-toggle">
+                        <input type="checkbox" class="gfw-layer-toggle" data-layer="effort_heatmap" />
+                        <span class="map-layer-toggle__swatch" style="background:#ff9f1c"></span>
+                        <span class="map-layer-toggle__name">Effort Heatmap</span>
+                        <span class="map-layer-toggle__count" id="gfw-count-effort_heatmap"></span>
+                    </label>
                 </div>
                 <!-- Species legend overlay at bottom of map -->
                 <div class="species-overlay" id="species-overlay">
@@ -281,7 +275,7 @@
 
     <script src="/js/vendor/leaflet.js"></script>
     <script src="/js/vendor/leaflet.markercluster.js"></script>
-    <script src="/js/config.js?v=6"></script>
-    <script src="/js/app.js?v=6"></script>
+    <script src="/js/config.js?v=8"></script>
+    <script src="/js/app.js?v=8"></script>
 </body>
 </html>

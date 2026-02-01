@@ -216,6 +216,17 @@ def get_dashboard(current_user: dict = Depends(get_current_admin), db: Session =
 def get_data_sources(current_user: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
     """List all data sources with their last sync status."""
 
+    # Auto-cleanup stale 'running' entries older than 1 hour
+    db.execute(text("""
+        UPDATE data_sync_log
+        SET status = 'failed',
+            completed_at = NOW(),
+            error_message = 'Process terminated unexpectedly (stale running entry)'
+        WHERE status = 'running'
+          AND started_at < NOW() - INTERVAL '1 hour'
+    """))
+    db.commit()
+
     query = """
         SELECT
             ds.*,
@@ -359,7 +370,7 @@ def get_sync_history(
         SELECT id, source, sync_type, started_at, completed_at,
                date_range_start, date_range_end,
                records_processed, records_inserted, records_updated, records_skipped,
-               status, error_message
+               status, error_message, log_messages
         FROM data_sync_log
     """
     params = {"limit": limit}
@@ -387,10 +398,39 @@ def get_sync_history(
             "records_updated": row.records_updated,
             "records_skipped": row.records_skipped,
             "status": row.status,
-            "error_message": row.error_message
+            "error_message": row.error_message,
+            "has_logs": bool(row.log_messages),
         })
 
     return {"entries": entries, "total": len(entries)}
+
+
+@router.get("/sync-history/{sync_id}/logs")
+def get_sync_logs(
+    sync_id: int,
+    current_user: dict = Depends(get_current_admin),
+    db: Session = Depends(get_db)
+):
+    """Get the captured log messages for a specific sync run."""
+
+    row = db.execute(text("""
+        SELECT id, source, status, started_at, completed_at,
+               error_message, log_messages
+        FROM data_sync_log WHERE id = :id
+    """), {"id": sync_id}).fetchone()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Sync entry not found")
+
+    return {
+        "id": row.id,
+        "source": row.source,
+        "status": row.status,
+        "started_at": row.started_at.isoformat() if row.started_at else None,
+        "completed_at": row.completed_at.isoformat() if row.completed_at else None,
+        "error_message": row.error_message,
+        "log_messages": row.log_messages or "No log messages captured for this sync run.",
+    }
 
 
 # ---------- Admin Users ----------

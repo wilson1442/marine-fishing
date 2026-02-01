@@ -349,6 +349,49 @@ textarea.field__input{resize:vertical;min-height:60px}
 .btn--reset{background:rgba(76,201,240,0.08);color:var(--cyan);border:1px solid rgba(76,201,240,0.2)}
 .btn--reset:hover{background:rgba(76,201,240,0.15)}
 
+/* ===== LOG MODAL ===== */
+.log-modal-overlay{
+    display:none;position:fixed;inset:0;z-index:300;
+    background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);
+    align-items:center;justify-content:center;
+}
+.log-modal-overlay.visible{display:flex}
+.log-modal{
+    width:90%;max-width:800px;max-height:80vh;
+    background:var(--bg);border:1px solid var(--border-strong);border-radius:8px;
+    display:flex;flex-direction:column;overflow:hidden;
+}
+.log-modal__head{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 20px;border-bottom:1px solid var(--border);
+}
+.log-modal__title{
+    font-family:var(--font-head);font-size:13px;font-weight:600;
+    color:var(--text-bright);display:flex;align-items:center;gap:8px;
+}
+.log-modal__close{
+    font-family:var(--font-mono);font-size:10px;font-weight:500;
+    letter-spacing:1px;text-transform:uppercase;
+    color:var(--text-dim);background:none;border:1px solid var(--border);
+    border-radius:3px;padding:4px 10px;cursor:pointer;transition:all 0.2s;
+}
+.log-modal__close:hover{color:var(--text);border-color:var(--border-strong)}
+.log-modal__meta{
+    padding:10px 20px;border-bottom:1px solid var(--border);
+    font-size:10px;color:var(--text-dim);display:flex;gap:20px;flex-wrap:wrap;
+}
+.log-modal__meta span{display:flex;align-items:center;gap:4px}
+.log-modal__body{
+    flex:1;overflow-y:auto;padding:16px 20px;
+}
+.log-modal__content{
+    font-family:var(--font-mono);font-size:11px;line-height:1.7;
+    white-space:pre-wrap;word-break:break-all;color:var(--text);
+}
+.log-modal__content .log-line--error{color:var(--red)}
+.log-modal__content .log-line--warn{color:var(--amber)}
+.log-modal__content .log-line--info{color:var(--text)}
+
 /* ===== RESPONSIVE ===== */
 @media(max-width:1100px){
     .cards{grid-template-columns:repeat(3,1fr)}
@@ -545,10 +588,11 @@ textarea.field__input{resize:vertical;min-height:60px}
                         <th>Processed</th>
                         <th>Inserted</th>
                         <th>Error</th>
+                        <th>Logs</th>
                     </tr>
                 </thead>
                 <tbody id="sync-tbody">
-                    <tr><td colspan="9" class="empty">Loading...</td></tr>
+                    <tr><td colspan="10" class="empty">Loading...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -654,6 +698,20 @@ textarea.field__input{resize:vertical;min-height:60px}
             </table>
         </div>
     </section>
+
+    <!-- Log Modal -->
+    <div class="log-modal-overlay" id="log-modal-overlay" onclick="closeLogModal(event)">
+        <div class="log-modal">
+            <div class="log-modal__head">
+                <div class="log-modal__title" id="log-modal-title">Sync Logs</div>
+                <button class="log-modal__close" onclick="closeLogModal()">Close</button>
+            </div>
+            <div class="log-modal__meta" id="log-modal-meta"></div>
+            <div class="log-modal__body">
+                <div class="log-modal__content" id="log-modal-content">Loading...</div>
+            </div>
+        </div>
+    </div>
 
     <!-- Admin Users -->
     <section class="section">
@@ -1025,7 +1083,7 @@ function populateDashboard(data) {
             var card = document.createElement('div');
             card.className = 'source-card';
             var nameMap = {
-                'gfw': 'Global Fishing Watch',
+                'aisstream': 'AIS Stream',
                 'noaa_commercial': 'NOAA Commercial',
                 'noaa_mrip': 'NOAA MRIP',
                 'synthetic': 'Synthetic'
@@ -1069,11 +1127,14 @@ function populateSources(data) {
 function populateSyncHistory(data) {
     var tbody = document.getElementById('sync-tbody');
     if (!data.entries || data.entries.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="empty">No sync history available</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="empty">No sync history available</td></tr>';
         return;
     }
     var html = '';
     data.entries.forEach(function(e) {
+        var logsBtn = e.has_logs
+            ? '<button class="btn btn--ghost btn--sm" onclick="viewSyncLogs(' + e.id + ')">View</button>'
+            : '<span style="color:var(--text-dim);font-size:10px">—</span>';
         html += '<tr>' +
             '<td>' + escHtml(e.source) + '</td>' +
             '<td>' + escHtml(e.sync_type || '—') + '</td>' +
@@ -1084,6 +1145,7 @@ function populateSyncHistory(data) {
             '<td>' + (e.records_processed != null ? e.records_processed.toLocaleString() : '—') + '</td>' +
             '<td>' + (e.records_inserted != null ? e.records_inserted.toLocaleString() : '—') + '</td>' +
             '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--red)">' + escHtml(e.error_message || '') + '</td>' +
+            '<td>' + logsBtn + '</td>' +
             '</tr>';
     });
     tbody.innerHTML = html;
@@ -1513,6 +1575,61 @@ async function denyRegistration(id) {
         if (err.message !== 'Session expired') showToast('Denial failed: ' + err.message, 'error');
     }
 }
+
+// ===== Sync Log Viewer =====
+
+async function viewSyncLogs(syncId) {
+    var overlay = document.getElementById('log-modal-overlay');
+    var titleEl = document.getElementById('log-modal-title');
+    var metaEl = document.getElementById('log-modal-meta');
+    var contentEl = document.getElementById('log-modal-content');
+
+    titleEl.textContent = 'Sync Logs';
+    metaEl.innerHTML = '';
+    contentEl.textContent = 'Loading...';
+    overlay.classList.add('visible');
+
+    try {
+        var resp = await authFetch(API + '/sync-history/' + syncId + '/logs');
+        if (!resp.ok) {
+            contentEl.textContent = 'Failed to load logs.';
+            return;
+        }
+        var data = await resp.json();
+
+        titleEl.textContent = 'Sync Logs — ' + (data.source || 'unknown').toUpperCase();
+        metaEl.innerHTML =
+            '<span>' + statusBadge(data.status) + '</span>' +
+            '<span>Started: ' + formatDateTime(data.started_at) + '</span>' +
+            '<span>Completed: ' + formatDateTime(data.completed_at) + '</span>' +
+            (data.error_message ? '<span style="color:var(--red)">Error: ' + escHtml(data.error_message) + '</span>' : '');
+
+        // Colorize log lines
+        var lines = (data.log_messages || '').split('\n');
+        var html = '';
+        lines.forEach(function(line) {
+            if (!line.trim()) return;
+            var cls = 'log-line--info';
+            if (/\[ERROR\]/.test(line)) cls = 'log-line--error';
+            else if (/\[WARNING\]/.test(line)) cls = 'log-line--warn';
+            html += '<span class="' + cls + '">' + escHtml(line) + '</span>\n';
+        });
+        contentEl.innerHTML = html || '<span style="color:var(--text-dim)">No log messages captured for this sync run.</span>';
+
+    } catch (err) {
+        if (err.message !== 'Session expired') contentEl.textContent = 'Error loading logs: ' + err.message;
+    }
+}
+
+function closeLogModal(event) {
+    if (event && event.target !== event.currentTarget) return;
+    document.getElementById('log-modal-overlay').classList.remove('visible');
+}
+
+// Close modal on Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeLogModal();
+});
 
 // ===== Reset Password =====
 

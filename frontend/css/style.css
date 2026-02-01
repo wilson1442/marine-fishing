@@ -800,6 +800,174 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     border-bottom: 1px solid var(--steel);
 }
 
+.catch-popup__disclaimer {
+    font-size: 9px;
+    color: #888;
+    font-style: italic;
+    margin-top: 6px;
+    padding-top: 4px;
+    border-top: 1px solid var(--steel);
+    line-height: 1.3;
+}
+
+/* ---- Map Layer Toggles Overlay (top-left) ---- */
+.map-layer-toggles {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 800;
+    background: rgba(11, 14, 26, 0.92);
+    border: 1px solid var(--steel);
+    border-radius: var(--radius);
+    padding: 0;
+    min-width: 180px;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.5);
+}
+.map-layer-toggles__header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--steel);
+}
+.map-layer-toggles__badge {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: var(--steel);
+    color: var(--text-dim);
+    transition: all 0.3s ease;
+}
+.map-layer-toggles__badge.active {
+    background: #118ab2;
+    color: #fff;
+    box-shadow: 0 0 8px rgba(17, 138, 178, 0.4);
+}
+.map-layer-toggles__title {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+}
+.map-layer-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 10px;
+    cursor: pointer;
+    transition: background var(--transition);
+}
+.map-layer-toggle:last-child {
+    padding-bottom: 8px;
+}
+.map-layer-toggle:first-of-type {
+    padding-top: 8px;
+}
+.map-layer-toggle:hover {
+    background: var(--steel);
+}
+.map-layer-toggle input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--rivet);
+    border-radius: 3px;
+    background: var(--abyss);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all var(--transition);
+    position: relative;
+}
+.map-layer-toggle input[type="checkbox"]:checked {
+    background: var(--cyan);
+    border-color: var(--cyan);
+}
+.map-layer-toggle input[type="checkbox"]:checked::after {
+    content: '';
+    position: absolute;
+    left: 2px; top: 0;
+    width: 5px; height: 8px;
+    border: solid var(--abyss);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+.map-layer-toggle__swatch {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 4px currentColor;
+}
+.map-layer-toggle__name {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text);
+    flex: 1;
+}
+.map-layer-toggle__count {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--cyan);
+    font-weight: 600;
+    min-width: 20px;
+    text-align: right;
+}
+
+/* ---- Vessel-shaped map markers ---- */
+.vessel-icon {
+    background: none !important;
+    border: none !important;
+}
+.vessel-icon__wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: transform 0.3s ease;
+}
+.vessel-icon__heading {
+    width: 2px;
+    height: 10px;
+    background: rgba(255,255,255,0.6);
+    margin-top: -2px;
+    border-radius: 1px;
+}
+
+/* ---- Buoy marker (SVG buoy shape) ---- */
+.buoy-marker__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+    transition: transform 0.2s ease;
+}
+.buoy-marker__icon:hover {
+    transform: scale(1.15);
+}
+
+/* ---- Buoy ID in popup ---- */
+.catch-popup__buoy-id {
+    font-family: var(--font-mono);
+    font-size: 16px;
+    font-weight: 700;
+    color: #ffd700;
+    text-align: center;
+    margin: 4px 0 8px;
+    padding: 4px 8px;
+    background: rgba(255, 215, 0, 0.1);
+    border: 1px solid rgba(255, 215, 0, 0.3);
+    border-radius: 4px;
+    letter-spacing: 1px;
+}
+
 /* ---- Scrollbar ---- */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--abyss); }
@@ -829,6 +997,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
     .species-overlay { gap: 8px; padding: 6px 10px; }
     .legend-code { display: none; }
+    .map-layer-toggles { min-width: 160px; }
 
     .topbar__toggle { display: block; }
     .topbar__stats { display: none; }

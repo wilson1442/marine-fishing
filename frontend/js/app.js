@@ -6,25 +6,26 @@ let buoysLayer;
 let speciesData = [];
 let mapReady = false;
 
-// GFW layer groups
-let gfwLayers = {
-    fishing_events: null,
+// Vessel layer groups
+let vesselLayers = {
+    live_vessels: null,
+    fishing_activity: null,
     loitering: null,
-    sar_detections: null,
-    infrastructure: null,
     ais_presence: null,
     effort_heatmap: null,
 };
 
-// Track which GFW layers are active
-let gfwLayerState = {
-    fishing_events: false,
+// Track which vessel layers are active
+let vesselLayerState = {
+    live_vessels: false,
+    fishing_activity: false,
     loitering: false,
-    sar_detections: false,
-    infrastructure: false,
     ais_presence: false,
     effort_heatmap: false,
 };
+
+// Auto-refresh interval for live vessels
+let liveRefreshInterval = null;
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', async function () {
@@ -43,7 +44,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     initFilters();
     initPanelToggles();
-    initGfwLayerToggles();
+    initVesselLayerToggles();
 
     // Run data fetches in parallel, don't let one block another
     await Promise.allSettled([
@@ -51,7 +52,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         loadCatches(),
         loadCurrentWeather(),
         loadBuoyStations(),
-        loadGfwSummary(),
+        loadVesselSummary(),
     ]);
 
     clearTimeout(loadingTimeout);
@@ -116,9 +117,9 @@ function initMap() {
     buoysLayer = L.layerGroup();
     map.addLayer(buoysLayer);
 
-    // Initialize GFW layer groups
-    Object.keys(gfwLayers).forEach(function (key) {
-        gfwLayers[key] = L.layerGroup();
+    // Initialize vessel layer groups
+    Object.keys(vesselLayers).forEach(function (key) {
+        vesselLayers[key] = L.layerGroup();
     });
 }
 
@@ -171,14 +172,25 @@ async function loadBuoyStations() {
             if (mapReady && buoysLayer && station.latitude && station.longitude) {
                 var icon = L.divIcon({
                     className: 'buoy-marker',
-                    html: '<div class="buoy-marker__pin"><span>' + station.station_id + '</span></div>',
-                    iconSize: [48, 24],
-                    iconAnchor: [24, 12]
+                    html: '<div class="buoy-marker__icon">' +
+                        '<svg viewBox="0 0 32 48" width="24" height="36">' +
+                        '<line x1="16" y1="6" x2="16" y2="0" stroke="#ff6b6b" stroke-width="1.5"/>' +
+                        '<circle cx="16" cy="4" r="2" fill="#ff6b6b"/>' +
+                        '<ellipse cx="16" cy="12" rx="6" ry="6" fill="#ffd700" stroke="#e6c200" stroke-width="1"/>' +
+                        '<rect x="12" y="10" width="8" height="4" rx="1" fill="#f0c000" stroke="#d4a800" stroke-width="0.5"/>' +
+                        '<path d="M10 18 Q10 24 8 30 Q8 32 16 32 Q24 32 24 30 Q22 24 22 18 Z" fill="#ffe033" stroke="#e6c200" stroke-width="1"/>' +
+                        '<ellipse cx="16" cy="32" rx="9" ry="3" fill="rgba(255,224,51,0.3)" stroke="none"/>' +
+                        '</svg>' +
+                        '</div>',
+                    iconSize: [24, 36],
+                    iconAnchor: [12, 36],
+                    popupAnchor: [0, -32]
                 });
                 var marker = L.marker([station.latitude, station.longitude], { icon: icon });
                 marker.bindPopup(
                     '<div class="catch-popup">' +
                     '<div class="catch-popup__species" style="color:#4cc9f0">' + station.station_name + '</div>' +
+                    '<div class="catch-popup__buoy-id">' + station.station_id + '</div>' +
                     '<div class="catch-popup__grid">' +
                     '<div class="catch-popup__field"><div class="catch-popup__label">Station ID</div><div class="catch-popup__val">' + station.station_id + '</div></div>' +
                     '<div class="catch-popup__field"><div class="catch-popup__label">Type</div><div class="catch-popup__val">' + (station.station_type || 'buoy') + '</div></div>' +
@@ -258,31 +270,54 @@ function initPanelToggles() {
     }
 }
 
-// Initialize GFW layer toggle checkboxes
-function initGfwLayerToggles() {
+// Initialize vessel layer toggle checkboxes
+function initVesselLayerToggles() {
     var toggles = document.querySelectorAll('.gfw-layer-toggle');
     toggles.forEach(function (toggle) {
         toggle.addEventListener('change', function () {
             var layerKey = this.dataset.layer;
-            gfwLayerState[layerKey] = this.checked;
+            vesselLayerState[layerKey] = this.checked;
             if (this.checked) {
-                loadGfwLayer(layerKey);
+                loadVesselLayer(layerKey);
+                // Start auto-refresh for live vessels
+                if (layerKey === 'live_vessels') {
+                    startLiveRefresh();
+                }
             } else {
-                removeGfwLayer(layerKey);
+                removeVesselLayer(layerKey);
+                if (layerKey === 'live_vessels') {
+                    stopLiveRefresh();
+                }
             }
         });
     });
 }
 
-// Load a specific GFW layer
-async function loadGfwLayer(layerKey) {
+// Start auto-refresh for live vessel positions
+function startLiveRefresh() {
+    stopLiveRefresh();
+    liveRefreshInterval = setInterval(function () {
+        if (vesselLayerState.live_vessels) {
+            loadVesselLayer('live_vessels');
+        }
+    }, 30000); // Refresh every 30 seconds
+}
+
+function stopLiveRefresh() {
+    if (liveRefreshInterval) {
+        clearInterval(liveRefreshInterval);
+        liveRefreshInterval = null;
+    }
+}
+
+// Load a specific vessel layer
+async function loadVesselLayer(layerKey) {
     var endpointMap = {
-        fishing_events: API_ENDPOINTS.gfwFishingEvents,
-        loitering: API_ENDPOINTS.gfwLoitering,
-        sar_detections: API_ENDPOINTS.gfwSarDetections,
-        infrastructure: API_ENDPOINTS.gfwInfrastructure,
-        ais_presence: API_ENDPOINTS.gfwAisPresence,
-        effort_heatmap: API_ENDPOINTS.gfwEffortHeatmap,
+        live_vessels: API_ENDPOINTS.vesselsLive,
+        fishing_activity: API_ENDPOINTS.vesselsFishingActivity,
+        loitering: API_ENDPOINTS.vesselsLoitering,
+        ais_presence: API_ENDPOINTS.vesselsPresence,
+        effort_heatmap: API_ENDPOINTS.vesselsEffortHeatmap,
     };
 
     var url = endpointMap[layerKey];
@@ -293,18 +328,18 @@ async function loadGfwLayer(layerKey) {
         var data = await response.json();
 
         if (!data.features || data.features.length === 0) {
-            updateGfwLayerCount(layerKey, 0);
+            updateVesselLayerCount(layerKey, 0);
             return;
         }
 
-        removeGfwLayer(layerKey);
-        gfwLayers[layerKey] = L.layerGroup();
+        removeVesselLayer(layerKey);
+        vesselLayers[layerKey] = L.layerGroup();
 
         var markers = [];
         data.features.forEach(function (feature) {
             var coords = feature.geometry.coordinates;
             var props = feature.properties;
-            var color = props.color || mapConfig.gfwLayerColors[layerKey] || '#ffffff';
+            var color = props.color || mapConfig.vesselLayerColors[layerKey] || '#ffffff';
 
             if (layerKey === 'ais_presence' || layerKey === 'effort_heatmap') {
                 // Render as heatmap-style rectangles
@@ -320,30 +355,32 @@ async function loadGfwLayer(layerKey) {
                     fillOpacity: Math.min(0.8, intensity * 0.9 + 0.1),
                     weight: 0,
                 });
-                rect.bindPopup(createGfwPopup(layerKey, props));
+                rect.bindPopup(createVesselPopup(layerKey, props));
                 markers.push(rect);
-            } else if (layerKey === 'infrastructure') {
-                // Square markers for infrastructure
-                var icon = L.divIcon({
-                    className: 'gfw-marker gfw-marker--infra',
-                    html: '<div class="gfw-pin gfw-pin--infra"></div>',
-                    iconSize: [14, 14],
-                    iconAnchor: [7, 7],
+            } else if (layerKey === 'live_vessels') {
+                // Vessel-shaped marker with heading/course indicator
+                var heading = props.heading != null ? props.heading : (props.course != null ? props.course : 0);
+                var vesselIcon = L.divIcon({
+                    className: 'vessel-icon',
+                    html: '<div class="vessel-icon__wrap" style="transform:rotate(' + heading + 'deg)">' +
+                        '<svg viewBox="0 0 24 40" width="20" height="32">' +
+                        '<path d="M12 2 L4 14 L4 34 Q4 38 12 38 Q20 38 20 34 L20 14 Z" fill="' + color + '" stroke="#fff" stroke-width="1.5" opacity="0.9"/>' +
+                        '<path d="M12 2 L8 10 L16 10 Z" fill="' + color + '" stroke="#fff" stroke-width="1" opacity="1"/>' +
+                        '</svg>' +
+                        '<div class="vessel-icon__heading"></div>' +
+                        '</div>',
+                    iconSize: [20, 32],
+                    iconAnchor: [10, 16],
+                    popupAnchor: [0, -16]
                 });
-                var marker = L.marker([coords[1], coords[0]], { icon: icon });
-                marker.bindPopup(createGfwPopup(layerKey, props));
+                var marker = L.marker([coords[1], coords[0]], { icon: vesselIcon });
+                marker.bindPopup(createVesselPopup(layerKey, props));
                 markers.push(marker);
             } else {
-                // Circle markers for events
+                // Circle markers for fishing_activity, loitering events
                 var radius = 6;
-                if (layerKey === 'fishing_events' && props.duration_hours) {
-                    radius = Math.min(12, Math.max(4, props.duration_hours / 2));
-                }
-                if (layerKey === 'loitering' && props.duration_hours) {
+                if ((layerKey === 'fishing_activity' || layerKey === 'loitering') && props.duration_hours) {
                     radius = Math.min(14, Math.max(5, props.duration_hours / 3));
-                }
-                if (layerKey === 'sar_detections') {
-                    radius = 5;
                 }
 
                 var marker = L.circleMarker([coords[1], coords[0]], {
@@ -354,31 +391,31 @@ async function loadGfwLayer(layerKey) {
                     opacity: 0.9,
                     fillOpacity: 0.7,
                 });
-                marker.bindPopup(createGfwPopup(layerKey, props));
+                marker.bindPopup(createVesselPopup(layerKey, props));
                 markers.push(marker);
             }
         });
 
-        markers.forEach(function (m) { gfwLayers[layerKey].addLayer(m); });
-        map.addLayer(gfwLayers[layerKey]);
+        markers.forEach(function (m) { vesselLayers[layerKey].addLayer(m); });
+        map.addLayer(vesselLayers[layerKey]);
 
-        updateGfwLayerCount(layerKey, data.metadata ? data.metadata.total : data.features.length);
+        updateVesselLayerCount(layerKey, data.metadata ? data.metadata.total : data.features.length);
     } catch (error) {
-        console.error('Error loading GFW layer ' + layerKey + ':', error);
+        console.error('Error loading vessel layer ' + layerKey + ':', error);
     }
 }
 
-// Remove a GFW layer from the map
-function removeGfwLayer(layerKey) {
-    if (gfwLayers[layerKey] && map.hasLayer(gfwLayers[layerKey])) {
-        map.removeLayer(gfwLayers[layerKey]);
+// Remove a vessel layer from the map
+function removeVesselLayer(layerKey) {
+    if (vesselLayers[layerKey] && map.hasLayer(vesselLayers[layerKey])) {
+        map.removeLayer(vesselLayers[layerKey]);
     }
-    gfwLayers[layerKey] = L.layerGroup();
-    updateGfwLayerCount(layerKey, null);
+    vesselLayers[layerKey] = L.layerGroup();
+    updateVesselLayerCount(layerKey, null);
 }
 
-// Update GFW layer count badge
-function updateGfwLayerCount(layerKey, count) {
+// Update vessel layer count badge
+function updateVesselLayerCount(layerKey, count) {
     var badge = document.getElementById('gfw-count-' + layerKey);
     if (badge) {
         if (count === null || count === undefined) {
@@ -389,71 +426,56 @@ function updateGfwLayerCount(layerKey, count) {
     }
 }
 
-// Create popup HTML for GFW features
-function createGfwPopup(layerKey, props) {
+// Create popup HTML for vessel features
+function createVesselPopup(layerKey, props) {
     var title = '';
     var fields = '';
 
     switch (layerKey) {
-        case 'fishing_events':
-            title = '<span style="color:#ff6b35">Fishing Event</span>';
+        case 'live_vessels':
+            title = '<span style="color:#ff6b35">Live Vessel</span>';
             fields =
                 field('Vessel', props.vessel_name || 'Unknown') +
-                field('MMSI', props.vessel_mmsi || 'N/A') +
-                field('Flag', props.vessel_flag || 'N/A') +
+                field('MMSI', props.mmsi || 'N/A') +
+                field('Flag', props.flag_country || 'N/A') +
+                field('Type', props.vessel_type || 'N/A') +
+                field('Speed', props.speed_knots != null ? props.speed_knots.toFixed(1) + ' kts' : 'N/A') +
+                field('Course', props.course != null ? props.course.toFixed(0) + '\u00B0' : 'N/A') +
+                field('Heading', props.heading != null ? props.heading.toFixed(0) + '\u00B0' : 'N/A') +
+                field('Last Seen', formatTime(props.received_at));
+            break;
+
+        case 'fishing_activity':
+            title = '<span style="color:#ff6b35">Fishing Activity</span>';
+            fields =
+                field('Vessel', props.vessel_name || 'Unknown') +
+                field('MMSI', props.mmsi || 'N/A') +
+                field('Flag', props.flag_country || 'N/A') +
                 field('Gear', props.gear_type || 'N/A') +
                 field('Start', formatTime(props.start_time)) +
                 field('Duration', props.duration_hours ? props.duration_hours.toFixed(1) + 'h' : 'N/A') +
-                field('Fishing Hrs', props.fishing_hours ? props.fishing_hours.toFixed(1) + 'h' : 'N/A') +
-                field('Shore Dist', props.distance_from_shore_km ? props.distance_from_shore_km.toFixed(0) + ' km' : 'N/A');
+                field('Avg Speed', props.avg_speed_knots ? props.avg_speed_knots.toFixed(1) + ' kts' : 'N/A') +
+                field('Detection', props.detection_method || 'N/A');
             break;
 
         case 'loitering':
             title = '<span style="color:#ffd166">Loitering Event</span>';
             fields =
                 field('Vessel', props.vessel_name || 'Unknown') +
-                field('MMSI', props.vessel_mmsi || 'N/A') +
-                field('Flag', props.vessel_flag || 'N/A') +
+                field('MMSI', props.mmsi || 'N/A') +
+                field('Flag', props.flag_country || 'N/A') +
                 field('Type', props.vessel_type || 'N/A') +
                 field('Start', formatTime(props.start_time)) +
                 field('Duration', props.duration_hours ? props.duration_hours.toFixed(1) + 'h' : 'N/A') +
-                field('Distance', props.total_distance_km ? props.total_distance_km.toFixed(1) + ' km' : 'N/A') +
                 field('Avg Speed', props.avg_speed_knots ? props.avg_speed_knots.toFixed(1) + ' kts' : 'N/A');
-            break;
-
-        case 'sar_detections':
-            title = '<span style="color:#ef476f">SAR Detection</span>';
-            fields =
-                field('Time', formatTime(props.detection_time)) +
-                field('Matched', props.is_matched ? 'Yes' : 'No') +
-                field('Vessel', props.matched_vessel_name || 'Unmatched') +
-                field('MMSI', props.matched_vessel_mmsi || 'N/A') +
-                field('Confidence', props.confidence != null ? props.confidence.toFixed(0) + '%' : 'N/A') +
-                field('Satellite', props.source_satellite || 'N/A') +
-                field('Shore Dist', props.distance_from_shore_km ? props.distance_from_shore_km.toFixed(0) + ' km' : 'N/A');
-            break;
-
-        case 'infrastructure':
-            title = '<span style="color:#06d6a0">Offshore Infrastructure</span>';
-            fields =
-                field('Type', props.structure_type || 'Unknown') +
-                field('Region', props.region || 'N/A') +
-                field('First Seen', formatDate(props.first_detected)) +
-                field('Last Seen', formatDate(props.last_detected)) +
-                field('Detections', props.detection_count || 'N/A') +
-                field('Confidence', props.confidence != null ? props.confidence.toFixed(0) + '%' : 'N/A') +
-                field('Shore Dist', props.distance_from_shore_km ? props.distance_from_shore_km.toFixed(0) + ' km' : 'N/A');
             break;
 
         case 'ais_presence':
             title = '<span style="color:#118ab2">AIS Presence</span>';
             fields =
-                field('Date', props.date || 'N/A') +
                 field('Vessels', props.vessel_count || 0) +
-                field('Fishing Vessels', props.fishing_vessel_count || 0) +
-                field('Total Hours', props.hours_total ? props.hours_total.toFixed(0) + 'h' : 'N/A') +
-                field('Fishing Hours', props.fishing_hours ? props.fishing_hours.toFixed(0) + 'h' : 'N/A') +
-                field('Vessel Type', props.vessel_type || 'All');
+                field('Positions', props.position_count || 0) +
+                field('Total Hours', props.hours_total ? props.hours_total.toFixed(0) + 'h' : 'N/A');
             break;
 
         case 'effort_heatmap':
@@ -469,7 +491,7 @@ function createGfwPopup(layerKey, props) {
 
     return '<div class="catch-popup">' +
         '<div class="catch-popup__species">' + title + '</div>' +
-        '<div class="catch-popup__source">Global Fishing Watch</div>' +
+        '<div class="catch-popup__source">AIS Stream</div>' +
         '<div class="catch-popup__grid">' + fields + '</div></div>';
 }
 
@@ -493,33 +515,29 @@ function formatDate(isoStr) {
     } catch (e) { return isoStr; }
 }
 
-// Load GFW summary stats
-async function loadGfwSummary() {
+// Load vessel summary stats
+async function loadVesselSummary() {
     try {
-        var response = await fetch(API_ENDPOINTS.gfwSummary);
+        var response = await fetch(API_ENDPOINTS.vesselsSummary);
         var data = await response.json();
         var stats = data.stats || {};
 
-        setText('gfw-fishing-events-total', (stats.fishing_events || 0).toLocaleString());
-        setText('gfw-loitering-total', (stats.loitering_events || 0).toLocaleString());
-        setText('gfw-vessels-total', (stats.vessels || 0).toLocaleString());
-        setText('gfw-sar-total', (stats.sar_detections || 0).toLocaleString());
-        setText('gfw-infra-total', (stats.infrastructure || 0).toLocaleString());
-        setText('gfw-presence-total', (stats.ais_presence_cells || 0).toLocaleString());
-        setText('gfw-effort-total', (stats.fishing_effort_cells || 0).toLocaleString());
-        setText('gfw-fishing-hours', Math.round(stats.total_fishing_hours || 0).toLocaleString());
+        setText('ais-live-vessels-total', (stats.live_vessels || 0).toLocaleString());
+        setText('ais-vessels-total', (stats.vessels || 0).toLocaleString());
+        setText('ais-effort-total', (stats.fishing_effort_cells || 0).toLocaleString());
+        setText('ais-fishing-hours', Math.round(stats.total_fishing_hours || 0).toLocaleString());
 
-        // Show data source badge
-        var badge = document.getElementById('gfw-source-badge');
-        if (badge) {
-            var total = (stats.fishing_events || 0) + (stats.loitering_events || 0) +
-                        (stats.sar_detections || 0) + (stats.fishing_effort_cells || 0);
-            if (total > 0) {
+        // Show data source badges
+        var total = (stats.live_vessels || 0) + (stats.fishing_events || 0) +
+                    (stats.fishing_effort_cells || 0);
+        ['ais-source-badge', 'ais-source-badge-map'].forEach(function (id) {
+            var badge = document.getElementById(id);
+            if (badge && total > 0) {
                 badge.classList.add('active');
             }
-        }
+        });
     } catch (error) {
-        console.error('Error loading GFW summary:', error);
+        console.error('Error loading vessel summary:', error);
     }
 }
 
@@ -622,7 +640,10 @@ function updateMapMarkers(geojson) {
 // Create popup HTML for a catch feature
 function createPopup(feature) {
     var p = feature.properties;
+    var sourceLabel = (p.source || 'unknown').replace(/_/g, ' ');
+    var sourceIdStr = p.source_id ? ' \u00B7 ' + p.source_id : '';
     return '<div class="catch-popup">' +
+        '<div class="catch-popup__source">' + sourceLabel + sourceIdStr + '</div>' +
         '<div class="catch-popup__species" style="color:' + (p.color_hex || '#4cc9f0') + '">' + (p.species_name || 'Unknown') + '</div>' +
         '<div class="catch-popup__grid">' +
         '<div class="catch-popup__field"><div class="catch-popup__label">Date</div><div class="catch-popup__val">' + (p.catch_date || 'N/A') + '</div></div>' +
@@ -631,7 +652,9 @@ function createPopup(feature) {
         '<div class="catch-popup__field"><div class="catch-popup__label">Method</div><div class="catch-popup__val">' + (p.fishing_method || 'N/A') + '</div></div>' +
         '<div class="catch-popup__field"><div class="catch-popup__label">Water</div><div class="catch-popup__val">' + (p.water_temp_f ? p.water_temp_f + '\u00B0F' : 'N/A') + '</div></div>' +
         '<div class="catch-popup__field"><div class="catch-popup__label">Conditions</div><div class="catch-popup__val">' + (p.conditions || 'N/A') + '</div></div>' +
-        '</div></div>';
+        '</div>' +
+        '<div class="catch-popup__disclaimer">Catch data is self-reported. Exact location may be inaccurate.</div>' +
+        '</div>';
 }
 
 // Update statistics display

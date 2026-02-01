@@ -44,12 +44,11 @@ const mapConfig = {
         'YFT': '#FFA500'   // Yellowfin - Orange
     },
 
-    // GFW layer colors
-    gfwLayerColors: {
-        fishing_events: '#ff6b35',
+    // AIS vessel layer colors
+    vesselLayerColors: {
+        live_vessels: '#ff6b35',
+        fishing_activity: '#ff6b35',
         loitering: '#ffd166',
-        sar_detections: '#ef476f',
-        infrastructure: '#06d6a0',
         ais_presence: '#118ab2',
         effort_heatmap: '#ff9f1c',
     }
@@ -63,14 +62,12 @@ const API_ENDPOINTS = {
     catchStats: `${API_BASE}/catches/stats`,
     species: `${API_BASE}/species`,
     weather: `${API_BASE}/weather`,
-    // GFW endpoints
-    gfwFishingEvents: `${API_BASE}/gfw/fishing-events`,
-    gfwLoitering: `${API_BASE}/gfw/loitering`,
-    gfwVessels: `${API_BASE}/gfw/vessels`,
-    gfwInsights: `${API_BASE}/gfw/insights`,
-    gfwSarDetections: `${API_BASE}/gfw/sar-detections`,
-    gfwInfrastructure: `${API_BASE}/gfw/infrastructure`,
-    gfwAisPresence: `${API_BASE}/gfw/ais-presence`,
-    gfwEffortHeatmap: `${API_BASE}/gfw/effort-heatmap`,
-    gfwSummary: `${API_BASE}/gfw/summary`,
+    // Vessel tracking endpoints
+    vesselsLive: `${API_BASE}/vessels/live`,
+    vesselsFishingActivity: `${API_BASE}/vessels/fishing-activity`,
+    vesselsLoitering: `${API_BASE}/vessels/loitering`,
+    vesselsPresence: `${API_BASE}/vessels/presence`,
+    vesselsEffortHeatmap: `${API_BASE}/vessels/effort-heatmap`,
+    vesselsSummary: `${API_BASE}/vessels/summary`,
+    vesselsSearch: `${API_BASE}/vessels/search`,
 };

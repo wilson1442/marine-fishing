@@ -46,6 +46,8 @@ def get_catches_geojson(
             c.fishing_method,
             c.water_temp_f,
             fc.name as conditions_name,
+            c.source,
+            c.source_id,
             ST_AsGeoJSON(c.location)::json as geojson
         FROM catches c
         LEFT JOIN species s ON c.species_id = s.id
@@ -126,7 +128,9 @@ def get_catches_geojson(
                 "depth_fathoms": row.depth_fathoms,
                 "water_temp_f": float(row.water_temp_f) if row.water_temp_f else None,
                 "fishing_method": row.fishing_method,
-                "conditions": row.conditions_name
+                "conditions": row.conditions_name,
+                "source": row.source,
+                "source_id": row.source_id
             }
         }
         features.append(feature)
