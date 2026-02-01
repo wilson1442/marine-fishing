@@ -879,7 +879,6 @@ var WeatherHeatmapLayer = L.Layer.extend({
         this._points = [];
         this._latStep = 1;
         this._lonStep = 1;
-        this._useSSTColors = false;
     },
 
     onAdd: function (map) {
@@ -952,7 +951,7 @@ var WeatherHeatmapLayer = L.Layer.extend({
             var cp = map.latLngToContainerPoint([pt.lat, pt.lon]);
             var x = cp.x + padX;
             var y = cp.y + padY;
-            var color = self._useSSTColors ? getSSTColor(pt._sst_f) : getWaveColor(pt.wave_height_m);
+            var color = getWaveColor(pt.wave_height_m);
             var rgb = self._hexToRgb(color);
 
             var gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
@@ -1339,26 +1338,156 @@ function initSpeciesToggleAll() {
     });
 }
 
-// ---- SST Heatmap Overlay ----
+// ---- SST Contour Overlay (NOAA filled-contour style) ----
 
-var sstHeatmapLayer = null;
+// Canvas layer that renders solid filled rectangles for each grid cell
+var SSTContourLayer = L.Layer.extend({
+    initialize: function () {
+        this._points = [];
+        this._latStep = 1;
+        this._lonStep = 1;
+    },
+
+    onAdd: function (map) {
+        this._map = map;
+        this._canvas = L.DomUtil.create('canvas', 'sst-contour-canvas', map.getPanes().overlayPane);
+        this._canvas.style.pointerEvents = 'none';
+        map.on('moveend', this._reset, this);
+        map.on('zoomanim', this._animateZoom, this);
+        this._reset();
+    },
+
+    onRemove: function (map) {
+        L.DomUtil.remove(this._canvas);
+        map.off('moveend', this._reset, this);
+        map.off('zoomanim', this._animateZoom, this);
+    },
+
+    setData: function (points, latStep, lonStep) {
+        this._points = points || [];
+        this._latStep = latStep || 1;
+        this._lonStep = lonStep || 1;
+        if (this._map) this._reset();
+    },
+
+    clearData: function () {
+        this._points = [];
+        if (this._canvas) {
+            var ctx = this._canvas.getContext('2d');
+            ctx.clearRect(0, 0, this._canvas.width, this._canvas.height);
+        }
+    },
+
+    _animateZoom: function (e) {
+        var map = this._map;
+        var scale = map.getZoomScale(e.zoom);
+        var offset = map._latLngBoundsToNewLayerBounds(map.getBounds(), e.zoom, e.center).min;
+        L.DomUtil.setTransform(this._canvas, offset, scale);
+    },
+
+    _hexToRgb: function (hex) {
+        var r = parseInt(hex.slice(1, 3), 16);
+        var g = parseInt(hex.slice(3, 5), 16);
+        var b = parseInt(hex.slice(5, 7), 16);
+        return r + ',' + g + ',' + b;
+    },
+
+    _reset: function () {
+        var map = this._map;
+        var size = map.getSize();
+
+        var pad = 0.5;
+        var padX = Math.round(size.x * pad);
+        var padY = Math.round(size.y * pad);
+        var width = size.x + padX * 2;
+        var height = size.y + padY * 2;
+
+        var topLeft = map.containerPointToLayerPoint([-padX, -padY]);
+        L.DomUtil.setPosition(this._canvas, topLeft);
+        this._canvas.width = width;
+        this._canvas.height = height;
+
+        var ctx = this._canvas.getContext('2d');
+        ctx.clearRect(0, 0, width, height);
+
+        if (this._points.length === 0) return;
+
+        // Compute radius from grid step — overlap for smooth blending
+        var center = map.getCenter();
+        var p1 = map.latLngToContainerPoint([center.lat - this._latStep / 2, center.lng]);
+        var p2 = map.latLngToContainerPoint([center.lat + this._latStep / 2, center.lng]);
+        var pixelStep = Math.abs(p2.y - p1.y);
+        var radius = pixelStep * 1.5;
+
+        var self = this;
+
+        // Render smooth radial gradients with NOAA SST colors
+        this._points.forEach(function (pt) {
+            if (pt.sst_f == null) return;
+
+            var cp = map.latLngToContainerPoint([pt.lat, pt.lon]);
+            var x = cp.x + padX;
+            var y = cp.y + padY;
+            var color = getSSTColor(pt.sst_f);
+            var rgb = self._hexToRgb(color);
+
+            var gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+            gradient.addColorStop(0, 'rgba(' + rgb + ',0.6)');
+            gradient.addColorStop(0.5, 'rgba(' + rgb + ',0.45)');
+            gradient.addColorStop(0.8, 'rgba(' + rgb + ',0.2)');
+            gradient.addColorStop(1, 'rgba(' + rgb + ',0)');
+
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        // Draw temperature labels
+        ctx.globalAlpha = 1.0;
+        ctx.font = '10px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        var labelInterval = this._points.length > 60 ? 3 : 2;
+        this._points.forEach(function (pt, idx) {
+            if (pt.sst_f == null) return;
+            if (idx % labelInterval !== 0) return;
+
+            var cp = map.latLngToContainerPoint([pt.lat, pt.lon]);
+            var tx = cp.x + padX;
+            var ty = cp.y + padY;
+            var tempC = Math.round((pt.sst_f - 32) * 5 / 9);
+            var label = tempC + '\u00B0';
+
+            ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+            ctx.lineWidth = 2.5;
+            ctx.strokeText(label, tx, ty);
+            ctx.fillStyle = '#fff';
+            ctx.fillText(label, tx, ty);
+        });
+    }
+});
+
+var sstContourLayer = null;
+var sstLabelLayer = null;
 var sstOverlayActive = false;
 var sstGridDebounceTimer = null;
 
 function initSSTOverlay() {
-    sstHeatmapLayer = new WeatherHeatmapLayer();
+    sstContourLayer = new SSTContourLayer();
     var toggle = document.getElementById('sst-overlay-toggle');
     if (!toggle) return;
 
     toggle.addEventListener('change', function () {
         sstOverlayActive = this.checked;
         if (sstOverlayActive) {
-            map.addLayer(sstHeatmapLayer);
+            map.addLayer(sstContourLayer);
             loadSSTGrid();
             map.on('moveend', onMapMoveSST);
         } else {
-            map.removeLayer(sstHeatmapLayer);
-            sstHeatmapLayer.clearData();
+            map.removeLayer(sstContourLayer);
+            sstContourLayer.clearData();
             map.off('moveend', onMapMoveSST);
             setText('sst-grid-count', '');
         }
@@ -1378,7 +1507,7 @@ async function loadSSTGrid() {
     if (!sstOverlayActive) return;
     var zoom = map.getZoom();
     if (zoom < weatherConfig.minZoom) {
-        sstHeatmapLayer.clearData();
+        sstContourLayer.clearData();
         setText('sst-grid-count', '');
         return;
     }
@@ -1390,38 +1519,23 @@ async function loadSSTGrid() {
         east: bounds.getEast().toFixed(2),
         west: bounds.getWest().toFixed(2),
         zoom: zoom,
+        density: 'high',
     });
 
     try {
         var response = await fetch(API_ENDPOINTS.marineWeatherGrid + '?' + params);
         var data = await response.json();
-        renderSSTGrid(data.points || [], data.lat_step || 1, data.lon_step || 1);
+        var sstPoints = [];
+        (data.points || []).forEach(function (pt) {
+            if (pt.sst_f != null) {
+                sstPoints.push(pt);
+            }
+        });
+        sstContourLayer.setData(sstPoints, data.lat_step || 1, data.lon_step || 1);
+        setText('sst-grid-count', sstPoints.length > 0 ? sstPoints.length.toString() : '');
     } catch (error) {
         console.error('Error loading SST grid:', error);
     }
-}
-
-function renderSSTGrid(points, latStep, lonStep) {
-    // Convert points to SST-specific format for the canvas layer
-    var sstPoints = [];
-    points.forEach(function (pt) {
-        if (pt.sst_f != null) {
-            sstPoints.push({
-                lat: pt.lat,
-                lon: pt.lon,
-                wave_height_m: pt.sst_f, // reuse wave_height_m field for rendering value
-                _sst_f: pt.sst_f,
-            });
-        }
-    });
-
-    // Override the heatmap render to use SST colors
-    var origReset = sstHeatmapLayer._reset;
-    sstHeatmapLayer._getColor = getSSTColor;
-    sstHeatmapLayer._useSSTColors = true;
-    sstHeatmapLayer.setData(sstPoints, latStep, lonStep);
-
-    setText('sst-grid-count', sstPoints.length > 0 ? sstPoints.length.toString() : '');
 }
 
 function onMapMoveSST() {

@@ -82,17 +82,26 @@ const weatherConfig = {
         { max: 2.0, color: '#ffa94d' },   // amber - moderate
         { max: Infinity, color: '#ff6b6b' } // red - rough 3m+
     ],
-    // SST color scale (Fahrenheit): cold blue -> green -> warm red
+    // SST color scale (Fahrenheit) — NOAA filled-contour style, 2°C bands
     sstColorScale: [
-        { max: 55, color: '#2166ac' },   // deep blue - cold
-        { max: 60, color: '#4393c3' },   // blue
-        { max: 65, color: '#92c5de' },   // light blue
-        { max: 68, color: '#d1e5f0' },   // pale blue
-        { max: 72, color: '#a6d96a' },   // green - temperate
-        { max: 75, color: '#fee08b' },   // yellow-green
-        { max: 78, color: '#fdae61' },   // orange
-        { max: 82, color: '#f46d43' },   // red-orange
-        { max: Infinity, color: '#d73027' } // red - hot
+        { max: 28.4, color: '#d000d0' },  // -2°C  magenta - ice/near-freezing
+        { max: 32.0, color: '#b000d0' },  //  0°C  magenta-purple
+        { max: 35.6, color: '#9000d0' },  //  2°C  purple
+        { max: 39.2, color: '#6a00d0' },  //  4°C  blue-purple
+        { max: 42.8, color: '#3000c0' },  //  6°C  indigo
+        { max: 46.4, color: '#0000c8' },  //  8°C  dark blue
+        { max: 50.0, color: '#0055d4' },  // 10°C  blue
+        { max: 53.6, color: '#0088e0' },  // 12°C  medium blue
+        { max: 57.2, color: '#00b8e8' },  // 14°C  cyan
+        { max: 60.8, color: '#00d0c0' },  // 16°C  teal
+        { max: 64.4, color: '#00c060' },  // 18°C  green-teal
+        { max: 68.0, color: '#00b000' },  // 20°C  green
+        { max: 71.6, color: '#80cc00' },  // 22°C  yellow-green
+        { max: 75.2, color: '#c8d000' },  // 24°C  yellow
+        { max: 78.8, color: '#e8a000' },  // 26°C  orange
+        { max: 82.4, color: '#e06000' },  // 28°C  red-orange
+        { max: 86.0, color: '#d02000' },  // 30°C  red
+        { max: Infinity, color: '#a00000' } // 32°C+ dark red
     ],
     gridDebounceMs: 800,
     minZoom: 4,

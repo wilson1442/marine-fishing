@@ -167,19 +167,29 @@ async def get_marine_weather_grid(
     east: float = Query(..., description="East bound longitude"),
     west: float = Query(..., description="West bound longitude"),
     zoom: int = Query(6, ge=1, le=18, description="Map zoom level"),
+    density: Optional[str] = Query(None, description="Grid density: 'high' for SST contour mode"),
 ):
     """Fetch marine weather grid from Open-Meteo for the visible map bounds."""
     import asyncio
     import httpx
     import math
 
-    # Compute grid density based on zoom (cap at ~60 points)
+    # Compute grid density based on zoom
     if zoom < 4:
         return {"points": [], "count": 0}
-    steps = min(8, max(3, zoom - 2))
-    total = steps * steps
-    if total > 60:
-        steps = int(math.sqrt(60))
+
+    # High density mode for SST contour rendering (~150 points)
+    if density == 'high':
+        max_points = 150
+        steps = min(12, max(5, zoom))
+        if steps * steps > max_points:
+            steps = int(math.sqrt(max_points))
+    else:
+        # Standard mode (~60 points)
+        steps = min(8, max(3, zoom - 2))
+        total = steps * steps
+        if total > 60:
+            steps = int(math.sqrt(60))
 
     lat_step = (north - south) / (steps + 1)
     lon_step = (east - west) / (steps + 1)
