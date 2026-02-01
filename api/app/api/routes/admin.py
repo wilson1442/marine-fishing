@@ -43,17 +43,6 @@ class DataSourceUpdate(BaseModel):
     config: Optional[dict] = None
 
 
-class AdminUserCreate(BaseModel):
-    username: str
-    password: str
-    display_name: Optional[str] = None
-
-
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
-
 class ScheduledBackupUpdate(BaseModel):
     enabled: bool
 
@@ -63,6 +52,24 @@ class RegistrationCreate(BaseModel):
     last_name: str
     email: str
     password: str
+
+
+class UserLoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class ExpirationUpdate(BaseModel):
+    expires_at: Optional[str] = None
+
+
+class RegistrationUpdate(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    email: Optional[str] = None
+    password: Optional[str] = None
+    status: Optional[str] = None
+    role: Optional[str] = None
 
 
 # ---------- Registered Users Table ----------
@@ -78,69 +85,20 @@ def _ensure_registered_users_table(db: Session):
             password_hash VARCHAR(128) NOT NULL,
             salt VARCHAR(64) NOT NULL,
             status VARCHAR(20) DEFAULT 'pending',
-            reviewed_by INTEGER REFERENCES admin_users(id),
+            reviewed_by INTEGER,
             reviewed_at TIMESTAMP,
+            expires_at TIMESTAMP,
             created_at TIMESTAMP DEFAULT NOW()
         )
     """))
+    # Migration for existing databases
+    db.execute(text("""
+        ALTER TABLE registered_users ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP
+    """))
+    db.execute(text("""
+        ALTER TABLE registered_users ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'user'
+    """))
     db.commit()
-
-
-# ---------- Auth Endpoints ----------
-
-@router.get("/setup-status")
-def get_setup_status(db: Session = Depends(get_db)):
-    """Check if any admin users exist (for first-time setup detection)."""
-    row = db.execute(text("SELECT COUNT(*) as cnt FROM admin_users")).fetchone()
-    return {"has_users": row.cnt > 0}
-
-
-@router.post("/login")
-def login(creds: LoginRequest, db: Session = Depends(get_db)):
-    """Verify credentials, set HttpOnly cookie, update last_login."""
-    row = db.execute(
-        text("SELECT id, username, password_hash, salt, display_name, is_active FROM admin_users WHERE username = :u"),
-        {"u": creds.username},
-    ).fetchone()
-    if not row or not row.is_active:
-        raise HTTPException(status_code=401, detail="Invalid username or password")
-    expected_hash = hashlib.sha256((row.salt + creds.password).encode()).hexdigest()
-    if expected_hash != row.password_hash:
-        raise HTTPException(status_code=401, detail="Invalid username or password")
-
-    # Update last_login
-    db.execute(text("UPDATE admin_users SET last_login = NOW() WHERE id = :id"), {"id": row.id})
-    db.commit()
-
-    token = _create_token(row.id, row.username)
-    settings = get_settings()
-    response = JSONResponse(content={
-        "message": "Login successful",
-        "user": {"user_id": row.id, "username": row.username, "display_name": row.display_name},
-    })
-    response.set_cookie(
-        key="admin_token",
-        value=token,
-        httponly=True,
-        path="/api/v1/admin",
-        samesite="strict",
-        max_age=settings.admin_token_expiry_hours * 3600,
-    )
-    return response
-
-
-@router.post("/logout")
-def logout():
-    """Clear the admin_token cookie."""
-    response = JSONResponse(content={"message": "Logged out"})
-    response.delete_cookie(key="admin_token", path="/api/v1/admin", samesite="strict")
-    return response
-
-
-@router.get("/me")
-def get_me(current_user: dict = Depends(get_current_admin)):
-    """Return current authenticated user info."""
-    return current_user
 
 
 # ---------- Dashboard ----------
@@ -433,102 +391,9 @@ def get_sync_logs(
     }
 
 
-# ---------- Admin Users ----------
-
 def _hash_password(password: str, salt: str) -> str:
     """Hash password with SHA-256 + salt."""
     return hashlib.sha256((salt + password).encode()).hexdigest()
-
-
-@router.get("/users")
-def get_admin_users(current_user: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
-    """List all admin users (no passwords returned)."""
-
-    query = """
-        SELECT id, username, display_name, role, is_active, last_login, created_at
-        FROM admin_users
-        ORDER BY created_at
-    """
-    rows = db.execute(text(query)).fetchall()
-
-    users = []
-    for row in rows:
-        users.append({
-            "id": row.id,
-            "username": row.username,
-            "display_name": row.display_name,
-            "role": row.role,
-            "is_active": row.is_active,
-            "last_login": row.last_login.isoformat() if row.last_login else None,
-            "created_at": row.created_at.isoformat() if row.created_at else None
-        })
-
-    return {"users": users, "total": len(users)}
-
-
-@router.post("/users")
-def create_admin_user(user: AdminUserCreate, request: Request, db: Session = Depends(get_db)):
-    """Create a new admin user. No auth required if zero users exist (bootstrap), otherwise requires auth."""
-
-    # Check if any users exist
-    count_row = db.execute(text("SELECT COUNT(*) as cnt FROM admin_users")).fetchone()
-    has_users = count_row.cnt > 0
-
-    if has_users:
-        # Require auth — manually verify token since we can't conditionally use Depends
-        token = request.cookies.get("admin_token")
-        payload = _verify_token(token)
-        if payload is None:
-            raise HTTPException(status_code=401, detail="Not authenticated")
-        caller = db.execute(
-            text("SELECT id, is_active FROM admin_users WHERE id = :id"),
-            {"id": payload["user_id"]},
-        ).fetchone()
-        if not caller or not caller.is_active:
-            raise HTTPException(status_code=401, detail="Not authenticated")
-
-    # Check for duplicate username
-    existing = db.execute(
-        text("SELECT id FROM admin_users WHERE username = :username"),
-        {"username": user.username}
-    ).fetchone()
-    if existing:
-        raise HTTPException(status_code=409, detail=f"Username '{user.username}' already exists")
-
-    salt = secrets.token_hex(32)
-    password_hash = _hash_password(user.password, salt)
-
-    query = """
-        INSERT INTO admin_users (username, password_hash, salt, display_name, role)
-        VALUES (:username, :password_hash, :salt, :display_name, 'admin')
-        RETURNING id
-    """
-    result = db.execute(text(query), {
-        "username": user.username,
-        "password_hash": password_hash,
-        "salt": salt,
-        "display_name": user.display_name or user.username
-    })
-    db.commit()
-    new_id = result.fetchone().id
-
-    return {"id": new_id, "username": user.username, "message": "Admin user created"}
-
-
-@router.delete("/users/{user_id}")
-def delete_admin_user(user_id: int, current_user: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
-    """Deactivate an admin user (soft delete)."""
-
-    result = db.execute(
-        text("UPDATE admin_users SET is_active = false WHERE id = :id RETURNING id"),
-        {"id": user_id}
-    )
-    db.commit()
-    row = result.fetchone()
-    if not row:
-        raise HTTPException(status_code=404, detail=f"User ID {user_id} not found")
-
-    return {"id": user_id, "message": "Admin user deactivated"}
 
 
 # ---------- Database Backup Helpers ----------
@@ -1075,8 +940,8 @@ def register_user(reg: RegistrationCreate, db: Session = Depends(get_db)):
     password_hash = _hash_password(reg.password, salt)
 
     result = db.execute(text("""
-        INSERT INTO registered_users (first_name, last_name, email, password_hash, salt, status)
-        VALUES (:first_name, :last_name, :email, :password_hash, :salt, 'pending')
+        INSERT INTO registered_users (first_name, last_name, email, password_hash, salt, status, role)
+        VALUES (:first_name, :last_name, :email, :password_hash, :salt, 'pending', 'user')
         RETURNING id
     """), {
         "first_name": reg.first_name.strip(),
@@ -1091,6 +956,90 @@ def register_user(reg: RegistrationCreate, db: Session = Depends(get_db)):
     return {"id": new_id, "message": "Registration submitted. Awaiting admin approval."}
 
 
+# ---------- User Login/Logout/Me ----------
+
+@router.post("/user-login")
+def user_login(creds: UserLoginRequest, db: Session = Depends(get_db)):
+    """Authenticate a registered user with email and password."""
+    _ensure_registered_users_table(db)
+
+    row = db.execute(
+        text("SELECT id, email, first_name, last_name, password_hash, salt, status, expires_at, role FROM registered_users WHERE email = :email"),
+        {"email": creds.email.strip().lower()},
+    ).fetchone()
+
+    if not row:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    expected_hash = hashlib.sha256((row.salt + creds.password).encode()).hexdigest()
+    if expected_hash != row.password_hash:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    if row.status == "pending":
+        raise HTTPException(status_code=403, detail="Your account is pending admin approval")
+    if row.status == "denied":
+        raise HTTPException(status_code=403, detail="Your account registration was denied")
+    if row.status != "approved":
+        raise HTTPException(status_code=403, detail="Account is not active")
+
+    if row.expires_at and row.expires_at < datetime.utcnow():
+        raise HTTPException(status_code=403, detail="Your account has expired. Please contact an administrator.")
+
+    token = _create_token(row.id, row.email)
+    settings = get_settings()
+    response = JSONResponse(content={
+        "message": "Login successful",
+        "user": {"id": row.id, "email": row.email, "first_name": row.first_name, "last_name": row.last_name, "role": row.role or "user"},
+    })
+    response.set_cookie(
+        key="user_token",
+        value=token,
+        httponly=True,
+        path="/",
+        samesite="strict",
+        max_age=settings.admin_token_expiry_hours * 3600,
+    )
+    return response
+
+
+@router.post("/user-logout")
+def user_logout():
+    """Clear the user_token cookie."""
+    response = JSONResponse(content={"message": "Logged out"})
+    response.delete_cookie(key="user_token", path="/", samesite="strict")
+    return response
+
+
+@router.get("/user-me")
+def get_user_me(request: Request, db: Session = Depends(get_db)):
+    """Return current authenticated registered user info."""
+    _ensure_registered_users_table(db)
+
+    token = request.cookies.get("user_token")
+    payload = _verify_token(token)
+    if payload is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    row = db.execute(
+        text("SELECT id, email, first_name, last_name, status, expires_at, role FROM registered_users WHERE id = :id"),
+        {"id": payload["user_id"]},
+    ).fetchone()
+
+    if not row or row.status != "approved":
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    if row.expires_at and row.expires_at < datetime.utcnow():
+        raise HTTPException(status_code=403, detail="Account expired")
+
+    return {
+        "id": row.id,
+        "email": row.email,
+        "first_name": row.first_name,
+        "last_name": row.last_name,
+        "role": row.role or "user",
+    }
+
+
 # ---------- Admin Registration Management ----------
 
 @router.get("/registrations")
@@ -1103,11 +1052,11 @@ def list_registrations(
     _ensure_registered_users_table(db)
 
     query = """
-        SELECT r.id, r.first_name, r.last_name, r.email, r.status,
-               r.created_at, r.reviewed_at,
-               a.username as reviewed_by_username
+        SELECT r.id, r.first_name, r.last_name, r.email, r.status, r.role,
+               r.created_at, r.reviewed_at, r.expires_at, r.reviewed_by,
+               rev.first_name as rev_first, rev.last_name as rev_last
         FROM registered_users r
-        LEFT JOIN admin_users a ON r.reviewed_by = a.id
+        LEFT JOIN registered_users rev ON r.reviewed_by = rev.id
     """
     params = {}
     if status and status in ("pending", "approved", "denied"):
@@ -1119,15 +1068,20 @@ def list_registrations(
 
     registrations = []
     for row in rows:
+        reviewed_by_name = None
+        if row.rev_first or row.rev_last:
+            reviewed_by_name = ((row.rev_first or "") + " " + (row.rev_last or "")).strip()
         registrations.append({
             "id": row.id,
             "first_name": row.first_name,
             "last_name": row.last_name,
             "email": row.email,
             "status": row.status,
+            "role": row.role or "user",
             "created_at": row.created_at.isoformat() if row.created_at else None,
             "reviewed_at": row.reviewed_at.isoformat() if row.reviewed_at else None,
-            "reviewed_by": row.reviewed_by_username,
+            "reviewed_by": reviewed_by_name,
+            "expires_at": row.expires_at.isoformat() if row.expires_at else None,
         })
 
     return {"registrations": registrations, "total": len(registrations)}
@@ -1181,30 +1135,110 @@ def deny_registration(reg_id: int, current_user: dict = Depends(get_current_admi
     return {"id": reg_id, "status": "denied", "message": "Registration denied"}
 
 
-# ---------- Admin User Password Reset ----------
+@router.put("/registrations/{reg_id}/expiration")
+def update_expiration(reg_id: int, body: ExpirationUpdate, current_user: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
+    """Set or clear the expiration date for a registered user."""
+    _ensure_registered_users_table(db)
 
-@router.put("/users/{user_id}/reset-password")
-def reset_admin_password(user_id: int, current_user: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
-    """Reset an admin user's password. Generates a random password and returns it."""
     row = db.execute(
-        text("SELECT id, username FROM admin_users WHERE id = :id"),
-        {"id": user_id}
+        text("SELECT id FROM registered_users WHERE id = :id"),
+        {"id": reg_id}
     ).fetchone()
     if not row:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="Registration not found")
 
-    new_password = secrets.token_urlsafe(12)
-    salt = secrets.token_hex(32)
-    password_hash = _hash_password(new_password, salt)
+    expires_at = None
+    if body.expires_at:
+        try:
+            expires_at = datetime.strptime(body.expires_at, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
 
     db.execute(text("""
-        UPDATE admin_users SET password_hash = :hash, salt = :salt WHERE id = :id
-    """), {"hash": password_hash, "salt": salt, "id": user_id})
+        UPDATE registered_users SET expires_at = :expires_at WHERE id = :id
+    """), {"id": reg_id, "expires_at": expires_at})
     db.commit()
 
-    return {
-        "id": user_id,
-        "username": row.username,
-        "new_password": new_password,
-        "message": f"Password reset for '{row.username}'. Share the new password securely.",
-    }
+    return {"id": reg_id, "expires_at": body.expires_at, "message": "Expiration updated"}
+
+
+@router.put("/registrations/{reg_id}")
+def update_registration(reg_id: int, update: RegistrationUpdate, current_user: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
+    """Update a registered user's details."""
+    _ensure_registered_users_table(db)
+
+    existing = db.execute(
+        text("SELECT id FROM registered_users WHERE id = :id"),
+        {"id": reg_id}
+    ).fetchone()
+    if not existing:
+        raise HTTPException(status_code=404, detail="Registration not found")
+
+    fields = []
+    params = {"id": reg_id}
+
+    for field_name, value in update.dict(exclude_unset=True).items():
+        if field_name == "password":
+            if value and len(value) < 6:
+                raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+            salt = secrets.token_hex(32)
+            password_hash = _hash_password(value, salt)
+            fields.append("password_hash = :password_hash")
+            fields.append("salt = :salt")
+            params["password_hash"] = password_hash
+            params["salt"] = salt
+        elif field_name == "email":
+            email = value.strip().lower()
+            dup = db.execute(
+                text("SELECT id FROM registered_users WHERE email = :email AND id != :id"),
+                {"email": email, "id": reg_id}
+            ).fetchone()
+            if dup:
+                raise HTTPException(status_code=409, detail="An account with this email already exists")
+            fields.append("email = :email")
+            params["email"] = email
+        elif field_name == "status":
+            if value not in ("pending", "approved", "denied"):
+                raise HTTPException(status_code=400, detail="Invalid status")
+            fields.append("status = :status")
+            params["status"] = value
+        elif field_name == "role":
+            if value not in ("user", "admin"):
+                raise HTTPException(status_code=400, detail="Invalid role. Must be 'user' or 'admin'")
+            fields.append("role = :role")
+            params["role"] = value
+        else:
+            fields.append(f"{field_name} = :{field_name}")
+            params[field_name] = value.strip() if isinstance(value, str) else value
+
+    if not fields:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    query = f"UPDATE registered_users SET {', '.join(fields)} WHERE id = :id"
+    db.execute(text(query), params)
+    db.commit()
+
+    return {"id": reg_id, "message": "Registration updated"}
+
+
+@router.delete("/registrations/{reg_id}")
+def delete_registration(reg_id: int, current_user: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
+    """Permanently delete a registered user."""
+    _ensure_registered_users_table(db)
+
+    existing = db.execute(
+        text("SELECT id FROM registered_users WHERE id = :id"),
+        {"id": reg_id}
+    ).fetchone()
+    if not existing:
+        raise HTTPException(status_code=404, detail="Registration not found")
+
+    db.execute(
+        text("DELETE FROM registered_users WHERE id = :id"),
+        {"id": reg_id}
+    )
+    db.commit()
+
+    return {"id": reg_id, "message": "Registration deleted"}
+
+

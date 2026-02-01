@@ -37,6 +37,24 @@ let weatherGridDebounceTimer = null;
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', async function () {
+    // Auth guard: verify user is logged in before loading map
+    try {
+        var authResp = await fetch('/api/v1/admin/user-me', { credentials: 'same-origin' });
+        if (!authResp.ok) {
+            window.location.href = '/';
+            return;
+        }
+        var userData = await authResp.json();
+        // Show Admin link if user has admin role
+        if (userData.role === 'admin') {
+            var adminLink = document.getElementById('admin-nav-link');
+            if (adminLink) adminLink.style.display = '';
+        }
+    } catch (e) {
+        window.location.href = '/';
+        return;
+    }
+
     // Safety timeout: hide loading overlay after 15s no matter what
     var loadingTimeout = setTimeout(function () {
         setMapLoading(false);
@@ -968,6 +986,7 @@ function initWeatherOverlay() {
         }
     });
 
+    // Always register click handler for weather bar updates (works regardless of overlay toggle)
     map.on('click', onMapClickWeather);
 }
 
@@ -1055,19 +1074,50 @@ function onMapMoveWeather() {
 }
 
 function onMapClickWeather(e) {
-    if (!weatherOverlayActive) return;
-
     var lat = e.latlng.lat.toFixed(2);
     var lon = e.latlng.lng.toFixed(2);
 
-    var popup = L.popup({ maxWidth: 280 })
-        .setLatLng(e.latlng)
-        .setContent('<div class="catch-popup"><div class="wx-popup__title">Loading marine weather\u2026</div></div>')
-        .openOn(map);
+    // Show popup only when weather overlay is active
+    var popup = null;
+    if (weatherOverlayActive) {
+        popup = L.popup({ maxWidth: 280 })
+            .setLatLng(e.latlng)
+            .setContent('<div class="catch-popup"><div class="wx-popup__title">Loading marine weather\u2026</div></div>')
+            .openOn(map);
+    }
 
+    // Single fetch updates both the weather bar and popup
     fetch(API_ENDPOINTS.marineWeatherPoint + '?lat=' + lat + '&lon=' + lon)
         .then(function (r) { return r.json(); })
         .then(function (data) {
+            // Always update weather bar with location-specific data
+            if (!data.error) {
+                var latNum = parseFloat(lat);
+                var lonNum = parseFloat(lon);
+                var latLabel = Math.abs(latNum).toFixed(2) + '\u00B0' + (latNum >= 0 ? 'N' : 'S');
+                var lonLabel = Math.abs(lonNum).toFixed(2) + '\u00B0' + (lonNum >= 0 ? 'E' : 'W');
+
+                var c = data.current || {};
+                updateWeatherPanel({
+                    station_name: latLabel + ', ' + lonLabel,
+                    air_temp_f: data.air_temp_f,
+                    water_temp_f: data.water_temp_f,
+                    wind_speed_kts: data.wind_speed_kts,
+                    wind_gust_kts: data.wind_gust_kts,
+                    wind_direction: data.wind_direction,
+                    wave_height_ft: c.wave_height_ft,
+                    wave_period_sec: c.wave_period_s,
+                    pressure_mb: data.pressure_mb,
+                    visibility_nm: data.visibility_nm,
+                    moon_phase: data.moon_phase,
+                    moon_illumination: data.moon_illumination,
+                    fishing_score: data.fishing_score,
+                });
+            }
+
+            // Update popup if overlay is active
+            if (!popup) return;
+
             if (data.error) {
                 popup.setContent('<div class="catch-popup"><div class="wx-popup__title">Error</div><p>' + data.error + '</p></div>');
                 return;
@@ -1105,10 +1155,13 @@ function onMapClickWeather(e) {
                 html += '</div>';
             }
 
+            html += '<div class="catch-popup__disclaimer">See Marine Conditions below for more accurate information.</div>';
             html += '</div>';
             popup.setContent(html);
         })
         .catch(function (err) {
-            popup.setContent('<div class="catch-popup"><div class="wx-popup__title">Error</div><p>' + err.message + '</p></div>');
+            if (popup) {
+                popup.setContent('<div class="catch-popup"><div class="wx-popup__title">Error</div><p>' + err.message + '</p></div>');
+            }
         });
 }

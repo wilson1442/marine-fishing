@@ -403,6 +403,32 @@ body{
     font-family:'DM Sans',sans-serif;font-size:13px;font-weight:300;
     color:#6a7f9a;line-height:1.6;
 }
+
+/* Tab styles */
+.reg-tabs{
+    display:flex;gap:0;margin-bottom:24px;
+    border:1px solid rgba(76,201,240,0.12);border-radius:6px;overflow:hidden;
+}
+.reg-tab-btn{
+    flex:1;padding:10px 0;
+    font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;
+    letter-spacing:1px;text-transform:uppercase;
+    color:#5a6a80;background:transparent;
+    border:none;cursor:pointer;transition:all 0.25s;
+}
+.reg-tab-btn:hover{color:#9aacbf}
+.reg-tab-btn.active{
+    color:#060b18;
+    background:linear-gradient(135deg,#4cc9f0 0%,#38b0d8 100%);
+}
+.tab-pane{display:none}
+.tab-pane.active{display:block}
+
+.reg-login-error{
+    font-family:'DM Sans',sans-serif;font-size:12px;color:#ff6b6b;
+    text-align:center;margin-top:14px;display:none;
+}
+.reg-login-error.show{display:block}
 </style>
 </head>
 <body>
@@ -446,10 +472,10 @@ body{
         <div style="display:flex;align-items:center;gap:24px">
             <ul class="nav__links">
                 <li><a href="/map">Live Map</a></li>
-                <li><a href="/admin">Admin</a></li>
+                <li><a href="/admin" id="admin-nav-link" style="display:none">Admin</a></li>
                 <li><a href="/api/docs">API</a></li>
             </ul>
-            <a href="#" class="nav-register" onclick="openRegisterModal(event)" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;text-decoration:none;color:#060b18;background:linear-gradient(135deg,#4cc9f0,#38b0d8);padding:7px 18px;border-radius:4px;font-weight:500;transition:all 0.3s">Register</a>
+            <a href="#" class="nav-register" onclick="openLoginModal(event)" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;text-decoration:none;color:#060b18;background:linear-gradient(135deg,#4cc9f0,#38b0d8);padding:7px 18px;border-radius:4px;font-weight:500;transition:all 0.3s">Login</a>
         </div>
     </nav>
 
@@ -492,7 +518,7 @@ body{
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                 </a>
                 <a href="/api/docs" class="btn-api">API Docs</a>
-                <a href="#" class="btn-api" onclick="openRegisterModal(event)" style="border-bottom:1px solid rgba(76,201,240,0.3);color:rgba(76,201,240,0.7)">Register</a>
+                <a href="#" class="btn-api" onclick="openLoginModal(event)" style="border-bottom:1px solid rgba(76,201,240,0.3);color:rgba(76,201,240,0.7)">Login</a>
             </div>
         </div>
     </section>
@@ -638,6 +664,20 @@ function countUp(el, target, duration) {
     } catch(e) { console.error(e); }
 })();
 
+// ===== Check if logged in user is admin =====
+(async function(){
+    try {
+        var r = await fetch('/api/v1/admin/user-me', { credentials: 'same-origin' });
+        if (r.ok) {
+            var u = await r.json();
+            if (u.role === 'admin') {
+                var link = document.getElementById('admin-nav-link');
+                if (link) link.style.display = '';
+            }
+        }
+    } catch(e) { /* not logged in */ }
+})();
+
 // ===== Load species =====
 (async function(){
     try {
@@ -661,55 +701,101 @@ function countUp(el, target, duration) {
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
 
-        <div id="reg-form-area">
-            <div class="reg-card__title">Create Account</div>
-            <div class="reg-card__sub">Register for access — admin approval required</div>
+        <div class="reg-tabs">
+            <button class="reg-tab-btn active" id="tab-login-btn" onclick="switchTab('login')">Login</button>
+            <button class="reg-tab-btn" id="tab-register-btn" onclick="switchTab('register')">Register</button>
+        </div>
 
-            <div class="reg-row">
-                <div class="reg-field">
-                    <label class="reg-field__label">First Name</label>
-                    <input type="text" class="reg-field__input" id="reg-first" placeholder="Jane">
-                    <div class="reg-field__error" id="reg-first-err"></div>
-                </div>
-                <div class="reg-field">
-                    <label class="reg-field__label">Last Name</label>
-                    <input type="text" class="reg-field__input" id="reg-last" placeholder="Doe">
-                    <div class="reg-field__error" id="reg-last-err"></div>
-                </div>
-            </div>
+        <!-- Login Tab -->
+        <div class="tab-pane active" id="tab-login">
+            <div class="reg-card__title">Welcome Back</div>
+            <div class="reg-card__sub">Sign in with your account</div>
             <div class="reg-field">
                 <label class="reg-field__label">Email</label>
-                <input type="email" class="reg-field__input" id="reg-email" placeholder="jane@example.com">
-                <div class="reg-field__error" id="reg-email-err"></div>
+                <input type="email" class="reg-field__input" id="login-email" placeholder="jane@example.com">
             </div>
             <div class="reg-field">
                 <label class="reg-field__label">Password</label>
-                <input type="password" class="reg-field__input" id="reg-pass" placeholder="Min. 6 characters">
-                <div class="reg-field__error" id="reg-pass-err"></div>
+                <input type="password" class="reg-field__input" id="login-pass" placeholder="Your password">
             </div>
-            <div class="reg-field">
-                <label class="reg-field__label">Confirm Password</label>
-                <input type="password" class="reg-field__input" id="reg-pass2" placeholder="Re-enter password">
-                <div class="reg-field__error" id="reg-pass2-err"></div>
-            </div>
-            <button class="reg-btn" id="reg-btn" onclick="submitRegistration()">Register</button>
-            <div class="reg-error-msg" id="reg-error-msg"></div>
+            <button class="reg-btn" id="login-btn" onclick="submitLogin()">Login</button>
+            <div class="reg-login-error" id="login-error-msg"></div>
         </div>
 
-        <div class="reg-success" id="reg-success">
-            <div class="reg-success__check">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        <!-- Register Tab -->
+        <div class="tab-pane" id="tab-register">
+            <div id="reg-form-area">
+                <div class="reg-card__title">Create Account</div>
+                <div class="reg-card__sub">Register for access — admin approval required</div>
+
+                <div class="reg-row">
+                    <div class="reg-field">
+                        <label class="reg-field__label">First Name</label>
+                        <input type="text" class="reg-field__input" id="reg-first" placeholder="Jane">
+                        <div class="reg-field__error" id="reg-first-err"></div>
+                    </div>
+                    <div class="reg-field">
+                        <label class="reg-field__label">Last Name</label>
+                        <input type="text" class="reg-field__input" id="reg-last" placeholder="Doe">
+                        <div class="reg-field__error" id="reg-last-err"></div>
+                    </div>
+                </div>
+                <div class="reg-field">
+                    <label class="reg-field__label">Email</label>
+                    <input type="email" class="reg-field__input" id="reg-email" placeholder="jane@example.com">
+                    <div class="reg-field__error" id="reg-email-err"></div>
+                </div>
+                <div class="reg-field">
+                    <label class="reg-field__label">Password</label>
+                    <input type="password" class="reg-field__input" id="reg-pass" placeholder="Min. 6 characters">
+                    <div class="reg-field__error" id="reg-pass-err"></div>
+                </div>
+                <div class="reg-field">
+                    <label class="reg-field__label">Confirm Password</label>
+                    <input type="password" class="reg-field__input" id="reg-pass2" placeholder="Re-enter password">
+                    <div class="reg-field__error" id="reg-pass2-err"></div>
+                </div>
+                <button class="reg-btn" id="reg-btn" onclick="submitRegistration()">Register</button>
+                <div class="reg-error-msg" id="reg-error-msg"></div>
             </div>
-            <div class="reg-success__title">Registration Submitted</div>
-            <div class="reg-success__msg">Your registration is pending admin approval.<br>You will be notified once your account is reviewed.</div>
+
+            <div class="reg-success" id="reg-success">
+                <div class="reg-success__check">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                <div class="reg-success__title">Registration Submitted</div>
+                <div class="reg-success__msg">Your registration is pending admin approval.<br>You will be notified once your account is reviewed.</div>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
-// ===== Registration Modal =====
+// ===== Login/Registration Modal =====
+
+function switchTab(tab) {
+    document.getElementById('tab-login-btn').classList.toggle('active', tab === 'login');
+    document.getElementById('tab-register-btn').classList.toggle('active', tab === 'register');
+    document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+    document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+}
+
+function openLoginModal(e) {
+    if (e) e.preventDefault();
+    switchTab('login');
+    var overlay = document.getElementById('reg-overlay');
+    overlay.classList.add('opening');
+    requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+            overlay.classList.add('open');
+            overlay.classList.remove('opening');
+        });
+    });
+}
+
 function openRegisterModal(e) {
     if (e) e.preventDefault();
+    switchTab('register');
     var overlay = document.getElementById('reg-overlay');
     overlay.classList.add('opening');
     requestAnimationFrame(function() {
@@ -724,7 +810,11 @@ function closeRegisterModal() {
     var overlay = document.getElementById('reg-overlay');
     overlay.classList.remove('open');
     setTimeout(function() {
-        // Reset form
+        // Reset login fields
+        document.getElementById('login-email').value = '';
+        document.getElementById('login-pass').value = '';
+        document.getElementById('login-error-msg').classList.remove('show');
+        // Reset register form
         document.getElementById('reg-form-area').style.display = '';
         document.getElementById('reg-success').classList.remove('show');
         ['reg-first','reg-last','reg-email','reg-pass','reg-pass2'].forEach(function(id) {
@@ -752,6 +842,62 @@ document.addEventListener('keydown', function(e) {
         closeRegisterModal();
     }
 });
+
+// Submit login on Enter key in login fields
+document.getElementById('login-email').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') submitLogin();
+});
+document.getElementById('login-pass').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') submitLogin();
+});
+
+async function submitLogin() {
+    var email = document.getElementById('login-email').value.trim();
+    var pass = document.getElementById('login-pass').value;
+    var btn = document.getElementById('login-btn');
+    var errMsg = document.getElementById('login-error-msg');
+
+    errMsg.classList.remove('show');
+
+    if (!email || !pass) {
+        errMsg.textContent = 'Email and password are required';
+        errMsg.classList.add('show');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Signing in...';
+
+    try {
+        var resp = await fetch('/api/v1/admin/user-login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ email: email, password: pass })
+        });
+        var data = await resp.json();
+
+        if (!resp.ok) {
+            errMsg.textContent = data.detail || 'Login failed';
+            errMsg.classList.add('show');
+            return;
+        }
+
+        // Show admin link if user has admin role
+        if (data.user && data.user.role === 'admin') {
+            var adminLink = document.getElementById('admin-nav-link');
+            if (adminLink) adminLink.style.display = '';
+        }
+
+        window.location.href = '/map';
+    } catch (e) {
+        errMsg.textContent = 'Network error. Please try again.';
+        errMsg.classList.add('show');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Login';
+    }
+}
 
 function clearRegErrors() {
     ['reg-first','reg-last','reg-email','reg-pass','reg-pass2'].forEach(function(id) {

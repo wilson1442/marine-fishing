@@ -4,6 +4,7 @@ import hashlib
 import json
 import base64
 import time
+from datetime import datetime
 
 from fastapi import Request, HTTPException, Depends
 from sqlalchemy.orm import Session
@@ -64,20 +65,22 @@ def _verify_token(token: str) -> dict | None:
 
 
 def get_current_admin(request: Request, db: Session = Depends(get_db)):
-    """FastAPI dependency: read cookie, verify token, confirm user is active."""
-    token = request.cookies.get("admin_token")
+    """FastAPI dependency: read user_token cookie, verify token, confirm user has admin role."""
+    token = request.cookies.get("user_token")
     payload = _verify_token(token)
     if payload is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
     row = db.execute(
-        text("SELECT id, username, display_name, role, is_active FROM admin_users WHERE id = :id"),
+        text("SELECT id, email, first_name, last_name, role, status, expires_at FROM registered_users WHERE id = :id"),
         {"id": payload["user_id"]},
     ).fetchone()
-    if not row or not row.is_active:
+    if not row or row.status != "approved" or row.role != "admin":
         raise HTTPException(status_code=401, detail="Not authenticated")
+    if row.expires_at and row.expires_at < datetime.utcnow():
+        raise HTTPException(status_code=401, detail="Account expired")
     return {
         "user_id": row.id,
-        "username": row.username,
-        "display_name": row.display_name,
+        "username": row.email,
+        "display_name": row.first_name + " " + row.last_name,
         "role": row.role,
     }

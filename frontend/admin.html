@@ -392,6 +392,34 @@ textarea.field__input{resize:vertical;min-height:60px}
 .log-modal__content .log-line--warn{color:var(--amber)}
 .log-modal__content .log-line--info{color:var(--text)}
 
+/* ===== TABS ===== */
+.tab-bar{
+    display:flex;gap:2px;margin-bottom:24px;
+    border-bottom:1px solid var(--border);
+    padding-bottom:0;
+}
+.tab-btn{
+    font-family:var(--font-mono);font-size:10px;font-weight:500;
+    letter-spacing:1.2px;text-transform:uppercase;
+    color:var(--text-dim);background:none;border:none;
+    padding:10px 20px;cursor:pointer;
+    border-bottom:2px solid transparent;
+    transition:all 0.2s;position:relative;bottom:-1px;
+}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{
+    color:var(--cyan);border-bottom-color:var(--cyan);
+}
+.tab-btn .tab-badge{
+    display:inline-flex;align-items:center;justify-content:center;
+    font-size:9px;font-weight:600;min-width:16px;height:16px;
+    padding:0 5px;border-radius:8px;margin-left:6px;
+    background:rgba(240,165,0,0.15);color:var(--amber);
+    line-height:1;
+}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
 /* ===== RESPONSIVE ===== */
 @media(max-width:1100px){
     .cards{grid-template-columns:repeat(3,1fr)}
@@ -437,48 +465,20 @@ textarea.field__input{resize:vertical;min-height:60px}
 <!-- Toast container -->
 <div class="toast-container" id="toast-container"></div>
 
-<!-- Login Screen -->
-<div class="auth-screen" id="login-screen">
-    <div class="auth-box">
-        <div class="auth-box__title">Admin Login</div>
-        <div class="auth-box__subtitle">Sign in to access the dashboard</div>
-        <div class="field">
-            <label class="field__label">Username</label>
-            <input type="text" class="field__input" id="login-username" placeholder="admin" autocomplete="username">
-        </div>
-        <div class="field">
-            <label class="field__label">Password</label>
-            <input type="password" class="field__input" id="login-password" placeholder="••••••••" autocomplete="current-password">
-        </div>
-        <button class="auth-box__btn" id="login-btn" onclick="doLogin()">Sign In</button>
-        <div class="auth-box__error" id="login-error"></div>
-    </div>
-</div>
-
-<!-- Setup Screen -->
-<div class="auth-screen" id="setup-screen">
-    <div class="auth-box">
-        <div class="auth-box__title">Initial Setup</div>
-        <div class="auth-box__subtitle">Create the first admin account to get started</div>
-        <div class="field">
-            <label class="field__label">Username</label>
-            <input type="text" class="field__input" id="setup-username" placeholder="admin" autocomplete="username">
-        </div>
-        <div class="field">
-            <label class="field__label">Password</label>
-            <input type="password" class="field__input" id="setup-password" placeholder="••••••••" autocomplete="new-password">
-        </div>
-        <div class="field">
-            <label class="field__label">Display Name</label>
-            <input type="text" class="field__input" id="setup-display" placeholder="John Doe">
-        </div>
-        <button class="auth-box__btn" id="setup-btn" onclick="doSetup()">Create Account</button>
-        <div class="auth-box__error" id="setup-error"></div>
-    </div>
-</div>
-
 <!-- Dashboard (hidden until authenticated) -->
 <div class="dashboard" id="dashboard">
+
+    <!-- Tab Bar -->
+    <div class="tab-bar" id="tab-bar">
+        <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')">Overview</button>
+        <button class="tab-btn" data-tab="datasources" onclick="switchTab('datasources')">Data Sources</button>
+        <button class="tab-btn" data-tab="synchistory" onclick="switchTab('synchistory')">Sync History</button>
+        <button class="tab-btn" data-tab="backups" onclick="switchTab('backups')">Backups</button>
+        <button class="tab-btn" data-tab="users" onclick="switchTab('users')">Users <span class="tab-badge" id="tab-users-badge" style="display:none">0</span></button>
+    </div>
+
+    <!-- TAB: Overview -->
+    <div class="tab-panel active" id="tab-overview">
 
     <!-- Summary Cards -->
     <section class="section">
@@ -507,7 +507,11 @@ textarea.field__input{resize:vertical;min-height:60px}
         </div>
     </section>
 
-    <!-- Data Sources -->
+    </div><!-- /tab-overview -->
+
+    <!-- TAB: Data Sources -->
+    <div class="tab-panel" id="tab-datasources">
+
     <section class="section">
         <div class="section__head">
             <h2 class="section__title">Data Sources</h2>
@@ -570,7 +574,11 @@ textarea.field__input{resize:vertical;min-height:60px}
         </div>
     </section>
 
-    <!-- Sync History -->
+    </div><!-- /tab-datasources -->
+
+    <!-- TAB: Sync History -->
+    <div class="tab-panel" id="tab-synchistory">
+
     <section class="section">
         <div class="section__head">
             <h2 class="section__title">Sync History</h2>
@@ -598,7 +606,11 @@ textarea.field__input{resize:vertical;min-height:60px}
         </div>
     </section>
 
-    <!-- Database Backups -->
+    </div><!-- /tab-synchistory -->
+
+    <!-- TAB: Backups -->
+    <div class="tab-panel" id="tab-backups">
+
     <section class="section">
         <div class="section__head">
             <h2 class="section__title">Database Backups</h2>
@@ -667,16 +679,20 @@ textarea.field__input{resize:vertical;min-height:60px}
         </div>
     </section>
 
-    <!-- Registrations -->
+    </div><!-- /tab-backups -->
+
+    <!-- TAB: Users -->
+    <div class="tab-panel" id="tab-users">
+
     <section class="section">
         <div class="section__head">
-            <h2 class="section__title">Pending Registrations <span class="badge badge--run" id="reg-count-badge" style="display:none;margin-left:8px">0</span></h2>
+            <h2 class="section__title">Users <span class="badge badge--run" id="reg-count-badge" style="display:none;margin-left:8px">0</span></h2>
             <div class="section__actions">
                 <div class="reg-filter-tabs" style="display:flex;gap:4px">
-                    <button class="btn btn--sm btn--ghost reg-tab active" data-status="" onclick="filterRegistrations(this,'')">All</button>
-                    <button class="btn btn--sm btn--ghost reg-tab" data-status="pending" onclick="filterRegistrations(this,'pending')">Pending</button>
-                    <button class="btn btn--sm btn--ghost reg-tab" data-status="approved" onclick="filterRegistrations(this,'approved')">Approved</button>
-                    <button class="btn btn--sm btn--ghost reg-tab" data-status="denied" onclick="filterRegistrations(this,'denied')">Denied</button>
+                    <button class="btn btn--sm btn--ghost reg-tab active" data-status="" onclick="filterUsers(this,'')">All</button>
+                    <button class="btn btn--sm btn--ghost reg-tab" data-status="pending" onclick="filterUsers(this,'pending')">Pending</button>
+                    <button class="btn btn--sm btn--ghost reg-tab" data-status="approved" onclick="filterUsers(this,'approved')">Approved</button>
+                    <button class="btn btn--sm btn--ghost reg-tab" data-status="denied" onclick="filterUsers(this,'denied')">Denied</button>
                 </div>
             </div>
         </div>
@@ -686,18 +702,21 @@ textarea.field__input{resize:vertical;min-height:60px}
                     <tr>
                         <th>Name</th>
                         <th>Email</th>
-                        <th>Submitted</th>
+                        <th>Role</th>
                         <th>Status</th>
-                        <th>Reviewed By</th>
+                        <th>Expires</th>
+                        <th>Created</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
-                <tbody id="registrations-tbody">
-                    <tr><td colspan="6" class="empty">Loading...</td></tr>
+                <tbody id="all-users-tbody">
+                    <tr><td colspan="7" class="empty">Loading...</td></tr>
                 </tbody>
             </table>
         </div>
     </section>
+
+    </div><!-- /tab-users -->
 
     <!-- Log Modal -->
     <div class="log-modal-overlay" id="log-modal-overlay" onclick="closeLogModal(event)">
@@ -713,56 +732,62 @@ textarea.field__input{resize:vertical;min-height:60px}
         </div>
     </div>
 
-    <!-- Admin Users -->
-    <section class="section">
-        <div class="section__head">
-            <h2 class="section__title">Admin Users</h2>
-        </div>
-        <div class="tbl-wrap">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Username</th>
-                        <th>Display Name</th>
-                        <th>Role</th>
-                        <th>Status</th>
-                        <th>Last Login</th>
-                        <th>Created</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="users-tbody">
-                    <tr><td colspan="6" class="empty">Loading...</td></tr>
-                </tbody>
-            </table>
-        </div>
-        <div class="form-panel" data-collapsed="true" id="add-user-panel">
-            <button class="form-panel__toggle" onclick="togglePanel('add-user-panel')">
-                <span>+ Create Admin User</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-            </button>
-            <div class="form-panel__body">
-                <div class="form-grid form-grid--3">
-                    <div class="field">
-                        <label class="field__label">Username</label>
-                        <input type="text" class="field__input" id="user-name" placeholder="admin_user">
+    <!-- Edit User Modal -->
+    <div class="log-modal-overlay" id="edit-user-overlay" onclick="closeEditUserModal(event)">
+        <div class="log-modal" style="max-width:520px">
+            <div class="log-modal__head">
+                <div class="log-modal__title" id="edit-user-title">Edit User</div>
+                <button class="log-modal__close" onclick="closeEditUserModal()">Close</button>
+            </div>
+            <div class="log-modal__body" style="padding:20px">
+                <input type="hidden" id="edit-user-id">
+                <div class="form-grid">
+                    <div class="field" id="edit-field-first">
+                        <label class="field__label">First Name</label>
+                        <input type="text" class="field__input" id="edit-user-first">
+                    </div>
+                    <div class="field" id="edit-field-last">
+                        <label class="field__label">Last Name</label>
+                        <input type="text" class="field__input" id="edit-user-last">
+                    </div>
+                    <div class="field field--full" id="edit-field-email">
+                        <label class="field__label">Email</label>
+                        <input type="email" class="field__input" id="edit-user-email">
+                    </div>
+                    <div class="field field--full" id="edit-field-password">
+                        <label class="field__label">Password (leave empty to keep current)</label>
+                        <input type="password" class="field__input" id="edit-user-password" placeholder="••••••••">
+                    </div>
+                    <div class="field" id="edit-field-status">
+                        <label class="field__label">Status</label>
+                        <select class="field__input" id="edit-user-status">
+                            <option value="pending">Pending</option>
+                            <option value="approved">Approved</option>
+                            <option value="denied">Denied</option>
+                        </select>
                     </div>
                     <div class="field">
-                        <label class="field__label">Password</label>
-                        <input type="password" class="field__input" id="user-pass" placeholder="••••••••">
+                        <label class="field__label">Role</label>
+                        <select class="field__input" id="edit-user-role">
+                            <option value="user">User</option>
+                            <option value="admin">Admin</option>
+                        </select>
                     </div>
-                    <div class="field">
-                        <label class="field__label">Display Name</label>
-                        <input type="text" class="field__input" id="user-display" placeholder="John Doe">
+                    <div class="field field--full" id="edit-field-expires">
+                        <label class="field__label">Expiration</label>
+                        <div style="display:flex;gap:8px;align-items:center">
+                            <input type="date" class="field__input" id="edit-user-expires" style="flex:1">
+                            <button type="button" class="btn btn--ghost btn--sm" onclick="document.getElementById('edit-user-expires').value=''">Clear</button>
+                        </div>
                     </div>
                     <div class="form-actions">
-                        <button class="btn btn--primary" onclick="createAdminUser()">Create User</button>
-                        <button class="btn btn--ghost" onclick="togglePanel('add-user-panel')">Cancel</button>
+                        <button type="button" class="btn btn--primary" onclick="saveUser()">Save Changes</button>
+                        <button type="button" class="btn btn--ghost" onclick="closeEditUserModal()">Cancel</button>
                     </div>
                 </div>
             </div>
         </div>
-    </section>
+    </div>
 
 </div>
 
@@ -849,16 +874,10 @@ function togglePanel(id) {
 // ===== Screen management =====
 
 function showScreen(name) {
-    document.getElementById('login-screen').classList.remove('visible');
-    document.getElementById('setup-screen').classList.remove('visible');
     document.getElementById('dashboard').classList.remove('visible');
     document.getElementById('topbar-user').classList.remove('visible');
 
-    if (name === 'login') {
-        document.getElementById('login-screen').classList.add('visible');
-    } else if (name === 'setup') {
-        document.getElementById('setup-screen').classList.add('visible');
-    } else if (name === 'dashboard') {
+    if (name === 'dashboard') {
         document.getElementById('dashboard').classList.add('visible');
         document.getElementById('topbar-user').classList.add('visible');
     }
@@ -873,7 +892,7 @@ async function authFetch(url, opts) {
     opts.credentials = 'same-origin';
     var resp = await fetch(url, opts);
     if (resp.status === 401) {
-        showScreen('login');
+        window.location.href = '/';
         throw new Error('Session expired');
     }
     return resp;
@@ -883,144 +902,29 @@ async function authFetch(url, opts) {
 
 async function checkAuth() {
     try {
-        var resp = await fetch(API + '/me', { credentials: 'same-origin' });
+        var resp = await fetch(API + '/user-me', { credentials: 'same-origin' });
         if (resp.ok) {
             var user = await resp.json();
-            document.getElementById('topbar-username').textContent = user.display_name || user.username;
+            if (user.role !== 'admin') {
+                window.location.href = '/index.html';
+                return;
+            }
+            document.getElementById('topbar-username').textContent = user.first_name + ' ' + user.last_name;
             showScreen('dashboard');
             loadAll();
             return;
         }
     } catch (e) { /* fall through */ }
 
-    // Not authenticated — check if setup needed
-    try {
-        var statusResp = await fetch(API + '/setup-status');
-        var status = await statusResp.json();
-        if (!status.has_users) {
-            showScreen('setup');
-        } else {
-            showScreen('login');
-        }
-    } catch (e) {
-        showScreen('login');
-    }
-}
-
-async function doLogin() {
-    var username = document.getElementById('login-username').value.trim();
-    var password = document.getElementById('login-password').value;
-    var errorEl = document.getElementById('login-error');
-    var btn = document.getElementById('login-btn');
-
-    errorEl.classList.remove('visible');
-
-    if (!username || !password) {
-        errorEl.textContent = 'Username and password are required';
-        errorEl.classList.add('visible');
-        return;
-    }
-
-    btn.disabled = true;
-    btn.textContent = 'Signing in...';
-
-    try {
-        var resp = await fetch(API + '/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'same-origin',
-            body: JSON.stringify({ username: username, password: password })
-        });
-        var data = await resp.json();
-
-        if (!resp.ok) {
-            errorEl.textContent = data.detail || 'Login failed';
-            errorEl.classList.add('visible');
-            return;
-        }
-
-        document.getElementById('topbar-username').textContent = data.user.display_name || data.user.username;
-        showScreen('dashboard');
-        loadAll();
-    } catch (e) {
-        errorEl.textContent = 'Network error';
-        errorEl.classList.add('visible');
-    } finally {
-        btn.disabled = false;
-        btn.textContent = 'Sign In';
-    }
-}
-
-async function doSetup() {
-    var username = document.getElementById('setup-username').value.trim();
-    var password = document.getElementById('setup-password').value;
-    var displayName = document.getElementById('setup-display').value.trim();
-    var errorEl = document.getElementById('setup-error');
-    var btn = document.getElementById('setup-btn');
-
-    errorEl.classList.remove('visible');
-
-    if (!username || !password) {
-        errorEl.textContent = 'Username and password are required';
-        errorEl.classList.add('visible');
-        return;
-    }
-
-    btn.disabled = true;
-    btn.textContent = 'Creating account...';
-
-    try {
-        // Create the first admin user (no auth needed)
-        var createResp = await fetch(API + '/users', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                username: username,
-                password: password,
-                display_name: displayName || null
-            })
-        });
-        var createData = await createResp.json();
-
-        if (!createResp.ok) {
-            errorEl.textContent = createData.detail || 'Failed to create account';
-            errorEl.classList.add('visible');
-            return;
-        }
-
-        // Auto-login with same credentials
-        var loginResp = await fetch(API + '/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'same-origin',
-            body: JSON.stringify({ username: username, password: password })
-        });
-        var loginData = await loginResp.json();
-
-        if (!loginResp.ok) {
-            errorEl.textContent = 'Account created but login failed. Please use the login form.';
-            errorEl.classList.add('visible');
-            showScreen('login');
-            return;
-        }
-
-        document.getElementById('topbar-username').textContent = loginData.user.display_name || loginData.user.username;
-        showScreen('dashboard');
-        loadAll();
-    } catch (e) {
-        errorEl.textContent = 'Network error';
-        errorEl.classList.add('visible');
-    } finally {
-        btn.disabled = false;
-        btn.textContent = 'Create Account';
-    }
+    // Not authenticated — redirect to landing
+    window.location.href = '/';
 }
 
 async function doLogout() {
     try {
-        await fetch(API + '/logout', { method: 'POST', credentials: 'same-origin' });
+        await fetch(API + '/user-logout', { method: 'POST', credentials: 'same-origin' });
     } catch (e) { /* ignore */ }
-    showScreen('login');
+    window.location.href = '/';
 }
 
 // ===== API Calls =====
@@ -1030,7 +934,6 @@ async function loadAll() {
         authFetch(API + '/dashboard').then(function(r) { return r.json(); }),
         authFetch(API + '/sources').then(function(r) { return r.json(); }),
         authFetch(API + '/sync-history?limit=20').then(function(r) { return r.json(); }),
-        authFetch(API + '/users').then(function(r) { return r.json(); }),
         authFetch(API + '/backups').then(function(r) { return r.json(); }),
         authFetch(API + '/backups/ssh-pubkey').then(function(r) { return r.ok ? r.json() : null; }),
         authFetch(API + '/backups/schedule').then(function(r) { return r.ok ? r.json() : null; }),
@@ -1040,15 +943,15 @@ async function loadAll() {
     if (results[0].status === 'fulfilled') populateDashboard(results[0].value);
     if (results[1].status === 'fulfilled') populateSources(results[1].value);
     if (results[2].status === 'fulfilled') populateSyncHistory(results[2].value);
-    if (results[3].status === 'fulfilled') populateUsers(results[3].value);
-    if (results[4].status === 'fulfilled') populateBackups(results[4].value);
+    if (results[3].status === 'fulfilled') populateBackups(results[3].value);
+    if (results[4].status === 'fulfilled' && results[4].value) {
+        document.getElementById('ssh-pubkey').value = results[4].value.public_key;
+    }
     if (results[5].status === 'fulfilled' && results[5].value) {
-        document.getElementById('ssh-pubkey').value = results[5].value.public_key;
+        setDailyBackupToggle(results[5].value.daily_enabled);
     }
-    if (results[6].status === 'fulfilled' && results[6].value) {
-        setDailyBackupToggle(results[6].value.daily_enabled);
-    }
-    if (results[7].status === 'fulfilled') populateRegistrations(results[7].value);
+    if (results[6].status === 'fulfilled') _registrationsCache = results[6].value.registrations || [];
+    populateAllUsers();
 }
 
 // ===== Populate Functions =====
@@ -1151,22 +1054,67 @@ function populateSyncHistory(data) {
     tbody.innerHTML = html;
 }
 
-function populateUsers(data) {
-    var tbody = document.getElementById('users-tbody');
-    if (!data.users || data.users.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="empty">No admin users created yet</td></tr>';
+function populateAllUsers() {
+    var tbody = document.getElementById('all-users-tbody');
+    var filter = currentUserFilter;
+    var rows = [];
+
+    _registrationsCache.forEach(function(r) {
+        if (filter && r.status !== filter) return;
+        rows.push(r);
+    });
+
+    // Update pending count badges
+    var pendingCount = _registrationsCache.filter(function(r) { return r.status === 'pending'; }).length;
+    var badge = document.getElementById('reg-count-badge');
+    var tabBadge = document.getElementById('tab-users-badge');
+    if (pendingCount > 0) {
+        badge.textContent = pendingCount;
+        badge.style.display = '';
+        tabBadge.textContent = pendingCount;
+        tabBadge.style.display = '';
+    } else {
+        badge.style.display = 'none';
+        tabBadge.style.display = 'none';
+    }
+
+    if (rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty">No users found</td></tr>';
         return;
     }
+
+    // Sort: pending first, then by date desc
+    rows.sort(function(a, b) {
+        var aP = a.status === 'pending' ? 0 : 1;
+        var bP = b.status === 'pending' ? 0 : 1;
+        if (aP !== bP) return aP - bP;
+        return (b.created_at || '').localeCompare(a.created_at || '');
+    });
+
     var html = '';
-    data.users.forEach(function(u) {
+    rows.forEach(function(r) {
+        var actions = '';
+        if (r.status === 'pending') {
+            actions +=
+                '<button class="btn btn--sm btn--approve" onclick="approveRegistration(' + r.id + ')">Approve</button> ' +
+                '<button class="btn btn--sm btn--deny" onclick="denyRegistration(' + r.id + ')">Deny</button> ';
+        }
+        actions +=
+            '<button class="btn btn--sm btn--ghost" onclick="openEditUserModal(' + r.id + ')">Edit</button> ' +
+            '<button class="btn btn--sm btn--danger" onclick="deleteRegistration(' + r.id + ',\'' + escHtml(r.first_name + ' ' + r.last_name).replace(/'/g,'&#39;') + '\')">Delete</button>';
+
+        var statusClass = r.status === 'approved' ? 'approved' : r.status === 'denied' ? 'denied' : 'pending';
+        var expiresDisplay = r.expires_at ? formatDate(r.expires_at) : '<span style="color:var(--text-dim)">—</span>';
+        var roleClass = (r.role || 'user') === 'admin' ? 'ok' : 'inactive';
+
         html += '<tr>' +
-            '<td>' + escHtml(u.username) + '</td>' +
-            '<td>' + escHtml(u.display_name || '—') + '</td>' +
-            '<td><span class="badge badge--active">' + escHtml(u.role) + '</span></td>' +
-            '<td>' + (u.is_active ? '<span class="badge badge--active">Active</span>' : '<span class="badge badge--inactive">Inactive</span>') + '</td>' +
-            '<td>' + (u.last_login ? formatDateTime(u.last_login) : '<span style="color:var(--text-dim)">Never</span>') + '</td>' +
-            '<td>' + formatDate(u.created_at) + '</td>' +
-            '<td><button class="btn btn--sm btn--reset" onclick="resetUserPassword(' + u.id + ',\'' + escHtml(u.username) + '\')">Reset Password</button></td>' +
+            '<td>' + escHtml(r.first_name + ' ' + r.last_name) + '</td>' +
+            '<td>' + escHtml(r.email) + '</td>' +
+            '<td><span class="badge badge--' + roleClass + '">' + escHtml(r.role || 'user') + '</span></td>' +
+            '<td><span class="badge badge--' + statusClass + '">' + escHtml(r.status) + '</span></td>' +
+            '<td style="white-space:nowrap">' + expiresDisplay + '</td>' +
+            '<td style="white-space:nowrap">' + formatDate(r.created_at) + '</td>' +
+            '<td style="white-space:nowrap">' + actions + '</td>' +
             '</tr>';
     });
     tbody.innerHTML = html;
@@ -1212,44 +1160,6 @@ async function addDataSource() {
         // Refresh sources
         var data = await authFetch(API + '/sources').then(function(r) { return r.json(); });
         populateSources(data);
-    } catch (err) {
-        if (err.message !== 'Session expired') showToast('Network error: ' + err.message, 'error');
-    }
-}
-
-async function createAdminUser() {
-    var username = document.getElementById('user-name').value.trim();
-    var password = document.getElementById('user-pass').value;
-    var displayName = document.getElementById('user-display').value.trim();
-
-    if (!username || !password) {
-        showToast('Username and password are required', 'error');
-        return;
-    }
-
-    try {
-        var resp = await authFetch(API + '/users', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                username: username,
-                password: password,
-                display_name: displayName || null
-            })
-        });
-        var result = await resp.json();
-        if (!resp.ok) {
-            showToast(result.detail || 'Failed to create user', 'error');
-            return;
-        }
-        showToast('Admin user "' + username + '" created', 'ok');
-        document.getElementById('user-name').value = '';
-        document.getElementById('user-pass').value = '';
-        document.getElementById('user-display').value = '';
-        togglePanel('add-user-panel');
-        // Refresh users
-        var data = await authFetch(API + '/users').then(function(r) { return r.json(); });
-        populateUsers(data);
     } catch (err) {
         if (err.message !== 'Session expired') showToast('Network error: ' + err.message, 'error');
     }
@@ -1480,67 +1390,28 @@ async function toggleDailyBackup() {
     }
 }
 
-// ===== Registrations =====
+// ===== Users (Unified) =====
 
-var currentRegFilter = '';
+var currentUserFilter = '';
+var _registrationsCache = [];
 
-function populateRegistrations(data) {
-    var tbody = document.getElementById('registrations-tbody');
-    var regs = data.registrations || [];
-
-    // Update pending count badge
-    var pendingCount = regs.filter(function(r) { return r.status === 'pending'; }).length;
-    var badge = document.getElementById('reg-count-badge');
-    if (pendingCount > 0) {
-        badge.textContent = pendingCount;
-        badge.style.display = '';
-    } else {
-        badge.style.display = 'none';
-    }
-
-    if (regs.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="empty">No registrations found</td></tr>';
-        return;
-    }
-    var html = '';
-    regs.forEach(function(r) {
-        var statusClass = r.status === 'approved' ? 'approved' : r.status === 'denied' ? 'denied' : 'pending';
-        var actions = '';
-        if (r.status === 'pending') {
-            actions =
-                '<button class="btn btn--sm btn--approve" onclick="approveRegistration(' + r.id + ')">Approve</button> ' +
-                '<button class="btn btn--sm btn--deny" onclick="denyRegistration(' + r.id + ')">Deny</button>';
-        } else {
-            actions = '<span style="color:var(--text-dim);font-size:10px">—</span>';
-        }
-        html += '<tr>' +
-            '<td>' + escHtml(r.first_name + ' ' + r.last_name) + '</td>' +
-            '<td>' + escHtml(r.email) + '</td>' +
-            '<td style="white-space:nowrap">' + timeAgo(r.created_at) + '</td>' +
-            '<td><span class="badge badge--' + statusClass + '">' + escHtml(r.status) + '</span></td>' +
-            '<td>' + (r.reviewed_by ? escHtml(r.reviewed_by) : '<span style="color:var(--text-dim)">—</span>') + '</td>' +
-            '<td>' + actions + '</td>' +
-            '</tr>';
-    });
-    tbody.innerHTML = html;
-}
-
-function filterRegistrations(btn, status) {
+function filterUsers(btn, status) {
     document.querySelectorAll('.reg-tab').forEach(function(t) { t.classList.remove('active'); });
     btn.classList.add('active');
-    currentRegFilter = status;
-    loadRegistrations(status);
+    currentUserFilter = status;
+    reloadAllUsers(status);
 }
 
-async function loadRegistrations(status) {
+async function reloadAllUsers(regFilter) {
     try {
-        var url = API + '/registrations';
-        if (status) url += '?status=' + status;
-        var resp = await authFetch(url);
+        var regUrl = API + '/registrations';
+        if (regFilter) regUrl += '?status=' + regFilter;
+        var resp = await authFetch(regUrl);
         var data = await resp.json();
-        populateRegistrations(data);
+        _registrationsCache = data.registrations || [];
+        populateAllUsers();
     } catch (err) {
-        if (err.message !== 'Session expired') showToast('Failed to load registrations', 'error');
+        if (err.message !== 'Session expired') showToast('Failed to load users', 'error');
     }
 }
 
@@ -1554,7 +1425,7 @@ async function approveRegistration(id) {
             return;
         }
         showToast('Registration approved', 'ok');
-        loadRegistrations(currentRegFilter);
+        reloadAllUsers(currentUserFilter);
     } catch (err) {
         if (err.message !== 'Session expired') showToast('Approval failed: ' + err.message, 'error');
     }
@@ -1570,9 +1441,104 @@ async function denyRegistration(id) {
             return;
         }
         showToast('Registration denied', 'ok');
-        loadRegistrations(currentRegFilter);
+        reloadAllUsers(currentUserFilter);
     } catch (err) {
         if (err.message !== 'Session expired') showToast('Denial failed: ' + err.message, 'error');
+    }
+}
+
+function openEditUserModal(id) {
+    var overlay = document.getElementById('edit-user-overlay');
+    document.getElementById('edit-user-id').value = id;
+    document.getElementById('edit-user-password').value = '';
+
+    var reg = _registrationsCache.find(function(r) { return r.id === id; });
+    if (!reg) { showToast('User not found', 'error'); return; }
+    document.getElementById('edit-user-title').textContent = 'Edit User — ' + reg.first_name + ' ' + reg.last_name;
+    document.getElementById('edit-user-first').value = reg.first_name || '';
+    document.getElementById('edit-user-last').value = reg.last_name || '';
+    document.getElementById('edit-user-email').value = reg.email || '';
+    document.getElementById('edit-user-status').value = reg.status || 'pending';
+    document.getElementById('edit-user-role').value = reg.role || 'user';
+    document.getElementById('edit-user-expires').value = reg.expires_at ? reg.expires_at.split('T')[0] : '';
+
+    overlay.classList.add('visible');
+}
+
+function closeEditUserModal(event) {
+    if (event && event.target !== event.currentTarget) return;
+    document.getElementById('edit-user-overlay').classList.remove('visible');
+}
+
+async function saveUser() {
+    var id = document.getElementById('edit-user-id').value;
+    var newPassword = document.getElementById('edit-user-password').value;
+
+    var reg = _registrationsCache.find(function(r) { return r.id == id; });
+    if (!reg) {
+        showToast('User not found in cache', 'error');
+        return;
+    }
+
+    var regBody = {};
+    regBody.first_name = document.getElementById('edit-user-first').value.trim();
+    regBody.last_name = document.getElementById('edit-user-last').value.trim();
+    regBody.email = document.getElementById('edit-user-email').value.trim();
+    if (newPassword) regBody.password = newPassword;
+    regBody.status = document.getElementById('edit-user-status').value;
+    regBody.role = document.getElementById('edit-user-role').value;
+
+    var newExpires = document.getElementById('edit-user-expires').value;
+    var currentExpires = reg.expires_at ? reg.expires_at.split('T')[0] : '';
+    var expiresChanged = newExpires !== currentExpires;
+
+    try {
+        var resp = await authFetch(API + '/registrations/' + id, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(regBody)
+        });
+        var data = await resp.json();
+        if (!resp.ok) {
+            showToast(data.detail || 'Update failed', 'error');
+            return;
+        }
+
+        if (expiresChanged) {
+            var expResp = await authFetch(API + '/registrations/' + id + '/expiration', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ expires_at: newExpires || null })
+            });
+            var expData = await expResp.json();
+            if (!expResp.ok) {
+                showToast(expData.detail || 'Failed to update expiration', 'error');
+                return;
+            }
+        }
+
+        showToast('User updated', 'ok');
+        closeEditUserModal();
+        reloadAllUsers(currentUserFilter);
+    } catch (err) {
+        if (err.message !== 'Session expired') showToast('Update failed: ' + err.message, 'error');
+    }
+}
+
+async function deleteRegistration(regId, name) {
+    if (!confirm('Permanently delete registered user "' + name + '"? This cannot be undone.')) return;
+
+    try {
+        var resp = await authFetch(API + '/registrations/' + regId, { method: 'DELETE' });
+        var data = await resp.json();
+        if (!resp.ok) {
+            showToast(data.detail || 'Delete failed', 'error');
+            return;
+        }
+        showToast('Registration deleted', 'ok');
+        reloadAllUsers(currentUserFilter);
+    } catch (err) {
+        if (err.message !== 'Session expired') showToast('Delete failed: ' + err.message, 'error');
     }
 }
 
@@ -1626,42 +1592,26 @@ function closeLogModal(event) {
     document.getElementById('log-modal-overlay').classList.remove('visible');
 }
 
-// Close modal on Escape key
+// Close modals on Escape key
 document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') closeLogModal();
+    if (e.key === 'Escape') {
+        closeLogModal();
+        closeEditUserModal();
+    }
 });
 
-// ===== Reset Password =====
+// ===== Tab Navigation =====
 
-async function resetUserPassword(userId, username) {
-    if (!confirm('Reset password for "' + username + '"? A new random password will be generated.')) return;
-    try {
-        var resp = await authFetch(API + '/users/' + userId + '/reset-password', { method: 'PUT' });
-        var data = await resp.json();
-        if (!resp.ok) {
-            showToast(data.detail || 'Password reset failed', 'error');
-            return;
-        }
-        showToast('New password for ' + data.username + ': ' + data.new_password, 'ok');
-    } catch (err) {
-        if (err.message !== 'Session expired') showToast('Password reset failed: ' + err.message, 'error');
-    }
+function switchTab(tabName) {
+    // Update buttons
+    document.querySelectorAll('.tab-btn').forEach(function(btn) {
+        btn.classList.toggle('active', btn.dataset.tab === tabName);
+    });
+    // Update panels
+    document.querySelectorAll('.tab-panel').forEach(function(panel) {
+        panel.classList.toggle('active', panel.id === 'tab-' + tabName);
+    });
 }
-
-// ===== Enter key handlers =====
-
-document.addEventListener('keydown', function(e) {
-    if (e.key !== 'Enter') return;
-    var loginScreen = document.getElementById('login-screen');
-    var setupScreen = document.getElementById('setup-screen');
-    if (loginScreen.classList.contains('visible')) {
-        e.preventDefault();
-        doLogin();
-    } else if (setupScreen.classList.contains('visible')) {
-        e.preventDefault();
-        doSetup();
-    }
-});
 
 // ===== Init =====
 document.addEventListener('DOMContentLoaded', checkAuth);
