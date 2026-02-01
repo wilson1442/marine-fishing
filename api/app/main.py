@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -38,6 +38,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Clear legacy admin_token cookie if present
+@app.middleware("http")
+async def clear_legacy_admin_token(request: Request, call_next):
+    response: Response = await call_next(request)
+    if request.cookies.get("admin_token"):
+        response.delete_cookie(key="admin_token", path="/api/v1/admin", samesite="strict")
+    return response
+
 
 # API routes
 app.include_router(catches.router, prefix="/api/v1/catches", tags=["catches"])
