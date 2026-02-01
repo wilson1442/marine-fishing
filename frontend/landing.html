@@ -472,10 +472,30 @@ body{
         <div style="display:flex;align-items:center;gap:24px">
             <ul class="nav__links">
                 <li><a href="/map">Live Map</a></li>
-                <li><a href="/admin" id="admin-nav-link" style="display:none">Admin</a></li>
                 <li><a href="/api/docs">API</a></li>
             </ul>
-            <a href="#" class="nav-register" onclick="openLoginModal(event)" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;text-decoration:none;color:#060b18;background:linear-gradient(135deg,#4cc9f0,#38b0d8);padding:7px 18px;border-radius:4px;font-weight:500;transition:all 0.3s">Login</a>
+            <a href="#" class="nav-register" id="nav-login-btn" onclick="openLoginModal(event)" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;text-decoration:none;color:#060b18;background:linear-gradient(135deg,#4cc9f0,#38b0d8);padding:7px 18px;border-radius:4px;font-weight:500;transition:all 0.3s">Login</a>
+            <div class="user-menu" id="user-menu" style="display:none">
+                <button class="user-menu__trigger" onclick="toggleUserMenu(event)">
+                    <span id="user-menu-name"></span>
+                    <svg class="user-menu__chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                </button>
+                <div class="user-menu__dropdown">
+                    <button class="user-menu__item" onclick="openProfileModal()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0112 0v1"/></svg>
+                        My Profile
+                    </button>
+                    <a href="/admin" class="user-menu__item" id="user-menu-admin" style="display:none">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                        Admin Dashboard
+                    </a>
+                    <div class="user-menu__divider"></div>
+                    <button class="user-menu__item user-menu__item--danger" onclick="doLogout()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+                        Logout
+                    </button>
+                </div>
+            </div>
         </div>
     </nav>
 
@@ -664,16 +684,16 @@ function countUp(el, target, duration) {
     } catch(e) { console.error(e); }
 })();
 
-// ===== Check if logged in user is admin =====
+// ===== Check if logged in — show user menu =====
 (async function(){
     try {
         var r = await fetch('/api/v1/admin/user-me', { credentials: 'same-origin' });
         if (r.ok) {
             var u = await r.json();
-            if (u.role === 'admin') {
-                var link = document.getElementById('admin-nav-link');
-                if (link) link.style.display = '';
-            }
+            // Hide login button, show user menu
+            var loginBtn = document.getElementById('nav-login-btn');
+            if (loginBtn) loginBtn.style.display = 'none';
+            initUserMenu(u);
         }
     } catch(e) { /* not logged in */ }
 })();
@@ -692,6 +712,178 @@ function countUp(el, target, duration) {
         });
     } catch(e) { console.error(e); }
 })();
+</script>
+
+<!-- User Menu & Profile Styles -->
+<style>
+.user-menu{position:relative;z-index:900}
+.user-menu__trigger{display:flex;align-items:center;gap:6px;background:none;border:1px solid rgba(76,201,240,0.15);border-radius:4px;padding:4px 10px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;color:#c0cddf;transition:all 0.2s;white-space:nowrap}
+.user-menu__trigger:hover{border-color:#4cc9f0;color:#4cc9f0}
+.user-menu__chevron{transition:transform 0.2s;opacity:0.5}
+.user-menu.open .user-menu__chevron{transform:rotate(180deg)}
+.user-menu__dropdown{display:none;position:fixed;min-width:180px;background:rgba(10,20,40,0.95);border:1px solid rgba(76,201,240,0.12);border-radius:6px;box-shadow:0 8px 32px rgba(0,0,0,0.5);overflow:hidden;z-index:910;backdrop-filter:blur(12px)}
+.user-menu.open .user-menu__dropdown{display:block}
+.user-menu__item{display:flex;align-items:center;gap:8px;width:100%;padding:10px 14px;background:none;border:none;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:500;letter-spacing:0.5px;text-transform:uppercase;color:#c0cddf;cursor:pointer;transition:background 0.2s,color 0.2s;text-decoration:none;text-align:left}
+.user-menu__item:hover{background:rgba(76,201,240,0.08);color:#4cc9f0}
+.user-menu__item--danger:hover{color:#ff6b6b}
+.user-menu__divider{height:1px;background:rgba(76,201,240,0.08)}
+.profile-overlay{display:none;position:fixed;inset:0;z-index:2000;align-items:center;justify-content:center;background:rgba(3,8,16,0.85);backdrop-filter:blur(12px)}
+.profile-overlay.open{display:flex}
+.profile-modal{width:100%;max-width:440px;background:rgba(10,20,40,0.9);border:1px solid rgba(76,201,240,0.12);border-radius:12px;box-shadow:0 16px 48px rgba(0,0,0,0.6);overflow:hidden;backdrop-filter:blur(20px)}
+.profile-modal__head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(76,201,240,0.08)}
+.profile-modal__title{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#eaf0ff}
+.profile-modal__close{background:none;border:1px solid rgba(76,201,240,0.12);color:#5a6a80;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:500;letter-spacing:1px;text-transform:uppercase;padding:4px 10px;border-radius:4px;cursor:pointer;transition:all 0.2s}
+.profile-modal__close:hover{color:#c0cddf;border-color:#4cc9f0}
+.profile-modal__body{padding:20px}
+.profile-modal__row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.profile-field{margin-bottom:14px}
+.profile-field__label{display:block;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;color:#5a6a80;margin-bottom:5px}
+.profile-field__input{width:100%;padding:9px 12px;background:rgba(255,255,255,0.03);border:1px solid rgba(76,201,240,0.1);border-radius:6px;color:#eaf0ff;font-family:'JetBrains Mono',monospace;font-size:12px;outline:none;transition:border-color 0.25s,box-shadow 0.25s}
+.profile-field__input:focus{border-color:rgba(76,201,240,0.4);box-shadow:0 0 12px rgba(76,201,240,0.1)}
+.profile-field__input::placeholder{color:#3a4a60}
+.profile-modal__divider{height:1px;background:rgba(76,201,240,0.08);margin:6px 0 14px}
+.profile-modal__actions{display:flex;gap:8px;margin-top:8px}
+.profile-modal__actions button{flex:1;padding:12px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;border:none;border-radius:6px;cursor:pointer;transition:all 0.3s}
+.profile-modal__actions .btn--primary{color:#060b18;background:linear-gradient(135deg,#4cc9f0,#38b0d8)}
+.profile-modal__actions .btn--primary:hover{box-shadow:0 0 20px rgba(76,201,240,0.3)}
+.profile-modal__actions .btn--ghost{color:#5a6a80;background:transparent;border:1px solid rgba(76,201,240,0.1)}
+.profile-modal__actions .btn--ghost:hover{border-color:rgba(76,201,240,0.3);color:#c0cddf}
+.profile-msg{font-family:'JetBrains Mono',monospace;font-size:11px;text-align:center;margin-top:10px;padding:6px 10px;border-radius:4px;display:none}
+.profile-msg.show{display:block}
+.profile-msg--ok{color:#3dffa2;background:rgba(61,255,162,0.08);border:1px solid rgba(61,255,162,0.15)}
+.profile-msg--err{color:#ff6b6b;background:rgba(255,107,107,0.08);border:1px solid rgba(255,107,107,0.15)}
+</style>
+
+<!-- Profile Modal -->
+<div class="profile-overlay" id="profile-overlay">
+    <div class="profile-modal">
+        <div class="profile-modal__head">
+            <div class="profile-modal__title">My Profile</div>
+            <button class="profile-modal__close" onclick="closeProfileModal()">Close</button>
+        </div>
+        <div class="profile-modal__body">
+            <div class="profile-modal__row">
+                <div class="profile-field">
+                    <label class="profile-field__label">First Name</label>
+                    <input type="text" class="profile-field__input" id="profile-first">
+                </div>
+                <div class="profile-field">
+                    <label class="profile-field__label">Last Name</label>
+                    <input type="text" class="profile-field__input" id="profile-last">
+                </div>
+            </div>
+            <div class="profile-field">
+                <label class="profile-field__label">Email</label>
+                <input type="email" class="profile-field__input" id="profile-email">
+            </div>
+            <div class="profile-modal__divider"></div>
+            <div class="profile-field">
+                <label class="profile-field__label">Current Password</label>
+                <input type="password" class="profile-field__input" id="profile-current-pass" placeholder="Required to change password">
+            </div>
+            <div class="profile-field">
+                <label class="profile-field__label">New Password</label>
+                <input type="password" class="profile-field__input" id="profile-new-pass" placeholder="Leave empty to keep current">
+            </div>
+            <div class="profile-modal__actions">
+                <button class="btn--primary" onclick="saveProfile()">Save</button>
+                <button class="btn--ghost" onclick="closeProfileModal()">Cancel</button>
+            </div>
+            <div class="profile-msg" id="profile-msg"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ===== User Menu & Profile (Landing) =====
+function initUserMenu(userData) {
+    var container = document.getElementById('user-menu');
+    if (!container) return;
+    var nameEl = document.getElementById('user-menu-name');
+    if (nameEl) nameEl.textContent = userData.first_name + ' ' + userData.last_name;
+    container.style.display = '';
+    var adminItem = document.getElementById('user-menu-admin');
+    if (adminItem) adminItem.style.display = userData.role === 'admin' ? '' : 'none';
+    var el;
+    el = document.getElementById('profile-first'); if (el) el.value = userData.first_name || '';
+    el = document.getElementById('profile-last'); if (el) el.value = userData.last_name || '';
+    el = document.getElementById('profile-email'); if (el) el.value = userData.email || '';
+}
+function toggleUserMenu(e) {
+    if (e) e.stopPropagation();
+    var menu = document.getElementById('user-menu');
+    if (!menu) return;
+    menu.classList.toggle('open');
+    if (menu.classList.contains('open')) {
+        var trigger = menu.querySelector('.user-menu__trigger');
+        var dropdown = menu.querySelector('.user-menu__dropdown');
+        if (trigger && dropdown) {
+            var rect = trigger.getBoundingClientRect();
+            dropdown.style.top = (rect.bottom + 6) + 'px';
+            dropdown.style.right = (window.innerWidth - rect.right) + 'px';
+        }
+    }
+}
+document.addEventListener('click', function(e) {
+    var menu = document.getElementById('user-menu');
+    if (menu && !menu.contains(e.target)) menu.classList.remove('open');
+});
+function openProfileModal() {
+    var menu = document.getElementById('user-menu');
+    if (menu) menu.classList.remove('open');
+    var overlay = document.getElementById('profile-overlay');
+    if (overlay) overlay.classList.add('open');
+    var cp = document.getElementById('profile-current-pass'); if (cp) cp.value = '';
+    var np = document.getElementById('profile-new-pass'); if (np) np.value = '';
+    var msg = document.getElementById('profile-msg');
+    if (msg) { msg.className = 'profile-msg'; msg.textContent = ''; }
+}
+function closeProfileModal() {
+    var overlay = document.getElementById('profile-overlay');
+    if (overlay) overlay.classList.remove('open');
+}
+async function saveProfile() {
+    var first = document.getElementById('profile-first').value.trim();
+    var last = document.getElementById('profile-last').value.trim();
+    var email = document.getElementById('profile-email').value.trim();
+    var currentPass = document.getElementById('profile-current-pass').value;
+    var newPass = document.getElementById('profile-new-pass').value;
+    var msg = document.getElementById('profile-msg');
+    msg.className = 'profile-msg'; msg.textContent = '';
+    if (!first || !last || !email) {
+        msg.textContent = 'First name, last name, and email are required';
+        msg.className = 'profile-msg profile-msg--err show'; return;
+    }
+    var body = { first_name: first, last_name: last, email: email };
+    if (newPass) { body.current_password = currentPass; body.new_password = newPass; }
+    try {
+        var resp = await fetch('/api/v1/admin/user-me', {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin', body: JSON.stringify(body)
+        });
+        var data = await resp.json();
+        if (!resp.ok) { msg.textContent = data.detail || 'Update failed'; msg.className = 'profile-msg profile-msg--err show'; return; }
+        msg.textContent = 'Profile updated'; msg.className = 'profile-msg profile-msg--ok show';
+        var nameEl = document.getElementById('user-menu-name');
+        if (nameEl) nameEl.textContent = data.first_name + ' ' + data.last_name;
+        document.getElementById('profile-current-pass').value = '';
+        document.getElementById('profile-new-pass').value = '';
+    } catch (e) { msg.textContent = 'Network error'; msg.className = 'profile-msg profile-msg--err show'; }
+}
+function doLogout() {
+    fetch('/api/v1/admin/user-logout', { method: 'POST', credentials: 'same-origin' })
+        .finally(function() { window.location.href = '/'; });
+}
+// Close profile modal on overlay click and Escape
+document.getElementById('profile-overlay').addEventListener('click', function(e) {
+    if (e.target === this) closeProfileModal();
+});
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        var prof = document.getElementById('profile-overlay');
+        if (prof && prof.classList.contains('open')) closeProfileModal();
+    }
+});
 </script>
 
 <!-- Registration Modal -->

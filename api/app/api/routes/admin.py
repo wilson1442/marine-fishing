@@ -63,6 +63,14 @@ class ExpirationUpdate(BaseModel):
     expires_at: Optional[str] = None
 
 
+class ProfileUpdate(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    email: Optional[str] = None
+    current_password: Optional[str] = None
+    new_password: Optional[str] = None
+
+
 class RegistrationUpdate(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
@@ -1037,6 +1045,91 @@ def get_user_me(request: Request, db: Session = Depends(get_db)):
         "first_name": row.first_name,
         "last_name": row.last_name,
         "role": row.role or "user",
+    }
+
+
+@router.put("/user-me")
+def update_user_me(update: ProfileUpdate, request: Request, db: Session = Depends(get_db)):
+    """Self-service profile update for the authenticated user."""
+    _ensure_registered_users_table(db)
+
+    token = request.cookies.get("user_token")
+    payload = _verify_token(token)
+    if payload is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    row = db.execute(
+        text("SELECT id, email, first_name, last_name, password_hash, salt, status, expires_at, role FROM registered_users WHERE id = :id"),
+        {"id": payload["user_id"]},
+    ).fetchone()
+
+    if not row or row.status != "approved":
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    if row.expires_at and row.expires_at < datetime.utcnow():
+        raise HTTPException(status_code=403, detail="Account expired")
+
+    fields = []
+    params = {"id": row.id}
+
+    if update.first_name is not None:
+        if not update.first_name.strip():
+            raise HTTPException(status_code=400, detail="First name cannot be empty")
+        fields.append("first_name = :first_name")
+        params["first_name"] = update.first_name.strip()
+
+    if update.last_name is not None:
+        if not update.last_name.strip():
+            raise HTTPException(status_code=400, detail="Last name cannot be empty")
+        fields.append("last_name = :last_name")
+        params["last_name"] = update.last_name.strip()
+
+    if update.email is not None:
+        email = update.email.strip().lower()
+        if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
+            raise HTTPException(status_code=400, detail="Invalid email format")
+        dup = db.execute(
+            text("SELECT id FROM registered_users WHERE email = :email AND id != :id"),
+            {"email": email, "id": row.id}
+        ).fetchone()
+        if dup:
+            raise HTTPException(status_code=409, detail="An account with this email already exists")
+        fields.append("email = :email")
+        params["email"] = email
+
+    if update.new_password is not None:
+        if not update.current_password:
+            raise HTTPException(status_code=400, detail="Current password is required to set a new password")
+        expected_hash = _hash_password(update.current_password, row.salt)
+        if expected_hash != row.password_hash:
+            raise HTTPException(status_code=400, detail="Current password is incorrect")
+        if len(update.new_password) < 6:
+            raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
+        salt = secrets.token_hex(32)
+        password_hash = _hash_password(update.new_password, salt)
+        fields.append("password_hash = :password_hash")
+        fields.append("salt = :salt")
+        params["password_hash"] = password_hash
+        params["salt"] = salt
+
+    if not fields:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    query = f"UPDATE registered_users SET {', '.join(fields)} WHERE id = :id"
+    db.execute(text(query), params)
+    db.commit()
+
+    updated = db.execute(
+        text("SELECT id, email, first_name, last_name, role FROM registered_users WHERE id = :id"),
+        {"id": row.id},
+    ).fetchone()
+
+    return {
+        "id": updated.id,
+        "email": updated.email,
+        "first_name": updated.first_name,
+        "last_name": updated.last_name,
+        "role": updated.role or "user",
     }
 
 

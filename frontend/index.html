@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="/css/vendor/MarkerCluster.css" />
     <link rel="stylesheet" href="/css/vendor/MarkerCluster.Default.css" />
 
-    <link rel="stylesheet" href="/css/style.css?v=12" />
+    <link rel="stylesheet" href="/css/style.css?v=13" />
 </head>
 <body>
     <div class="scanline-overlay"></div>
@@ -131,6 +131,27 @@
                 <div class="topbar__brand">
                     <svg class="topbar__icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 17c1.5-2 3-3 5-3s3.5 1 5 3 3 3 5 3 3.5-1 5-3"/><path d="M3 12c1.5-2 3-3 5-3s3.5 1 5 3 3 3 5 3 3.5-1 5-3"/><path d="M12 2v5M12 22v-3"/></svg>
                     <span class="topbar__name">Marine Fishing Intelligence</span>
+                </div>
+                <div class="user-menu" id="user-menu" style="display:none">
+                    <button class="user-menu__trigger" onclick="toggleUserMenu(event)">
+                        <span id="user-menu-name"></span>
+                        <svg class="user-menu__chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                    </button>
+                    <div class="user-menu__dropdown">
+                        <button class="user-menu__item" onclick="openProfileModal()">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0112 0v1"/></svg>
+                            My Profile
+                        </button>
+                        <a href="/admin" class="user-menu__item" id="user-menu-admin" style="display:none">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                            Admin Dashboard
+                        </a>
+                        <div class="user-menu__divider"></div>
+                        <button class="user-menu__item user-menu__item--danger" onclick="doLogout()">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+                            Logout
+                        </button>
+                    </div>
                 </div>
                 <div class="topbar__stats">
                     <div class="topbar__stat">
@@ -284,9 +305,49 @@
 
     </div>
 
+    <!-- Profile Modal -->
+    <div class="profile-overlay" id="profile-overlay">
+        <div class="profile-modal">
+            <div class="profile-modal__head">
+                <div class="profile-modal__title">My Profile</div>
+                <button class="profile-modal__close" onclick="closeProfileModal()">Close</button>
+            </div>
+            <div class="profile-modal__body">
+                <div class="profile-modal__row">
+                    <div class="profile-field">
+                        <label class="profile-field__label">First Name</label>
+                        <input type="text" class="profile-field__input" id="profile-first">
+                    </div>
+                    <div class="profile-field">
+                        <label class="profile-field__label">Last Name</label>
+                        <input type="text" class="profile-field__input" id="profile-last">
+                    </div>
+                </div>
+                <div class="profile-field">
+                    <label class="profile-field__label">Email</label>
+                    <input type="email" class="profile-field__input" id="profile-email">
+                </div>
+                <div class="profile-modal__divider"></div>
+                <div class="profile-field">
+                    <label class="profile-field__label">Current Password</label>
+                    <input type="password" class="profile-field__input" id="profile-current-pass" placeholder="Required to change password">
+                </div>
+                <div class="profile-field">
+                    <label class="profile-field__label">New Password</label>
+                    <input type="password" class="profile-field__input" id="profile-new-pass" placeholder="Leave empty to keep current">
+                </div>
+                <div class="profile-modal__actions">
+                    <button class="btn btn--primary" onclick="saveProfile()">Save</button>
+                    <button class="btn btn--ghost" onclick="closeProfileModal()">Cancel</button>
+                </div>
+                <div class="profile-msg" id="profile-msg"></div>
+            </div>
+        </div>
+    </div>
+
     <script src="/js/vendor/leaflet.js"></script>
     <script src="/js/vendor/leaflet.markercluster.js"></script>
-    <script src="/js/config.js?v=12"></script>
-    <script src="/js/app.js?v=12"></script>
+    <script src="/js/config.js?v=15"></script>
+    <script src="/js/app.js?v=15"></script>
 </body>
 </html>

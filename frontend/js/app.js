@@ -45,11 +45,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             return;
         }
         var userData = await authResp.json();
-        // Show Admin link if user has admin role
-        if (userData.role === 'admin') {
-            var adminLink = document.getElementById('admin-nav-link');
-            if (adminLink) adminLink.style.display = '';
-        }
+        initUserMenu(userData);
     } catch (e) {
         window.location.href = '/';
         return;
@@ -1165,3 +1161,139 @@ function onMapClickWeather(e) {
             }
         });
 }
+
+// ---- User Menu & Profile ----
+
+function initUserMenu(userData) {
+    var container = document.getElementById('user-menu');
+    if (!container) return;
+    var nameEl = document.getElementById('user-menu-name');
+    if (nameEl) nameEl.textContent = userData.first_name + ' ' + userData.last_name;
+    container.style.display = '';
+
+    // Show/hide admin link
+    var adminItem = document.getElementById('user-menu-admin');
+    if (adminItem) {
+        adminItem.style.display = userData.role === 'admin' ? '' : 'none';
+    }
+
+    // Pre-fill profile modal
+    var el;
+    el = document.getElementById('profile-first'); if (el) el.value = userData.first_name || '';
+    el = document.getElementById('profile-last'); if (el) el.value = userData.last_name || '';
+    el = document.getElementById('profile-email'); if (el) el.value = userData.email || '';
+}
+
+function toggleUserMenu(e) {
+    if (e) e.stopPropagation();
+    var menu = document.getElementById('user-menu');
+    if (!menu) return;
+    menu.classList.toggle('open');
+    if (menu.classList.contains('open')) {
+        var trigger = menu.querySelector('.user-menu__trigger');
+        var dropdown = menu.querySelector('.user-menu__dropdown');
+        if (trigger && dropdown) {
+            var rect = trigger.getBoundingClientRect();
+            dropdown.style.top = (rect.bottom + 6) + 'px';
+            dropdown.style.right = (window.innerWidth - rect.right) + 'px';
+        }
+    }
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function (e) {
+    var menu = document.getElementById('user-menu');
+    if (menu && !menu.contains(e.target)) {
+        menu.classList.remove('open');
+    }
+});
+
+function openProfileModal() {
+    var menu = document.getElementById('user-menu');
+    if (menu) menu.classList.remove('open');
+    var overlay = document.getElementById('profile-overlay');
+    if (overlay) overlay.classList.add('open');
+    // Clear password fields and messages
+    var cp = document.getElementById('profile-current-pass'); if (cp) cp.value = '';
+    var np = document.getElementById('profile-new-pass'); if (np) np.value = '';
+    var msg = document.getElementById('profile-msg');
+    if (msg) { msg.className = 'profile-msg'; msg.textContent = ''; }
+}
+
+function closeProfileModal() {
+    var overlay = document.getElementById('profile-overlay');
+    if (overlay) overlay.classList.remove('open');
+}
+
+async function saveProfile() {
+    var first = document.getElementById('profile-first').value.trim();
+    var last = document.getElementById('profile-last').value.trim();
+    var email = document.getElementById('profile-email').value.trim();
+    var currentPass = document.getElementById('profile-current-pass').value;
+    var newPass = document.getElementById('profile-new-pass').value;
+    var msg = document.getElementById('profile-msg');
+
+    msg.className = 'profile-msg';
+    msg.textContent = '';
+
+    if (!first || !last || !email) {
+        msg.textContent = 'First name, last name, and email are required';
+        msg.className = 'profile-msg profile-msg--err show';
+        return;
+    }
+
+    var body = { first_name: first, last_name: last, email: email };
+    if (newPass) {
+        body.current_password = currentPass;
+        body.new_password = newPass;
+    }
+
+    try {
+        var resp = await fetch('/api/v1/admin/user-me', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify(body)
+        });
+        var data = await resp.json();
+        if (!resp.ok) {
+            msg.textContent = data.detail || 'Update failed';
+            msg.className = 'profile-msg profile-msg--err show';
+            return;
+        }
+        msg.textContent = 'Profile updated';
+        msg.className = 'profile-msg profile-msg--ok show';
+        // Update displayed name
+        var nameEl = document.getElementById('user-menu-name');
+        if (nameEl) nameEl.textContent = data.first_name + ' ' + data.last_name;
+        // Clear password fields
+        document.getElementById('profile-current-pass').value = '';
+        document.getElementById('profile-new-pass').value = '';
+    } catch (e) {
+        msg.textContent = 'Network error';
+        msg.className = 'profile-msg profile-msg--err show';
+    }
+}
+
+function doLogout() {
+    fetch('/api/v1/admin/user-logout', { method: 'POST', credentials: 'same-origin' })
+        .finally(function () { window.location.href = '/'; });
+}
+
+// Close profile modal on overlay click
+(function () {
+    var overlay = document.getElementById('profile-overlay');
+    if (overlay) {
+        overlay.addEventListener('click', function (e) {
+            if (e.target === this) closeProfileModal();
+        });
+    }
+})();
+
+// Close profile modal on Escape
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+        var overlay = document.getElementById('profile-overlay');
+        if (overlay && overlay.classList.contains('open')) closeProfileModal();
+    }
+});
