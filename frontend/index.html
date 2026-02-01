@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="/css/vendor/MarkerCluster.css" />
     <link rel="stylesheet" href="/css/vendor/MarkerCluster.Default.css" />
 
-    <link rel="stylesheet" href="/css/style.css?v=13" />
+    <link rel="stylesheet" href="/css/style.css?v=16" />
 </head>
 <body>
     <div class="scanline-overlay"></div>
@@ -118,7 +118,7 @@
                         </div>
                         <div class="gfw-stat">
                             <span class="gfw-stat__val" id="ais-effort-total">0</span>
-                            <span class="gfw-stat__label">Effort</span>
+                            <span class="gfw-stat__label">Positions</span>
                         </div>
                     </div>
                 </div>
@@ -229,10 +229,17 @@
                         <span class="map-layer-toggle__name">Weather Grid</span>
                         <span class="map-layer-toggle__count" id="weather-grid-count"></span>
                     </label>
+                    <label class="map-layer-toggle">
+                        <input type="checkbox" id="sst-overlay-toggle" />
+                        <span class="map-layer-toggle__swatch" style="background:#f46d43"></span>
+                        <span class="map-layer-toggle__name">SST Heatmap</span>
+                        <span class="map-layer-toggle__count" id="sst-grid-count"></span>
+                    </label>
                 </div>
                 <!-- Species legend overlay at bottom of map -->
                 <div class="species-overlay" id="species-overlay">
                     <span class="species-overlay__label">Species</span>
+                    <button class="species-overlay__toggle" id="toggle-all-species">Hide All</button>
                     <div class="species-overlay__items" id="legend-items"></div>
                 </div>
             </div>
@@ -347,7 +354,7 @@
 
     <script src="/js/vendor/leaflet.js"></script>
     <script src="/js/vendor/leaflet.markercluster.js"></script>
-    <script src="/js/config.js?v=15"></script>
-    <script src="/js/app.js?v=15"></script>
+    <script src="/js/config.js?v=16"></script>
+    <script src="/js/app.js?v=16"></script>
 </body>
 </html>

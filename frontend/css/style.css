@@ -58,7 +58,7 @@ fieldset { border: none; }
 /* ---- App shell grid ---- */
 .app-shell {
     display: grid;
-    grid-template-columns: var(--sidebar-w) 1fr;
+    grid-template-columns: auto 1fr;
     height: 100vh;
     overflow: hidden;
 }
@@ -117,7 +117,28 @@ fieldset { border: none; }
 }
 
 /* ---- Filter Panel ---- */
-.panel--filters { border-right: 1px solid var(--steel); }
+.panel--filters {
+    border-right: 1px solid var(--steel);
+    width: var(--sidebar-w);
+    transition: width 0.25s ease, min-width 0.25s ease, padding 0.25s ease, border-width 0.25s ease, opacity 0.25s ease;
+}
+.panel--filters.collapsed {
+    width: 36px;
+    min-width: 36px;
+    overflow: hidden;
+}
+.panel--filters.collapsed .panel__body { display: none; }
+.panel--filters.collapsed .panel__header {
+    padding: 12px 6px;
+    justify-content: center;
+}
+.panel--filters.collapsed .panel__title-group { display: none; }
+.panel--filters .panel__collapse {
+    transition: color var(--transition), background var(--transition), transform 0.25s ease;
+}
+.panel--filters.collapsed .panel__collapse {
+    transform: rotate(180deg);
+}
 
 .field { margin-bottom: 16px; }
 
@@ -474,6 +495,28 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     color: var(--text-dim);
     flex-shrink: 0;
     pointer-events: auto;
+}
+
+.species-overlay__toggle {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    background: rgba(22,27,51,0.8);
+    border: 1px solid var(--steel);
+    border-radius: 10px;
+    color: var(--text-dim);
+    cursor: pointer;
+    pointer-events: auto;
+    flex-shrink: 0;
+    transition: all var(--transition);
+    backdrop-filter: blur(6px);
+}
+.species-overlay__toggle:hover {
+    border-color: var(--cyan);
+    color: var(--cyan);
 }
 
 .species-overlay__items {

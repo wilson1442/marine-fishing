@@ -82,6 +82,18 @@ const weatherConfig = {
         { max: 2.0, color: '#ffa94d' },   // amber - moderate
         { max: Infinity, color: '#ff6b6b' } // red - rough 3m+
     ],
+    // SST color scale (Fahrenheit): cold blue -> green -> warm red
+    sstColorScale: [
+        { max: 55, color: '#2166ac' },   // deep blue - cold
+        { max: 60, color: '#4393c3' },   // blue
+        { max: 65, color: '#92c5de' },   // light blue
+        { max: 68, color: '#d1e5f0' },   // pale blue
+        { max: 72, color: '#a6d96a' },   // green - temperate
+        { max: 75, color: '#fee08b' },   // yellow-green
+        { max: 78, color: '#fdae61' },   // orange
+        { max: 82, color: '#f46d43' },   // red-orange
+        { max: Infinity, color: '#d73027' } // red - hot
+    ],
     gridDebounceMs: 800,
     minZoom: 4,
 };

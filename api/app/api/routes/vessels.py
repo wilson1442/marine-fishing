@@ -207,50 +207,6 @@ def search_vessels(
 
 
 # ------------------------------------------------------------------
-# Vessel Detail
-# ------------------------------------------------------------------
-
-@router.get("/{mmsi}")
-def get_vessel_detail(mmsi: str, db: Session = Depends(get_db)):
-    """Get detailed vessel info by MMSI with activity stats."""
-    result = db.execute(text("""
-        SELECT
-            v.id, v.mmsi, v.imo, v.vessel_name, v.flag_country, v.vessel_type,
-            v.length_meters, v.gross_tonnage, v.gear_type, v.source, v.metadata,
-            ST_Y(v.last_position) as latitude,
-            ST_X(v.last_position) as longitude,
-            v.last_seen,
-            (SELECT COUNT(*) FROM detected_fishing_events fe WHERE fe.mmsi = v.mmsi) as fishing_event_count,
-            (SELECT COUNT(*) FROM detected_loitering_events le WHERE le.mmsi = v.mmsi) as loitering_event_count,
-            (SELECT COALESCE(SUM(fe.duration_hours), 0) FROM detected_fishing_events fe WHERE fe.mmsi = v.mmsi) as total_fishing_hours
-        FROM vessels v
-        WHERE v.mmsi = :mmsi
-    """), {"mmsi": mmsi}).fetchone()
-
-    if not result:
-        raise HTTPException(status_code=404, detail="Vessel not found")
-
-    return {
-        "id": result.id,
-        "mmsi": result.mmsi,
-        "imo": result.imo,
-        "vessel_name": result.vessel_name,
-        "flag_country": result.flag_country,
-        "vessel_type": result.vessel_type,
-        "length_meters": float(result.length_meters) if result.length_meters else None,
-        "gross_tonnage": result.gross_tonnage,
-        "gear_type": result.gear_type,
-        "source": result.source,
-        "latitude": float(result.latitude) if result.latitude else None,
-        "longitude": float(result.longitude) if result.longitude else None,
-        "last_seen": result.last_seen.isoformat() if result.last_seen else None,
-        "fishing_event_count": result.fishing_event_count or 0,
-        "loitering_event_count": result.loitering_event_count or 0,
-        "total_fishing_hours": float(result.total_fishing_hours) if result.total_fishing_hours else 0,
-    }
-
-
-# ------------------------------------------------------------------
 # Detected Fishing Activity
 # ------------------------------------------------------------------
 
@@ -584,7 +540,7 @@ def get_vessels_summary(db: Session = Depends(get_db)):
         "live_vessels": "SELECT COUNT(DISTINCT mmsi) FROM vessel_positions WHERE received_at > NOW() - INTERVAL '24 hours'",
         "fishing_events": "SELECT COUNT(*) FROM detected_fishing_events",
         "loitering_events": "SELECT COUNT(*) FROM detected_loitering_events",
-        "vessels": "SELECT COUNT(*) FROM vessels WHERE source = 'aisstream'",
+        "vessels": "SELECT COUNT(*) FROM vessels",
         "total_positions": "SELECT COUNT(*) FROM vessel_positions",
         "fishing_effort_cells": "SELECT COUNT(*) FROM fishing_effort",
     }
@@ -618,4 +574,48 @@ def get_vessels_summary(db: Session = Depends(get_db)):
     return {
         "source": "AIS Stream",
         "stats": stats,
+    }
+
+
+# ------------------------------------------------------------------
+# Vessel Detail (must be last — catches /{mmsi} wildcard)
+# ------------------------------------------------------------------
+
+@router.get("/{mmsi}")
+def get_vessel_detail(mmsi: str, db: Session = Depends(get_db)):
+    """Get detailed vessel info by MMSI with activity stats."""
+    result = db.execute(text("""
+        SELECT
+            v.id, v.mmsi, v.imo, v.vessel_name, v.flag_country, v.vessel_type,
+            v.length_meters, v.gross_tonnage, v.gear_type, v.source, v.metadata,
+            ST_Y(v.last_position) as latitude,
+            ST_X(v.last_position) as longitude,
+            v.last_seen,
+            (SELECT COUNT(*) FROM detected_fishing_events fe WHERE fe.mmsi = v.mmsi) as fishing_event_count,
+            (SELECT COUNT(*) FROM detected_loitering_events le WHERE le.mmsi = v.mmsi) as loitering_event_count,
+            (SELECT COALESCE(SUM(fe.duration_hours), 0) FROM detected_fishing_events fe WHERE fe.mmsi = v.mmsi) as total_fishing_hours
+        FROM vessels v
+        WHERE v.mmsi = :mmsi
+    """), {"mmsi": mmsi}).fetchone()
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Vessel not found")
+
+    return {
+        "id": result.id,
+        "mmsi": result.mmsi,
+        "imo": result.imo,
+        "vessel_name": result.vessel_name,
+        "flag_country": result.flag_country,
+        "vessel_type": result.vessel_type,
+        "length_meters": float(result.length_meters) if result.length_meters else None,
+        "gross_tonnage": result.gross_tonnage,
+        "gear_type": result.gear_type,
+        "source": result.source,
+        "latitude": float(result.latitude) if result.latitude else None,
+        "longitude": float(result.longitude) if result.longitude else None,
+        "last_seen": result.last_seen.isoformat() if result.last_seen else None,
+        "fishing_event_count": result.fishing_event_count or 0,
+        "loitering_event_count": result.loitering_event_count or 0,
+        "total_fishing_hours": float(result.total_fishing_hours) if result.total_fishing_hours else 0,
     }

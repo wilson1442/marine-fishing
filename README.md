@@ -28,14 +28,18 @@ A full-stack geospatial data aggregation and visualization system for marine fis
 ### Interactive Catch Map
 - Leaflet.js map with clustered markers for 44,000+ geo-tagged catch records
 - Species color-coded markers with filterable legend (checkbox toggles per species)
+- Bulk "Hide All / Show All" species toggle button on the map legend
+- Collapsible filter panel on desktop (slides to narrow strip) and mobile (drawer overlay)
 - Filter by date range, year, species, fishing conditions, and buoy station
 - Real-time stats readout (catches, fishing days, species count, dataset range)
 
 ### AIS Vessel Tracking
 - Real-time fishing vessel positions via AIS Stream WebSocket
+- Expanded offshore coverage: Florida Keys (24°N) to Nova Scotia (46°N), out to the Grand Banks (55°W)
 - Five toggleable map layers: Live Vessels, Fishing Activity, Loitering, AIS Presence, Effort Heatmap
 - Vessel-shaped directional markers with heading rotation
 - Auto-refreshing live vessel positions (30-second interval)
+- Vessel stats panel with live count, total vessels, positions, and fishing hours (auto-refreshes every 60s)
 - Fishing activity detection via speed-based pattern analysis
 - Loitering event detection via stationary behavior analysis
 
@@ -47,10 +51,17 @@ A full-stack geospatial data aggregation and visualization system for marine fis
 - Historical weather lookup by date and station
 
 ### Marine Weather Grid Overlay
-- Fetches wave/swell/current data from Open-Meteo Marine API for visible map bounds
+- Fetches wave/swell/current/SST data from Open-Meteo Marine API for visible map bounds
 - Smooth canvas heatmap rendering with radial gradients (land-filtered)
 - Text labels showing wave height, direction arrows, and swell data
 - Debounced loading on map pan/zoom
+
+### Sea Surface Temperature (SST) Heatmap
+- Dedicated SST toggle in the Live Layers panel
+- 9-step color gradient from deep blue (cold, <55°F) through green (~72°F) to red (hot, >82°F)
+- Visualizes temperature breaks and warm/cold water boundaries for identifying fishing structure
+- Uses the same Open-Meteo Marine API grid with `sea_surface_temperature` parameter
+- SST data also returned in point-query weather popups and weather bar
 
 ### Fishing Conditions Scoring
 - Algorithmic scoring (0-100) based on water temp, wind speed, wave height, and moon illumination
@@ -133,7 +144,7 @@ A full-stack geospatial data aggregation and visualization system for marine fis
 | **API** | WebSocket `wss://stream.aisstream.io/v0/stream` |
 | **Auth** | `AISSTREAM_API_KEY` environment variable |
 | **Filter** | Ship type 30 (fishing vessels) |
-| **Geographic Bounds** | US East Coast: 34.0N-43.0N, 76.0W-67.0W (configurable) |
+| **Geographic Bounds** | US East Coast + offshore: 24.0N-46.0N, 82.0W-55.0W (Florida Keys to Nova Scotia, Gulf Stream to Grand Banks) |
 | **Data Collected** | Vessel positions (MMSI, lat/lon, speed, course, heading, nav status), vessel metadata (name, flag, type, IMO, length, tonnage, gear type), detected fishing activity, detected loitering events |
 | **Detection** | Speed-based pattern analysis for fishing; stationary behavior analysis for loitering |
 | **Process Management** | `scripts/run_ais_harvester.sh start|stop|restart|status` |
@@ -155,7 +166,7 @@ A full-stack geospatial data aggregation and visualization system for marine fis
 |--------|-------|
 | **Endpoint** | `https://marine-api.open-meteo.com/v1/marine` |
 | **Usage** | Fetched on-demand for map weather overlay and point queries |
-| **Data** | Wave height/direction/period, swell height, ocean current velocity/direction, sea surface temperature |
+| **Data** | Wave height/direction/period, swell height, ocean current velocity/direction, sea surface temperature (SST in °C and °F) |
 | **Caching** | Redis with 1800s TTL |
 | **Integration** | Weather grid overlay on map, click-to-query popups |
 
@@ -193,7 +204,7 @@ A full-stack geospatial data aggregation and visualization system for marine fis
 | GET | `/historical/{date}` | Weather for a specific date. Filters: `station_id`, `lat`/`lon` |
 | GET | `/buoys` | List all buoy stations with metadata. Filter: `active_only` |
 | GET | `/buoys/{station_id}` | Recent observations for a buoy (limit: 1-168 hours) |
-| GET | `/marine/grid` | Marine weather grid for map bounds. Params: `north`, `south`, `east`, `west`, `zoom` |
+| GET | `/marine/grid` | Marine weather grid for map bounds (includes SST). Params: `north`, `south`, `east`, `west`, `zoom` |
 | GET | `/marine/point` | Detailed marine weather + 24h forecast for a single lat/lon |
 
 ### Vessels (`/api/v1/vessels`)
@@ -208,7 +219,7 @@ A full-stack geospatial data aggregation and visualization system for marine fis
 | GET | `/loitering` | Detected loitering events. Filters: `date_from`, `date_to`, `vessel_mmsi`, `bbox` |
 | GET | `/presence` | AIS vessel presence heatmap grid. Params: `resolution`, `date_from`, `date_to`, `bbox` |
 | GET | `/effort-heatmap` | Fishing effort heatmap. Filters: `date_from`, `date_to`, `gear_type`, `flag_country`, `bbox` |
-| GET | `/summary` | Summary stats: live vessels, fishing events, loitering events, total positions |
+| GET | `/summary` | Summary stats: live vessels, total vessels, fishing events, loitering events, total positions, fishing hours |
 
 ### Admin (`/api/v1/admin`)
 

@@ -18,8 +18,9 @@ import websocket
 from harvesters.base import BaseHarvester
 
 
-# Default bounding box: US East Coast [[lat1, lon1], [lat2, lon2]]
-DEFAULT_BBOX = [[34.0, -76.0], [43.0, -67.0]]
+# Default bounding box: US East Coast + offshore [[lat1, lon1], [lat2, lon2]]
+# Covers Florida Keys (24N) to Nova Scotia (46N), Gulf Stream to Grand Banks (55W)
+DEFAULT_BBOX = [[24.0, -82.0], [46.0, -55.0]]
 
 
 class AISStreamHarvester(BaseHarvester):

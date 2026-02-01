@@ -68,6 +68,8 @@ document.addEventListener('DOMContentLoaded', async function () {
     initPanelToggles();
     initVesselLayerToggles();
     initWeatherOverlay();
+    initSSTOverlay();
+    initSpeciesToggleAll();
 
     // Run data fetches in parallel, don't let one block another
     await Promise.allSettled([
@@ -289,7 +291,7 @@ function initFilters() {
     });
 }
 
-// Initialize panel toggles for mobile
+// Initialize panel toggles for mobile and desktop collapse
 function initPanelToggles() {
     var toggleBtn = document.getElementById('toggle-filters');
     var filterPanel = document.getElementById('filter-panel');
@@ -302,7 +304,10 @@ function initPanelToggles() {
     }
     if (collapseBtn && filterPanel) {
         collapseBtn.addEventListener('click', function () {
+            // Mobile: close the drawer
             filterPanel.classList.remove('open');
+            // Desktop: toggle collapsed state
+            filterPanel.classList.toggle('collapsed');
         });
     }
 }
@@ -561,12 +566,18 @@ async function loadVesselSummary() {
 
         setText('ais-live-vessels-total', (stats.live_vessels || 0).toLocaleString());
         setText('ais-vessels-total', (stats.vessels || 0).toLocaleString());
-        setText('ais-effort-total', (stats.fishing_effort_cells || 0).toLocaleString());
+        setText('ais-effort-total', (stats.total_positions || 0).toLocaleString());
         setText('ais-fishing-hours', Math.round(stats.total_fishing_hours || 0).toLocaleString());
 
+        // Log when all stats are zero to aid debugging
+        var allZero = !stats.live_vessels && !stats.vessels && !stats.total_positions && !stats.fishing_events;
+        if (allZero) {
+            console.warn('Vessel summary: all stats are 0. AIS harvester may not be running or database may be empty.', stats);
+        }
+
         // Show data source badges
-        var total = (stats.live_vessels || 0) + (stats.fishing_events || 0) +
-                    (stats.fishing_effort_cells || 0);
+        var total = (stats.live_vessels || 0) + (stats.vessels || 0) +
+                    (stats.total_positions || 0);
         ['ais-source-badge', 'ais-source-badge-map'].forEach(function (id) {
             var badge = document.getElementById(id);
             if (badge && total > 0) {
@@ -577,6 +588,11 @@ async function loadVesselSummary() {
         console.error('Error loading vessel summary:', error);
     }
 }
+
+// Periodically refresh vessel summary stats
+setInterval(function () {
+    loadVesselSummary();
+}, 60000);
 
 // Get current filter values
 function getFilters() {
@@ -863,6 +879,7 @@ var WeatherHeatmapLayer = L.Layer.extend({
         this._points = [];
         this._latStep = 1;
         this._lonStep = 1;
+        this._useSSTColors = false;
     },
 
     onAdd: function (map) {
@@ -935,7 +952,7 @@ var WeatherHeatmapLayer = L.Layer.extend({
             var cp = map.latLngToContainerPoint([pt.lat, pt.lon]);
             var x = cp.x + padX;
             var y = cp.y + padY;
-            var color = getWaveColor(pt.wave_height_m);
+            var color = self._useSSTColors ? getSSTColor(pt._sst_f) : getWaveColor(pt.wave_height_m);
             var rgb = self._hexToRgb(color);
 
             var gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
@@ -1297,3 +1314,119 @@ document.addEventListener('keydown', function (e) {
         if (overlay && overlay.classList.contains('open')) closeProfileModal();
     }
 });
+
+// ---- Hide All / Show All Species Toggle ----
+
+function initSpeciesToggleAll() {
+    var btn = document.getElementById('toggle-all-species');
+    if (!btn) return;
+
+    btn.addEventListener('click', function () {
+        var allHidden = btn.textContent.trim() === 'Show All';
+        var checkboxes = document.querySelectorAll('.legend-checkbox');
+
+        checkboxes.forEach(function (cb) {
+            var code = cb.dataset.species;
+            cb.checked = allHidden;
+            speciesVisible[code] = allHidden;
+            var legendItem = cb.closest('.legend-item');
+            legendItem.classList.toggle('legend-item--active', allHidden);
+            legendItem.classList.toggle('legend-item--hidden', !allHidden);
+        });
+
+        btn.textContent = allHidden ? 'Hide All' : 'Show All';
+        applySpeciesFilter();
+    });
+}
+
+// ---- SST Heatmap Overlay ----
+
+var sstHeatmapLayer = null;
+var sstOverlayActive = false;
+var sstGridDebounceTimer = null;
+
+function initSSTOverlay() {
+    sstHeatmapLayer = new WeatherHeatmapLayer();
+    var toggle = document.getElementById('sst-overlay-toggle');
+    if (!toggle) return;
+
+    toggle.addEventListener('change', function () {
+        sstOverlayActive = this.checked;
+        if (sstOverlayActive) {
+            map.addLayer(sstHeatmapLayer);
+            loadSSTGrid();
+            map.on('moveend', onMapMoveSST);
+        } else {
+            map.removeLayer(sstHeatmapLayer);
+            sstHeatmapLayer.clearData();
+            map.off('moveend', onMapMoveSST);
+            setText('sst-grid-count', '');
+        }
+    });
+}
+
+function getSSTColor(tempF) {
+    if (tempF == null) return '#6b7da0';
+    var scale = weatherConfig.sstColorScale;
+    for (var i = 0; i < scale.length; i++) {
+        if (tempF < scale[i].max) return scale[i].color;
+    }
+    return scale[scale.length - 1].color;
+}
+
+async function loadSSTGrid() {
+    if (!sstOverlayActive) return;
+    var zoom = map.getZoom();
+    if (zoom < weatherConfig.minZoom) {
+        sstHeatmapLayer.clearData();
+        setText('sst-grid-count', '');
+        return;
+    }
+
+    var bounds = map.getBounds();
+    var params = new URLSearchParams({
+        north: bounds.getNorth().toFixed(2),
+        south: bounds.getSouth().toFixed(2),
+        east: bounds.getEast().toFixed(2),
+        west: bounds.getWest().toFixed(2),
+        zoom: zoom,
+    });
+
+    try {
+        var response = await fetch(API_ENDPOINTS.marineWeatherGrid + '?' + params);
+        var data = await response.json();
+        renderSSTGrid(data.points || [], data.lat_step || 1, data.lon_step || 1);
+    } catch (error) {
+        console.error('Error loading SST grid:', error);
+    }
+}
+
+function renderSSTGrid(points, latStep, lonStep) {
+    // Convert points to SST-specific format for the canvas layer
+    var sstPoints = [];
+    points.forEach(function (pt) {
+        if (pt.sst_f != null) {
+            sstPoints.push({
+                lat: pt.lat,
+                lon: pt.lon,
+                wave_height_m: pt.sst_f, // reuse wave_height_m field for rendering value
+                _sst_f: pt.sst_f,
+            });
+        }
+    });
+
+    // Override the heatmap render to use SST colors
+    var origReset = sstHeatmapLayer._reset;
+    sstHeatmapLayer._getColor = getSSTColor;
+    sstHeatmapLayer._useSSTColors = true;
+    sstHeatmapLayer.setData(sstPoints, latStep, lonStep);
+
+    setText('sst-grid-count', sstPoints.length > 0 ? sstPoints.length.toString() : '');
+}
+
+function onMapMoveSST() {
+    if (sstGridDebounceTimer) clearTimeout(sstGridDebounceTimer);
+    sstGridDebounceTimer = setTimeout(function () {
+        loadSSTGrid();
+    }, weatherConfig.gridDebounceMs);
+}

@@ -202,7 +202,7 @@ async def get_marine_weather_grid(
         redis_client = None
 
     CACHE_TTL = 1800  # 30 minutes
-    OPEN_METEO_PARAMS = "wave_height,wave_direction,wave_period,swell_wave_height,ocean_current_velocity,ocean_current_direction"
+    OPEN_METEO_PARAMS = "wave_height,wave_direction,wave_period,swell_wave_height,ocean_current_velocity,ocean_current_direction,sea_surface_temperature"
 
     async def fetch_point(client, lat, lon):
         cache_key = f"marine_wx:{lat}:{lon}"
@@ -240,6 +240,9 @@ async def get_marine_weather_grid(
         if current.get("wave_height") is None:
             return None
 
+        sst_c = current.get("sea_surface_temperature")
+        sst_f = round(sst_c * 9 / 5 + 32, 1) if sst_c is not None else None
+
         result = {
             "lat": lat,
             "lon": lon,
@@ -249,6 +252,8 @@ async def get_marine_weather_grid(
             "swell_height_m": current.get("swell_wave_height"),
             "current_velocity_ms": current.get("ocean_current_velocity"),
             "current_direction": current.get("ocean_current_direction"),
+            "sst_c": sst_c,
+            "sst_f": sst_f,
         }
 
         # Store in cache
@@ -278,8 +283,11 @@ async def get_marine_weather_point(
     lon: float = Query(..., description="Longitude"),
 ):
     """Fetch detailed marine weather for a single point from Open-Meteo (current + 24h forecast)."""
+    import asyncio
     import httpx
     import json as json_mod
+    import math
+    from datetime import datetime, timezone
 
     lat_r = round(lat, 1)
     lon_r = round(lon, 1)
@@ -306,30 +314,51 @@ async def get_marine_weather_point(
         except Exception:
             pass
 
-    CURRENT_PARAMS = "wave_height,wave_direction,wave_period,swell_wave_height,ocean_current_velocity,ocean_current_direction"
-    HOURLY_PARAMS = "wave_height,wave_direction,wave_period,swell_wave_height"
+    MARINE_CURRENT_PARAMS = "wave_height,wave_direction,wave_period,swell_wave_height,ocean_current_velocity,ocean_current_direction,sea_surface_temperature"
+    MARINE_HOURLY_PARAMS = "wave_height,wave_direction,wave_period,swell_wave_height"
+    FORECAST_CURRENT_PARAMS = "temperature_2m,wind_speed_10m,wind_gusts_10m,wind_direction_10m,surface_pressure,visibility"
+
+    async def fetch_marine(client):
+        resp = await client.get(
+            "https://marine-api.open-meteo.com/v1/marine",
+            params={
+                "latitude": lat,
+                "longitude": lon,
+                "current": MARINE_CURRENT_PARAMS,
+                "hourly": MARINE_HOURLY_PARAMS,
+                "forecast_hours": 24,
+            },
+            timeout=10.0,
+        )
+        return resp.json() if resp.status_code == 200 else None
+
+    async def fetch_forecast(client):
+        resp = await client.get(
+            "https://api.open-meteo.com/v1/forecast",
+            params={
+                "latitude": lat,
+                "longitude": lon,
+                "current": FORECAST_CURRENT_PARAMS,
+            },
+            timeout=10.0,
+        )
+        return resp.json() if resp.status_code == 200 else None
 
     try:
         async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                "https://marine-api.open-meteo.com/v1/marine",
-                params={
-                    "latitude": lat,
-                    "longitude": lon,
-                    "current": CURRENT_PARAMS,
-                    "hourly": HOURLY_PARAMS,
-                    "forecast_hours": 24,
-                },
-                timeout=10.0,
+            marine_data, forecast_data = await asyncio.gather(
+                fetch_marine(client),
+                fetch_forecast(client),
             )
-            if resp.status_code != 200:
-                return {"error": "Open-Meteo request failed", "status": resp.status_code}
-            data = resp.json()
     except Exception as e:
         return {"error": str(e)}
 
-    current = data.get("current", {})
-    hourly = data.get("hourly", {})
+    if not marine_data or marine_data.get("error"):
+        return {"error": marine_data.get("reason", "Open-Meteo marine request failed") if marine_data else "Open-Meteo marine request failed"}
+
+    current = marine_data.get("current", {})
+    hourly = marine_data.get("hourly", {})
+    forecast_current = forecast_data.get("current", {}) if forecast_data else {}
 
     # Build hourly forecast array
     hours = []
@@ -344,12 +373,72 @@ async def get_marine_weather_point(
         })
 
     wave_height_m = current.get("wave_height")
+
+    # Extract sea surface temperature from marine API
+    sst_c = current.get("sea_surface_temperature")
+    water_temp_f = round(sst_c * 9 / 5 + 32, 1) if sst_c is not None else None
+
+    # Extract atmospheric data from forecast API
+    air_temp_c = forecast_current.get("temperature_2m")
+    wind_speed_kmh = forecast_current.get("wind_speed_10m")
+    wind_gust_kmh = forecast_current.get("wind_gusts_10m")
+    wind_dir = forecast_current.get("wind_direction_10m")
+    pressure = forecast_current.get("surface_pressure")
+    visibility_m = forecast_current.get("visibility")
+
+    # Conversions
+    air_temp_f = round(air_temp_c * 9 / 5 + 32, 1) if air_temp_c is not None else None
+    wind_speed_kts = round(wind_speed_kmh * 0.539957, 1) if wind_speed_kmh is not None else None
+    wind_gust_kts = round(wind_gust_kmh * 0.539957, 1) if wind_gust_kmh is not None else None
+    pressure_mb = round(pressure, 1) if pressure is not None else None
+    visibility_nm = round(visibility_m / 1852, 1) if visibility_m is not None else None
+
+    # Convert wind direction degrees to compass label
+    wind_direction_label = None
+    if wind_dir is not None:
+        compass = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
+                    "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
+        wind_direction_label = compass[int((wind_dir + 11.25) / 22.5) % 16]
+
+    # Moon phase calculation (simplified astronomical algorithm)
+    now = datetime.now(timezone.utc)
+    # Known new moon reference: Jan 6, 2000 18:14 UTC
+    ref_new_moon = datetime(2000, 1, 6, 18, 14, 0, tzinfo=timezone.utc)
+    days_since = (now - ref_new_moon).total_seconds() / 86400.0
+    synodic_month = 29.53058770576
+    moon_age = days_since % synodic_month
+    moon_fraction = moon_age / synodic_month
+    moon_illumination = round((1 - math.cos(2 * math.pi * moon_fraction)) / 2 * 100)
+
+    if moon_fraction < 0.0625:
+        moon_phase = "New Moon"
+    elif moon_fraction < 0.1875:
+        moon_phase = "Waxing Crescent"
+    elif moon_fraction < 0.3125:
+        moon_phase = "First Quarter"
+    elif moon_fraction < 0.4375:
+        moon_phase = "Waxing Gibbous"
+    elif moon_fraction < 0.5625:
+        moon_phase = "Full Moon"
+    elif moon_fraction < 0.6875:
+        moon_phase = "Waning Gibbous"
+    elif moon_fraction < 0.8125:
+        moon_phase = "Last Quarter"
+    elif moon_fraction < 0.9375:
+        moon_phase = "Waning Crescent"
+    else:
+        moon_phase = "New Moon"
+
+    # Fishing score (adapted from harvester, now includes water temp)
+    wave_height_ft = round(wave_height_m * 3.281, 1) if wave_height_m is not None else None
+    fishing_score = _calculate_point_fishing_score(wave_height_ft, wind_speed_kts, moon_illumination, water_temp_f)
+
     result = {
         "lat": lat,
         "lon": lon,
         "current": {
             "wave_height_m": wave_height_m,
-            "wave_height_ft": round(wave_height_m * 3.281, 1) if wave_height_m is not None else None,
+            "wave_height_ft": wave_height_ft,
             "wave_direction": current.get("wave_direction"),
             "wave_period_s": current.get("wave_period"),
             "swell_height_m": current.get("swell_wave_height"),
@@ -357,6 +446,16 @@ async def get_marine_weather_point(
             "current_direction": current.get("ocean_current_direction"),
         },
         "hourly": hours,
+        "water_temp_f": water_temp_f,
+        "air_temp_f": air_temp_f,
+        "wind_speed_kts": wind_speed_kts,
+        "wind_gust_kts": wind_gust_kts,
+        "wind_direction": wind_direction_label,
+        "pressure_mb": pressure_mb,
+        "visibility_nm": visibility_nm,
+        "moon_phase": moon_phase,
+        "moon_illumination": moon_illumination,
+        "fishing_score": fishing_score,
     }
 
     if redis_client:
@@ -367,6 +466,49 @@ async def get_marine_weather_point(
         await redis_client.aclose()
 
     return result
+
+
+def _calculate_point_fishing_score(wave_height_ft, wind_speed_kts, moon_illumination, water_temp_f=None):
+    """Calculate fishing score from wave/wind/moon/water temp data (0-10 scale)."""
+    score = 50  # Base score out of 100
+
+    # Water temp scoring (optimal: 68-78F for offshore)
+    if water_temp_f is not None:
+        if 68 <= water_temp_f <= 78:
+            score += 20
+        elif 60 <= water_temp_f <= 85:
+            score += 10
+        else:
+            score -= 10
+
+    # Wind scoring (optimal: < 15 kts)
+    if wind_speed_kts is not None:
+        if wind_speed_kts < 10:
+            score += 15
+        elif wind_speed_kts < 15:
+            score += 10
+        elif wind_speed_kts < 20:
+            score += 0
+        else:
+            score -= 15
+
+    # Wave scoring (optimal: < 3 ft)
+    if wave_height_ft is not None:
+        if wave_height_ft < 2:
+            score += 15
+        elif wave_height_ft < 4:
+            score += 5
+        else:
+            score -= 10
+
+    # Moon phase (new moon and full moon often better)
+    if moon_illumination is not None:
+        if moon_illumination < 10 or moon_illumination > 90:
+            score += 5
+
+    # Clamp 0-100, convert to 0-10 scale
+    score = max(0, min(100, score))
+    return round(score / 10)
 
 
 def _format_weather(row) -> dict:
