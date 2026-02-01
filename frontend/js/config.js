@@ -70,4 +70,18 @@ const API_ENDPOINTS = {
     vesselsEffortHeatmap: `${API_BASE}/vessels/effort-heatmap`,
     vesselsSummary: `${API_BASE}/vessels/summary`,
     vesselsSearch: `${API_BASE}/vessels/search`,
+    marineWeatherGrid: `${API_BASE}/weather/marine/grid`,
+    marineWeatherPoint: `${API_BASE}/weather/marine/point`,
+};
+
+const weatherConfig = {
+    // Wave height color scale: calm -> light -> moderate -> rough
+    waveColorScale: [
+        { max: 0.5, color: '#3dffa2' },   // green - calm
+        { max: 1.0, color: '#4cc9f0' },   // cyan - light
+        { max: 2.0, color: '#ffa94d' },   // amber - moderate
+        { max: Infinity, color: '#ff6b6b' } // red - rough 3m+
+    ],
+    gridDebounceMs: 800,
+    minZoom: 4,
 };

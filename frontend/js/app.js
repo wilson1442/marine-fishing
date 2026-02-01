@@ -4,6 +4,8 @@ let map;
 let markersLayer;
 let buoysLayer;
 let speciesData = [];
+let speciesVisible = {}; // Track which species are visible on the map
+let lastGeoJSON = null; // Cache last loaded GeoJSON for filtering
 let mapReady = false;
 
 // Vessel layer groups
@@ -27,6 +29,12 @@ let vesselLayerState = {
 // Auto-refresh interval for live vessels
 let liveRefreshInterval = null;
 
+// Weather overlay state
+let weatherGridLayer = null;
+let weatherHeatmapLayer = null;
+let weatherOverlayActive = false;
+let weatherGridDebounceTimer = null;
+
 // Initialize the application
 document.addEventListener('DOMContentLoaded', async function () {
     // Safety timeout: hide loading overlay after 15s no matter what
@@ -45,6 +53,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     initFilters();
     initPanelToggles();
     initVesselLayerToggles();
+    initWeatherOverlay();
 
     // Run data fetches in parallel, don't let one block another
     await Promise.allSettled([
@@ -141,12 +150,26 @@ async function loadSpecies() {
         var legendItems = document.getElementById('legend-items');
         legendItems.innerHTML = '';
         speciesData.forEach(function (sp) {
-            var item = document.createElement('div');
-            item.className = 'legend-item';
+            // Default all species to visible
+            speciesVisible[sp.species_code] = true;
+
+            var item = document.createElement('label');
+            item.className = 'legend-item legend-item--active';
+            item.dataset.species = sp.species_code;
             item.innerHTML =
-                '<span class="legend-swatch" style="background-color:' + sp.color_hex + '"></span>' +
+                '<input type="checkbox" class="legend-checkbox" data-species="' + sp.species_code + '" checked>' +
+                '<span class="legend-swatch" style="background-color:' + sp.color_hex + '; color:' + sp.color_hex + '"></span>' +
                 '<span class="legend-name">' + sp.common_name + '</span>' +
                 '<span class="legend-code">' + sp.species_code + '</span>';
+            var checkbox = item.querySelector('.legend-checkbox');
+            checkbox.addEventListener('change', function () {
+                var code = this.dataset.species;
+                var legendItem = this.closest('.legend-item');
+                speciesVisible[code] = this.checked;
+                legendItem.classList.toggle('legend-item--active', this.checked);
+                legendItem.classList.toggle('legend-item--hidden', !this.checked);
+                applySpeciesFilter();
+            });
             legendItems.appendChild(item);
         });
     } catch (error) {
@@ -605,16 +628,27 @@ async function loadCatches() {
 
 // Update map markers with GeoJSON data
 function updateMapMarkers(geojson) {
+    lastGeoJSON = geojson;
+    renderFilteredMarkers();
+}
+
+// Render markers filtered by species visibility
+function renderFilteredMarkers() {
     markersLayer.clearLayers();
 
-    if (!geojson.features || geojson.features.length === 0) {
+    if (!lastGeoJSON || !lastGeoJSON.features || lastGeoJSON.features.length === 0) {
         return;
     }
 
     var markers = [];
-    geojson.features.forEach(function (feature) {
+    lastGeoJSON.features.forEach(function (feature) {
         var coords = feature.geometry.coordinates;
         var props = feature.properties;
+
+        // Skip species that are toggled off
+        if (props.species_code && speciesVisible[props.species_code] === false) {
+            return;
+        }
 
         var marker = L.circleMarker([coords[1], coords[0]], {
             radius: 8,
@@ -634,6 +668,13 @@ function updateMapMarkers(geojson) {
         markersLayer.addLayers(markers);
     } else {
         markers.forEach(function (m) { markersLayer.addLayer(m); });
+    }
+}
+
+// Apply species filter to map markers
+function applySpeciesFilter() {
+    if (mapReady && markersLayer) {
+        renderFilteredMarkers();
     }
 }
 
@@ -798,4 +839,276 @@ function clearWeatherPanel() {
     ['air-temp', 'water-temp', 'wind-speed', 'wave-height', 'pressure', 'moon-phase', 'fishing-score', 'visibility'].forEach(function (id) {
         setText(id, '\u2014');
     });
+}
+
+// ---- Marine Weather Overlay ----
+
+// Canvas-based heatmap layer for smooth weather rendering
+var WeatherHeatmapLayer = L.Layer.extend({
+    initialize: function () {
+        this._points = [];
+        this._latStep = 1;
+        this._lonStep = 1;
+    },
+
+    onAdd: function (map) {
+        this._map = map;
+        this._canvas = L.DomUtil.create('canvas', 'weather-heatmap-canvas', map.getPanes().overlayPane);
+        this._canvas.style.pointerEvents = 'none';
+        map.on('moveend', this._reset, this);
+        map.on('zoomanim', this._animateZoom, this);
+        this._reset();
+    },
+
+    onRemove: function (map) {
+        L.DomUtil.remove(this._canvas);
+        map.off('moveend', this._reset, this);
+        map.off('zoomanim', this._animateZoom, this);
+    },
+
+    setData: function (points, latStep, lonStep) {
+        this._points = points || [];
+        this._latStep = latStep || 1;
+        this._lonStep = lonStep || 1;
+        if (this._map) this._reset();
+    },
+
+    clearData: function () {
+        this._points = [];
+        if (this._canvas) {
+            var ctx = this._canvas.getContext('2d');
+            ctx.clearRect(0, 0, this._canvas.width, this._canvas.height);
+        }
+    },
+
+    _animateZoom: function (e) {
+        var map = this._map;
+        var scale = map.getZoomScale(e.zoom);
+        var offset = map._latLngBoundsToNewLayerBounds(map.getBounds(), e.zoom, e.center).min;
+        L.DomUtil.setTransform(this._canvas, offset, scale);
+    },
+
+    _reset: function () {
+        var map = this._map;
+        var size = map.getSize();
+
+        // Pad canvas beyond viewport so content doesn't vanish during pans
+        var pad = 0.5;
+        var padX = Math.round(size.x * pad);
+        var padY = Math.round(size.y * pad);
+        var width = size.x + padX * 2;
+        var height = size.y + padY * 2;
+
+        var topLeft = map.containerPointToLayerPoint([-padX, -padY]);
+        L.DomUtil.setPosition(this._canvas, topLeft);
+        this._canvas.width = width;
+        this._canvas.height = height;
+
+        var ctx = this._canvas.getContext('2d');
+        ctx.clearRect(0, 0, width, height);
+
+        if (this._points.length === 0) return;
+
+        // Compute blob radius in pixels from lat step
+        var center = map.getCenter();
+        var p1 = map.latLngToContainerPoint([center.lat - this._latStep / 2, center.lng]);
+        var p2 = map.latLngToContainerPoint([center.lat + this._latStep / 2, center.lng]);
+        var pixelStep = Math.abs(p2.y - p1.y);
+        var radius = pixelStep * 1.4;
+
+        var self = this;
+        this._points.forEach(function (pt) {
+            var cp = map.latLngToContainerPoint([pt.lat, pt.lon]);
+            var x = cp.x + padX;
+            var y = cp.y + padY;
+            var color = getWaveColor(pt.wave_height_m);
+            var rgb = self._hexToRgb(color);
+
+            var gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+            gradient.addColorStop(0, 'rgba(' + rgb + ',0.5)');
+            gradient.addColorStop(0.45, 'rgba(' + rgb + ',0.35)');
+            gradient.addColorStop(0.75, 'rgba(' + rgb + ',0.15)');
+            gradient.addColorStop(1, 'rgba(' + rgb + ',0)');
+
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fill();
+        });
+    },
+
+    _hexToRgb: function (hex) {
+        var r = parseInt(hex.slice(1, 3), 16);
+        var g = parseInt(hex.slice(3, 5), 16);
+        var b = parseInt(hex.slice(5, 7), 16);
+        return r + ',' + g + ',' + b;
+    }
+});
+
+function initWeatherOverlay() {
+    weatherGridLayer = L.layerGroup();          // text labels
+    weatherHeatmapLayer = new WeatherHeatmapLayer(); // canvas heatmap
+    var toggle = document.getElementById('weather-overlay-toggle');
+    if (!toggle) return;
+
+    toggle.addEventListener('change', function () {
+        weatherOverlayActive = this.checked;
+        if (weatherOverlayActive) {
+            map.addLayer(weatherHeatmapLayer);
+            map.addLayer(weatherGridLayer);
+            loadWeatherGrid();
+            map.on('moveend', onMapMoveWeather);
+        } else {
+            map.removeLayer(weatherGridLayer);
+            map.removeLayer(weatherHeatmapLayer);
+            weatherGridLayer.clearLayers();
+            weatherHeatmapLayer.clearData();
+            map.off('moveend', onMapMoveWeather);
+            setText('weather-grid-count', '');
+        }
+    });
+
+    map.on('click', onMapClickWeather);
+}
+
+function getWaveColor(heightM) {
+    if (heightM == null) return '#6b7da0';
+    var scale = weatherConfig.waveColorScale;
+    for (var i = 0; i < scale.length; i++) {
+        if (heightM < scale[i].max) return scale[i].color;
+    }
+    return scale[scale.length - 1].color;
+}
+
+function directionArrow(deg) {
+    if (deg == null) return '';
+    return '\u2191'; // ↑ rotated via CSS transform
+}
+
+async function loadWeatherGrid() {
+    if (!weatherOverlayActive) return;
+    var zoom = map.getZoom();
+    if (zoom < weatherConfig.minZoom) {
+        weatherGridLayer.clearLayers();
+        weatherHeatmapLayer.clearData();
+        setText('weather-grid-count', '');
+        return;
+    }
+
+    var bounds = map.getBounds();
+    var params = new URLSearchParams({
+        north: bounds.getNorth().toFixed(2),
+        south: bounds.getSouth().toFixed(2),
+        east: bounds.getEast().toFixed(2),
+        west: bounds.getWest().toFixed(2),
+        zoom: zoom,
+    });
+
+    try {
+        var response = await fetch(API_ENDPOINTS.marineWeatherGrid + '?' + params);
+        var data = await response.json();
+        renderWeatherGrid(data.points || [], data.lat_step || 1, data.lon_step || 1);
+    } catch (error) {
+        console.error('Error loading weather grid:', error);
+    }
+}
+
+function renderWeatherGrid(points, latStep, lonStep) {
+    // Update canvas heatmap
+    weatherHeatmapLayer.setData(points, latStep, lonStep);
+
+    // Update text labels
+    weatherGridLayer.clearLayers();
+
+    points.forEach(function (pt) {
+        var color = getWaveColor(pt.wave_height_m);
+
+        var waveText = pt.wave_height_m != null ? pt.wave_height_m.toFixed(1) + 'm' : '--';
+        var arrowRotation = pt.wave_direction != null ? pt.wave_direction : 0;
+        var swellText = pt.swell_height_m != null ? pt.swell_height_m.toFixed(1) + 'm sw' : '';
+
+        var html = '<div class="wx-grid-marker__inner">' +
+            '<span class="wx-grid-marker__wave" style="color:' + color + '">' + waveText + '</span>' +
+            '<span class="wx-grid-marker__arrow" style="transform:rotate(' + arrowRotation + 'deg)">\u2191</span>' +
+            (swellText ? '<span class="wx-grid-marker__temp">' + swellText + '</span>' : '') +
+            '</div>';
+
+        var icon = L.divIcon({
+            className: 'wx-grid-marker',
+            html: html,
+            iconSize: [54, 40],
+            iconAnchor: [27, 20],
+        });
+
+        var label = L.marker([pt.lat, pt.lon], { icon: icon, interactive: false });
+        weatherGridLayer.addLayer(label);
+    });
+
+    setText('weather-grid-count', points.length > 0 ? points.length.toString() : '');
+}
+
+function onMapMoveWeather() {
+    if (weatherGridDebounceTimer) clearTimeout(weatherGridDebounceTimer);
+    weatherGridDebounceTimer = setTimeout(function () {
+        loadWeatherGrid();
+    }, weatherConfig.gridDebounceMs);
+}
+
+function onMapClickWeather(e) {
+    if (!weatherOverlayActive) return;
+
+    var lat = e.latlng.lat.toFixed(2);
+    var lon = e.latlng.lng.toFixed(2);
+
+    var popup = L.popup({ maxWidth: 280 })
+        .setLatLng(e.latlng)
+        .setContent('<div class="catch-popup"><div class="wx-popup__title">Loading marine weather\u2026</div></div>')
+        .openOn(map);
+
+    fetch(API_ENDPOINTS.marineWeatherPoint + '?lat=' + lat + '&lon=' + lon)
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data.error) {
+                popup.setContent('<div class="catch-popup"><div class="wx-popup__title">Error</div><p>' + data.error + '</p></div>');
+                return;
+            }
+            var c = data.current || {};
+            var waveColor = getWaveColor(c.wave_height_m);
+
+            var html = '<div class="catch-popup">' +
+                '<div class="wx-popup__title">Marine Weather</div>' +
+                '<div style="font-family:var(--font-mono);font-size:9px;color:var(--text-dim);margin-bottom:6px">' +
+                    parseFloat(lat).toFixed(2) + '\u00B0, ' + parseFloat(lon).toFixed(2) + '\u00B0</div>' +
+                '<div class="catch-popup__grid">' +
+                field('Waves', c.wave_height_ft != null ? '<span style="color:' + waveColor + '">' + c.wave_height_ft + ' ft</span> (' + (c.wave_height_m != null ? c.wave_height_m.toFixed(1) : '--') + 'm)' : 'N/A') +
+                field('Direction', c.wave_direction != null ? c.wave_direction + '\u00B0' : 'N/A') +
+                field('Period', c.wave_period_s != null ? c.wave_period_s + 's' : 'N/A') +
+                field('Swell', c.swell_height_m != null ? c.swell_height_m.toFixed(1) + 'm' : 'N/A') +
+                field('Current', c.current_velocity_ms != null ? c.current_velocity_ms + ' m/s' : 'N/A') +
+                field('Cur. Dir', c.current_direction != null ? c.current_direction + '\u00B0' : 'N/A') +
+                '</div>';
+
+            // Hourly forecast
+            if (data.hourly && data.hourly.length > 0) {
+                html += '<div class="wx-popup__section">24h Forecast</div>' +
+                    '<div class="wx-popup__forecast">';
+                data.hourly.forEach(function (h) {
+                    var t = h.time ? h.time.split('T')[1] || h.time : '';
+                    var wh = h.wave_height_m != null ? h.wave_height_m.toFixed(1) + 'm' : '--';
+                    var wd = h.wave_direction != null ? h.wave_direction + '\u00B0' : '';
+                    html += '<div class="wx-popup__hour">' +
+                        '<span class="wx-popup__hour-time">' + t + '</span>' +
+                        '<span>' + wh + '</span>' +
+                        '<span>' + wd + '</span>' +
+                        '</div>';
+                });
+                html += '</div>';
+            }
+
+            html += '</div>';
+            popup.setContent(html);
+        })
+        .catch(function (err) {
+            popup.setContent('<div class="catch-popup"><div class="wx-popup__title">Error</div><p>' + err.message + '</p></div>');
+        });
 }

@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="/css/vendor/MarkerCluster.css" />
     <link rel="stylesheet" href="/css/vendor/MarkerCluster.Default.css" />
 
-    <link rel="stylesheet" href="/css/style.css?v=8" />
+    <link rel="stylesheet" href="/css/style.css?v=12" />
 </head>
 <body>
     <div class="scanline-overlay"></div>
@@ -197,6 +197,17 @@
                         <span class="map-layer-toggle__name">Effort Heatmap</span>
                         <span class="map-layer-toggle__count" id="gfw-count-effort_heatmap"></span>
                     </label>
+                    <div class="map-layer-toggles__divider"></div>
+                    <div class="map-layer-toggles__header">
+                        <span class="map-layer-toggles__badge" style="background:#4cc9f0">WX</span>
+                        <span class="map-layer-toggles__title">Marine Weather</span>
+                    </div>
+                    <label class="map-layer-toggle">
+                        <input type="checkbox" id="weather-overlay-toggle" />
+                        <span class="map-layer-toggle__swatch" style="background:#4cc9f0"></span>
+                        <span class="map-layer-toggle__name">Weather Grid</span>
+                        <span class="map-layer-toggle__count" id="weather-grid-count"></span>
+                    </label>
                 </div>
                 <!-- Species legend overlay at bottom of map -->
                 <div class="species-overlay" id="species-overlay">
@@ -275,7 +286,7 @@
 
     <script src="/js/vendor/leaflet.js"></script>
     <script src="/js/vendor/leaflet.markercluster.js"></script>
-    <script src="/js/config.js?v=8"></script>
-    <script src="/js/app.js?v=8"></script>
+    <script src="/js/config.js?v=12"></script>
+    <script src="/js/app.js?v=12"></script>
 </body>
 </html>

@@ -160,6 +160,215 @@ def get_buoy_data(
     return {"station_id": station_id, "observations": observations, "count": len(observations)}
 
 
+@router.get("/marine/grid")
+async def get_marine_weather_grid(
+    north: float = Query(..., description="North bound latitude"),
+    south: float = Query(..., description="South bound latitude"),
+    east: float = Query(..., description="East bound longitude"),
+    west: float = Query(..., description="West bound longitude"),
+    zoom: int = Query(6, ge=1, le=18, description="Map zoom level"),
+):
+    """Fetch marine weather grid from Open-Meteo for the visible map bounds."""
+    import asyncio
+    import httpx
+    import math
+
+    # Compute grid density based on zoom (cap at ~60 points)
+    if zoom < 4:
+        return {"points": [], "count": 0}
+    steps = min(8, max(3, zoom - 2))
+    total = steps * steps
+    if total > 60:
+        steps = int(math.sqrt(60))
+
+    lat_step = (north - south) / (steps + 1)
+    lon_step = (east - west) / (steps + 1)
+
+    grid_points = []
+    for i in range(1, steps + 1):
+        for j in range(1, steps + 1):
+            lat = round(south + lat_step * i, 1)
+            lon = round(west + lon_step * j, 1)
+            grid_points.append((lat, lon))
+
+    # Redis cache setup
+    redis_client = None
+    try:
+        import redis.asyncio as aioredis
+        from app.config import get_settings
+        redis_client = aioredis.from_url(get_settings().redis_url, decode_responses=True)
+        await redis_client.ping()
+    except Exception:
+        redis_client = None
+
+    CACHE_TTL = 1800  # 30 minutes
+    OPEN_METEO_PARAMS = "wave_height,wave_direction,wave_period,swell_wave_height,ocean_current_velocity,ocean_current_direction"
+
+    async def fetch_point(client, lat, lon):
+        cache_key = f"marine_wx:{lat}:{lon}"
+
+        # Try cache
+        if redis_client:
+            try:
+                import json
+                cached = await redis_client.get(cache_key)
+                if cached:
+                    return json.loads(cached)
+            except Exception:
+                pass
+
+        # Fetch from Open-Meteo
+        try:
+            resp = await client.get(
+                "https://marine-api.open-meteo.com/v1/marine",
+                params={
+                    "latitude": lat,
+                    "longitude": lon,
+                    "current": OPEN_METEO_PARAMS,
+                },
+                timeout=10.0,
+            )
+            if resp.status_code != 200:
+                return None
+            data = resp.json()
+        except Exception:
+            return None
+
+        current = data.get("current", {})
+
+        # Land filter: Open-Meteo returns wave_height=null for land cells
+        if current.get("wave_height") is None:
+            return None
+
+        result = {
+            "lat": lat,
+            "lon": lon,
+            "wave_height_m": current.get("wave_height"),
+            "wave_direction": current.get("wave_direction"),
+            "wave_period_s": current.get("wave_period"),
+            "swell_height_m": current.get("swell_wave_height"),
+            "current_velocity_ms": current.get("ocean_current_velocity"),
+            "current_direction": current.get("ocean_current_direction"),
+        }
+
+        # Store in cache
+        if redis_client:
+            try:
+                import json
+                await redis_client.set(cache_key, json.dumps(result), ex=CACHE_TTL)
+            except Exception:
+                pass
+
+        return result
+
+    async with httpx.AsyncClient() as client:
+        tasks = [fetch_point(client, lat, lon) for lat, lon in grid_points]
+        results = await asyncio.gather(*tasks)
+
+    if redis_client:
+        await redis_client.aclose()
+
+    points = [r for r in results if r is not None]
+    return {"points": points, "count": len(points), "lat_step": lat_step, "lon_step": lon_step}
+
+
+@router.get("/marine/point")
+async def get_marine_weather_point(
+    lat: float = Query(..., description="Latitude"),
+    lon: float = Query(..., description="Longitude"),
+):
+    """Fetch detailed marine weather for a single point from Open-Meteo (current + 24h forecast)."""
+    import httpx
+    import json as json_mod
+
+    lat_r = round(lat, 1)
+    lon_r = round(lon, 1)
+
+    # Redis cache
+    redis_client = None
+    try:
+        import redis.asyncio as aioredis
+        from app.config import get_settings
+        redis_client = aioredis.from_url(get_settings().redis_url, decode_responses=True)
+        await redis_client.ping()
+    except Exception:
+        redis_client = None
+
+    CACHE_TTL = 1800
+    cache_key = f"marine_wx_detail:{lat_r}:{lon_r}"
+
+    if redis_client:
+        try:
+            cached = await redis_client.get(cache_key)
+            if cached:
+                await redis_client.aclose()
+                return json_mod.loads(cached)
+        except Exception:
+            pass
+
+    CURRENT_PARAMS = "wave_height,wave_direction,wave_period,swell_wave_height,ocean_current_velocity,ocean_current_direction"
+    HOURLY_PARAMS = "wave_height,wave_direction,wave_period,swell_wave_height"
+
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                "https://marine-api.open-meteo.com/v1/marine",
+                params={
+                    "latitude": lat,
+                    "longitude": lon,
+                    "current": CURRENT_PARAMS,
+                    "hourly": HOURLY_PARAMS,
+                    "forecast_hours": 24,
+                },
+                timeout=10.0,
+            )
+            if resp.status_code != 200:
+                return {"error": "Open-Meteo request failed", "status": resp.status_code}
+            data = resp.json()
+    except Exception as e:
+        return {"error": str(e)}
+
+    current = data.get("current", {})
+    hourly = data.get("hourly", {})
+
+    # Build hourly forecast array
+    hours = []
+    times = hourly.get("time", [])
+    for idx, t in enumerate(times):
+        hours.append({
+            "time": t,
+            "wave_height_m": (hourly.get("wave_height") or [None])[idx] if idx < len(hourly.get("wave_height", [])) else None,
+            "wave_direction": (hourly.get("wave_direction") or [None])[idx] if idx < len(hourly.get("wave_direction", [])) else None,
+            "wave_period_s": (hourly.get("wave_period") or [None])[idx] if idx < len(hourly.get("wave_period", [])) else None,
+            "swell_height_m": (hourly.get("swell_wave_height") or [None])[idx] if idx < len(hourly.get("swell_wave_height", [])) else None,
+        })
+
+    wave_height_m = current.get("wave_height")
+    result = {
+        "lat": lat,
+        "lon": lon,
+        "current": {
+            "wave_height_m": wave_height_m,
+            "wave_height_ft": round(wave_height_m * 3.281, 1) if wave_height_m is not None else None,
+            "wave_direction": current.get("wave_direction"),
+            "wave_period_s": current.get("wave_period"),
+            "swell_height_m": current.get("swell_wave_height"),
+            "current_velocity_ms": current.get("ocean_current_velocity"),
+            "current_direction": current.get("ocean_current_direction"),
+        },
+        "hourly": hours,
+    }
+
+    if redis_client:
+        try:
+            await redis_client.set(cache_key, json_mod.dumps(result), ex=CACHE_TTL)
+        except Exception:
+            pass
+        await redis_client.aclose()
+
+    return result
+
+
 def _format_weather(row) -> dict:
     """Format a weather observation row into a clean dict."""
     return {

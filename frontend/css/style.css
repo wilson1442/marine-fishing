@@ -489,15 +489,54 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     gap: 6px;
     padding: 4px 10px 4px 8px;
     border-radius: 12px;
-    cursor: default;
+    cursor: pointer;
     background: rgba(22,27,51,0.8);
     border: 1px solid var(--steel);
     backdrop-filter: blur(6px);
-    transition: border-color var(--transition), box-shadow var(--transition);
+    transition: border-color var(--transition), box-shadow var(--transition), opacity var(--transition);
+    user-select: none;
 }
 .legend-item:hover {
     border-color: var(--rivet);
     box-shadow: 0 0 8px rgba(76,201,240,0.1);
+}
+.legend-item--hidden {
+    opacity: 0.35;
+}
+.legend-item--hidden .legend-swatch {
+    box-shadow: none;
+}
+.legend-item--active:hover {
+    border-color: var(--cyan-dim);
+    box-shadow: 0 0 10px rgba(76,201,240,0.15);
+}
+
+.legend-checkbox {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--rivet);
+    border-radius: 3px;
+    background: var(--abyss);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all var(--transition);
+    position: relative;
+    margin: 0;
+}
+.legend-checkbox:checked {
+    background: var(--cyan);
+    border-color: var(--cyan);
+}
+.legend-checkbox:checked::after {
+    content: '';
+    position: absolute;
+    left: 1.5px; top: -0.5px;
+    width: 4px; height: 7px;
+    border: solid var(--abyss);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
 }
 
 .legend-swatch {
@@ -919,6 +958,91 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     font-weight: 600;
     min-width: 20px;
     text-align: right;
+}
+
+/* ---- Map layer toggles divider ---- */
+.map-layer-toggles__divider {
+    height: 1px;
+    background: var(--steel);
+    margin: 4px 0;
+}
+
+/* ---- Weather grid markers ---- */
+.wx-grid-marker {
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+.wx-grid-marker__inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    pointer-events: none;
+}
+.wx-grid-marker__wave {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-bright);
+    text-shadow: 0 1px 3px rgba(0,0,0,0.8), 0 0 6px rgba(0,0,0,0.5);
+    line-height: 1;
+}
+.wx-grid-marker__arrow {
+    font-size: 12px;
+    line-height: 1;
+    color: var(--text);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+    display: inline-block;
+}
+.wx-grid-marker__temp {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-dim);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+    line-height: 1;
+}
+
+/* ---- Weather detail popup ---- */
+.wx-popup__title {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #4cc9f0;
+    margin-bottom: 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--steel);
+}
+.wx-popup__section {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    margin-top: 8px;
+    margin-bottom: 4px;
+}
+.wx-popup__forecast {
+    max-height: 140px;
+    overflow-y: auto;
+    margin-top: 4px;
+}
+.wx-popup__hour {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 2px 0;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text);
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.wx-popup__hour-time {
+    color: var(--text-dim);
+    flex-shrink: 0;
 }
 
 /* ---- Vessel-shaped map markers ---- */
