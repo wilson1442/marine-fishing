@@ -111,6 +111,14 @@ if settings.serve_frontend and os.path.exists(settings.frontend_dir):
             return FileResponse(explorer_path)
         return {"message": "Data explorer not found. API available at /api/docs"}
 
+    # Test landing page (preview new design)
+    @app.get("/landing-test")
+    async def serve_landing_test():
+        test_path = os.path.join(settings.frontend_dir, "landing-test.html")
+        if os.path.exists(test_path):
+            return FileResponse(test_path)
+        return {"message": "Test landing page not found."}
+
 
 if __name__ == "__main__":
     import uvicorn

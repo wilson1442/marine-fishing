@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marine Fishing Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300;1,9..40,400&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{height:100%;overflow-x:hidden;scroll-behavior:smooth}
+body{
+    min-height:100%;
+    font-family:'DM Sans',system-ui,sans-serif;
+    background:#030810;
+    color:#c0cddf;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+}
+
+/* ===== BACKGROUND LAYERS ===== */
+
+#wave-canvas{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.bg-deep{
+    position:fixed;inset:0;z-index:1;pointer-events:none;
+    background:
+        radial-gradient(ellipse 140% 50% at 50% 0%, rgba(10,42,74,0.0) 0%, transparent 100%),
+        radial-gradient(ellipse 80% 80% at 15% 85%, rgba(4,60,100,0.35) 0%, transparent 50%),
+        radial-gradient(ellipse 60% 60% at 85% 75%, rgba(15,30,80,0.3) 0%, transparent 45%),
+        radial-gradient(ellipse 50% 40% at 50% 50%, rgba(8,20,50,0.4) 0%, transparent 60%);
+}
+.orb{position:fixed;border-radius:50%;filter:blur(80px);pointer-events:none;mix-blend-mode:screen;z-index:1}
+.orb--1{width:600px;height:600px;background:radial-gradient(circle,rgba(76,201,240,0.08) 0%,transparent 70%);top:-10%;left:-5%;animation:orb-drift-1 20s ease-in-out infinite}
+.orb--2{width:500px;height:500px;background:radial-gradient(circle,rgba(61,255,162,0.05) 0%,transparent 70%);bottom:10%;right:-10%;animation:orb-drift-2 25s ease-in-out infinite}
+.orb--3{width:400px;height:400px;background:radial-gradient(circle,rgba(100,140,255,0.06) 0%,transparent 70%);top:40%;left:30%;animation:orb-drift-3 18s ease-in-out infinite}
+.orb--4{width:350px;height:350px;background:radial-gradient(circle,rgba(76,201,240,0.04) 0%,transparent 70%);top:20%;right:10%;animation:orb-drift-4 22s ease-in-out infinite}
+@keyframes orb-drift-1{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(60px,40px) scale(1.1)}66%{transform:translate(-30px,80px) scale(0.95)}}
+@keyframes orb-drift-2{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(-50px,-60px) scale(1.05)}66%{transform:translate(40px,-20px) scale(0.9)}}
+@keyframes orb-drift-3{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(80px,-40px) scale(1.15)}}
+@keyframes orb-drift-4{0%,100%{transform:translate(0,0)}50%{transform:translate(-60px,50px)}}
+
+.god-rays{position:fixed;top:0;left:0;width:100%;height:100%;z-index:1;pointer-events:none;overflow:hidden;opacity:0.5}
+.god-ray{position:absolute;top:-20%;width:2px;height:130%;background:linear-gradient(180deg,rgba(76,201,240,0.12) 0%,rgba(76,201,240,0.04) 30%,transparent 80%);transform-origin:top center}
+.god-ray:nth-child(1){left:15%;transform:rotate(3deg);animation:ray-sway 12s ease-in-out infinite;width:3px}
+.god-ray:nth-child(2){left:35%;transform:rotate(-2deg);animation:ray-sway 15s ease-in-out 2s infinite;opacity:0.6}
+.god-ray:nth-child(3){left:55%;transform:rotate(4deg);animation:ray-sway 10s ease-in-out 5s infinite;width:4px;opacity:0.4}
+.god-ray:nth-child(4){left:72%;transform:rotate(-3deg);animation:ray-sway 18s ease-in-out 1s infinite;opacity:0.5}
+.god-ray:nth-child(5){left:88%;transform:rotate(2deg);animation:ray-sway 14s ease-in-out 7s infinite;width:2px;opacity:0.3}
+@keyframes ray-sway{0%,100%{transform:rotate(var(--r,3deg)) scaleX(1)}50%{transform:rotate(calc(var(--r,3deg) * -1)) scaleX(1.5)}}
+
+.particles{position:fixed;inset:0;z-index:2;pointer-events:none;overflow:hidden}
+.particle{position:absolute;border-radius:50%;animation:float-up linear infinite}
+@keyframes float-up{0%{transform:translateY(110vh) translateX(0);opacity:0}5%{opacity:var(--o,0.4)}85%{opacity:var(--o,0.4)}100%{transform:translateY(-10vh) translateX(var(--dx,20px));opacity:0}}
+
+.depth-line{position:fixed;left:40px;top:0;bottom:0;width:1px;z-index:3;background:linear-gradient(180deg,transparent 0%,rgba(76,201,240,0.06) 15%,rgba(76,201,240,0.12) 50%,rgba(76,201,240,0.06) 85%,transparent 100%)}
+.depth-line::before{content:'';position:absolute;left:-3px;top:50%;width:7px;height:7px;background:#4cc9f0;border-radius:50%;box-shadow:0 0 12px rgba(76,201,240,0.5);animation:pulse-dot 4s ease-in-out infinite}
+.depth-tick{position:absolute;left:0;width:12px;height:1px;background:rgba(76,201,240,0.1)}
+@keyframes pulse-dot{0%,100%{opacity:0.4;transform:scale(0.8)}50%{opacity:1;transform:scale(1.2)}}
+
+.horizon{position:fixed;top:0;left:0;width:100%;height:220px;z-index:1;pointer-events:none;background:linear-gradient(180deg,rgba(20,50,90,0.3) 0%,rgba(10,30,60,0.15) 40%,transparent 100%)}
+.horizon::after{content:'';position:absolute;bottom:0;left:0;width:100%;height:1px;background:linear-gradient(90deg,transparent 0%,rgba(76,201,240,0.08) 30%,rgba(76,201,240,0.15) 50%,rgba(76,201,240,0.08) 70%,transparent 100%)}
+
+.contours{position:fixed;bottom:0;left:0;width:100%;height:40%;z-index:1;pointer-events:none;opacity:0.04}
+
+/* ===== PAGE ===== */
+.page{position:relative;z-index:5;display:flex;flex-direction:column}
+
+/* ===== NAV ===== */
+.nav{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:24px 48px;position:sticky;top:0;z-index:50;
+    background:linear-gradient(180deg,rgba(3,8,16,0.9) 0%,rgba(3,8,16,0) 100%);
+    backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+}
+.nav__mark{display:flex;align-items:center;gap:10px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;letter-spacing:2px;text-transform:uppercase;color:rgba(76,201,240,0.7)}
+.nav__mark svg{opacity:0.6}
+.nav__links{display:flex;gap:32px;list-style:none}
+.nav__links a{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:400;letter-spacing:1.5px;text-transform:uppercase;color:#5a6a80;text-decoration:none;transition:color 0.3s}
+.nav__links a:hover{color:#4cc9f0}
+.nav-register:hover{box-shadow:0 0 20px rgba(76,201,240,0.35)}
+
+/* ===== LIVE STATS — TOP OF PAGE ===== */
+.stats{
+    padding:20px 48px;
+    display:flex;justify-content:center;gap:48px;
+    opacity:0;animation:fade-up 0.6s ease 0.2s forwards;
+    border-bottom:1px solid rgba(76,201,240,0.06);
+}
+.stat{display:flex;align-items:baseline;gap:10px}
+.stat__value{
+    font-family:'Instrument Serif',Georgia,serif;
+    font-size:32px;color:#eaf0ff;line-height:1;
+    font-variant-numeric:tabular-nums;
+}
+.stat__value.counting{color:#4cc9f0}
+.stat__value.done{color:#eaf0ff}
+.stat__label{
+    font-family:'JetBrains Mono',monospace;
+    font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#4a5a70;
+}
+
+/* ===== HERO WITH SCREENSHOT ===== */
+.hero{
+    position:relative;
+    min-height:clamp(500px,70vh,800px);
+    display:flex;align-items:center;justify-content:flex-start;
+    padding:48px 48px 48px 80px;
+    overflow:hidden;
+}
+
+/* Screenshot as background */
+.hero__screen{
+    position:absolute;inset:0;z-index:0;
+    overflow:hidden;
+}
+.hero__screen img{
+    width:100%;height:100%;
+    object-fit:cover;object-position:center top;
+    opacity:0;
+    animation:hero-img-in 1.2s ease 0.3s forwards;
+}
+@keyframes hero-img-in{0%{opacity:0;transform:scale(1.03)}100%{opacity:1;transform:scale(1)}}
+
+/* Gradient overlays on the screenshot */
+.hero__screen::after{
+    content:'';position:absolute;inset:0;z-index:1;
+    background:
+        linear-gradient(90deg, rgba(3,8,16,0.92) 0%, rgba(3,8,16,0.7) 35%, rgba(3,8,16,0.15) 65%, rgba(3,8,16,0.3) 100%),
+        linear-gradient(180deg, rgba(3,8,16,0.5) 0%, rgba(3,8,16,0.1) 30%, rgba(3,8,16,0.1) 70%, rgba(3,8,16,0.85) 100%);
+}
+/* Scan lines */
+.hero__screen::before{
+    content:'';position:absolute;inset:0;z-index:2;pointer-events:none;
+    background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.02) 2px,rgba(0,0,0,0.02) 4px);
+}
+
+/* Cyan border glow at bottom */
+.hero::after{
+    content:'';position:absolute;bottom:0;left:0;right:0;height:1px;z-index:3;
+    background:linear-gradient(90deg,transparent 0%,rgba(76,201,240,0.2) 20%,rgba(76,201,240,0.35) 50%,rgba(76,201,240,0.2) 80%,transparent 100%);
+    box-shadow:0 0 20px rgba(76,201,240,0.1);
+}
+
+/* Hero content overlay */
+.hero__content{
+    position:relative;z-index:5;
+    max-width:560px;
+}
+.hero__overline{
+    font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:400;
+    letter-spacing:3px;text-transform:uppercase;color:#4cc9f0;margin-bottom:24px;
+    opacity:0;animation:fade-up 0.8s ease 0.5s forwards;
+}
+.hero__overline::before{content:'';display:inline-block;width:24px;height:1px;background:#4cc9f0;margin-right:12px;vertical-align:middle}
+.hero__title{
+    font-family:'Instrument Serif',Georgia,serif;
+    font-size:clamp(44px,6vw,84px);font-weight:400;
+    line-height:1.05;color:#eaf0ff;margin-bottom:24px;
+    opacity:0;animation:fade-up 0.8s ease 0.7s forwards;
+    text-shadow:0 2px 40px rgba(3,8,16,0.8);
+}
+.hero__title em{font-style:italic;color:#4cc9f0}
+.hero__sub{
+    font-size:16px;font-weight:300;line-height:1.7;
+    color:#9aacbf;max-width:440px;margin-bottom:36px;
+    opacity:0;animation:fade-up 0.8s ease 0.9s forwards;
+    text-shadow:0 1px 8px rgba(3,8,16,0.6);
+}
+.hero__actions{
+    display:flex;align-items:center;gap:24px;
+    opacity:0;animation:fade-up 0.8s ease 1.1s forwards;
+}
+.btn-enter{
+    position:relative;display:inline-flex;align-items:center;gap:12px;
+    font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;
+    letter-spacing:1px;text-transform:uppercase;color:#060b18;
+    background:linear-gradient(135deg,#4cc9f0 0%,#38b0d8 100%);
+    padding:16px 36px;border:none;border-radius:4px;cursor:pointer;text-decoration:none;
+    transition:all 0.35s cubic-bezier(0.4,0,0.2,1);
+    box-shadow:0 0 0 0 rgba(76,201,240,0),0 4px 24px rgba(0,0,0,0.3);overflow:hidden;
+}
+.btn-enter::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,transparent 0%,rgba(255,255,255,0.2) 50%,transparent 100%);transform:translateX(-100%);transition:transform 0.5s}
+.btn-enter:hover::before{transform:translateX(100%)}
+.btn-enter:hover{transform:translateY(-2px);box-shadow:0 0 40px rgba(76,201,240,0.3),0 8px 32px rgba(0,0,0,0.3)}
+.btn-enter svg{transition:transform 0.3s}
+.btn-enter:hover svg{transform:translateX(4px)}
+.btn-api{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:400;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);text-decoration:none;padding:16px 8px;border-bottom:1px solid transparent;transition:all 0.3s;text-shadow:0 1px 4px rgba(0,0,0,0.5)}
+.btn-api:hover{color:#4cc9f0;border-bottom-color:#4cc9f0}
+
+@keyframes fade-up{0%{opacity:0;transform:translateY(20px)}100%{opacity:1;transform:translateY(0)}}
+
+/* ===== FEATURE CARDS ===== */
+.features-section{
+    padding:64px 48px 48px;
+    opacity:0;transform:translateY(30px);
+    transition:opacity 0.8s ease,transform 0.8s ease;
+}
+.features-section.in-view{opacity:1;transform:translateY(0)}
+.features-section__heading{
+    font-family:'Instrument Serif',Georgia,serif;
+    font-size:clamp(24px,3.5vw,38px);font-weight:400;
+    color:#eaf0ff;text-align:center;margin-bottom:40px;line-height:1.2;
+}
+.features-section__heading em{font-style:italic;color:#4cc9f0}
+.features{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:20px;
+    max-width:1200px;margin:0 auto;
+}
+.feat{
+    background:rgba(255,255,255,0.015);
+    border:1px solid rgba(76,201,240,0.06);
+    border-radius:6px;padding:28px 24px;
+    opacity:0;transform:translateY(20px);
+    transition:opacity 0.6s ease,transform 0.6s ease,border-color 0.3s,background 0.3s;
+}
+.feat.in-view{opacity:1;transform:translateY(0)}
+.feat:hover{border-color:rgba(76,201,240,0.2);background:rgba(255,255,255,0.03);transform:translateY(-3px)}
+.feat__icon{
+    width:40px;height:40px;display:flex;align-items:center;justify-content:center;
+    border-radius:6px;margin-bottom:16px;background:rgba(76,201,240,0.06);color:#4cc9f0;
+}
+.feat__title{font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;color:#eaf0ff;margin-bottom:8px}
+.feat__desc{font-size:13px;font-weight:300;line-height:1.65;color:#6a7f9a}
+.feat__img{margin-top:14px;border-radius:4px;overflow:hidden;border:1px solid rgba(76,201,240,0.08)}
+.feat__img img{display:block;width:100%;height:auto}
+
+/* ===== SPECIES RIBBON ===== */
+.species-ribbon{
+    padding:48px 80px;
+    opacity:0;transform:translateY(20px);
+    transition:opacity 0.8s ease,transform 0.8s ease;
+}
+.species-ribbon.in-view{opacity:1;transform:translateY(0)}
+.species-ribbon__label{
+    font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:400;
+    letter-spacing:2px;text-transform:uppercase;color:#3a4a60;margin-bottom:14px;
+}
+.species-ribbon__row{display:flex;flex-wrap:wrap;gap:8px}
+.species-tag{
+    display:flex;align-items:center;gap:6px;
+    font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:400;letter-spacing:0.5px;
+    color:#6a7a94;background:rgba(255,255,255,0.015);
+    border:1px solid rgba(255,255,255,0.04);border-radius:3px;padding:6px 12px;transition:all 0.3s;
+}
+.species-tag:hover{border-color:rgba(76,201,240,0.2);color:#a0b4d0;box-shadow:0 0 12px rgba(76,201,240,0.05)}
+.species-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;box-shadow:0 0 6px currentColor}
+
+/* ===== DATA SOURCES ===== */
+.sources-strip{
+    padding:32px 80px;border-top:1px solid rgba(76,201,240,0.04);text-align:center;
+    opacity:0;transform:translateY(20px);transition:opacity 0.8s ease,transform 0.8s ease;
+}
+.sources-strip.in-view{opacity:1;transform:translateY(0)}
+.sources-strip__label{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:400;letter-spacing:2px;text-transform:uppercase;color:#2a3a50;margin-bottom:12px}
+.sources-strip__row{display:flex;justify-content:center;gap:40px;flex-wrap:wrap}
+.sources-strip__item{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:300;letter-spacing:1px;color:#3a4a60;display:flex;align-items:center;gap:8px}
+.sources-strip__item::before{content:'';width:4px;height:4px;border-radius:50%;background:rgba(76,201,240,0.3)}
+
+/* ===== FOOTER ===== */
+.footer{
+    padding:24px 80px;display:flex;justify-content:space-between;align-items:center;
+    border-top:1px solid rgba(255,255,255,0.03);
+    font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:1px;color:#2a3a50;
+}
+
+/* ===== RESPONSIVE ===== */
+@media(max-width:1024px){
+    .features{grid-template-columns:1fr 1fr;gap:16px}
+    .feat:nth-child(3){grid-column:1/-1;max-width:50%;margin:0 auto}
+}
+@media(max-width:768px){
+    .nav{padding:20px 24px}
+    .nav__links{gap:20px}
+    .stats{padding:16px 24px;gap:24px;flex-wrap:wrap;justify-content:flex-start}
+    .stat__value{font-size:24px}
+    .hero{padding:36px 24px;min-height:60vh}
+    .hero__title{font-size:clamp(32px,9vw,56px)}
+    .hero__screen::after{
+        background:
+            linear-gradient(90deg, rgba(3,8,16,0.95) 0%, rgba(3,8,16,0.75) 50%, rgba(3,8,16,0.4) 100%),
+            linear-gradient(180deg, rgba(3,8,16,0.4) 0%, rgba(3,8,16,0.1) 30%, rgba(3,8,16,0.1) 70%, rgba(3,8,16,0.8) 100%);
+    }
+    .features-section{padding:48px 24px 32px}
+    .features{grid-template-columns:1fr;padding:0}
+    .feat:nth-child(3){max-width:100%}
+    .species-ribbon{padding:36px 24px}
+    .sources-strip{padding:24px}
+    .sources-strip__row{gap:20px}
+    .footer{padding:20px 24px;flex-direction:column;gap:8px}
+    .depth-line{display:none}
+    .god-rays{opacity:0.3}
+}
+@media(max-width:480px){
+    .stats{gap:16px}
+    .stat{gap:6px}
+    .stat__value{font-size:20px}
+    .nav__links{display:none}
+}
+
+/* ===== REGISTRATION MODAL ===== */
+.reg-overlay{
+    position:fixed;inset:0;z-index:1000;
+    display:none;align-items:center;justify-content:center;
+    background:rgba(3,8,16,0.85);
+    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    opacity:0;transition:opacity 0.3s ease;
+}
+.reg-overlay.open{display:flex;opacity:1}
+.reg-overlay.opening{display:flex}
+
+.reg-card{
+    width:100%;max-width:440px;
+    background:rgba(10,20,40,0.7);
+    border:1px solid rgba(76,201,240,0.12);
+    border-radius:12px;padding:40px 36px;
+    backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    box-shadow:0 0 60px rgba(76,201,240,0.06),0 20px 60px rgba(0,0,0,0.4);
+    transform:translateY(30px);opacity:0;
+    transition:transform 0.4s cubic-bezier(0.4,0,0.2,1),opacity 0.4s ease;
+    position:relative;
+}
+.reg-overlay.open .reg-card{transform:translateY(0);opacity:1}
+
+.reg-card__close{
+    position:absolute;top:16px;right:16px;
+    background:none;border:none;color:#5a6a80;cursor:pointer;
+    padding:4px;transition:color 0.2s;
+}
+.reg-card__close:hover{color:#4cc9f0}
+
+.reg-card__title{
+    font-family:'Instrument Serif',Georgia,serif;
+    font-size:28px;font-weight:400;color:#eaf0ff;
+    text-align:center;margin-bottom:4px;
+}
+.reg-card__sub{
+    font-family:'DM Sans',sans-serif;font-size:13px;font-weight:300;
+    color:#6a7f9a;text-align:center;margin-bottom:28px;
+}
+.reg-field{margin-bottom:16px}
+.reg-field__label{
+    display:block;font-family:'JetBrains Mono',monospace;
+    font-size:9px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;
+    color:#5a6a80;margin-bottom:5px;
+}
+.reg-field__input{
+    width:100%;font-family:'JetBrains Mono',monospace;font-size:12px;
+    background:rgba(255,255,255,0.03);color:#eaf0ff;
+    border:1px solid rgba(76,201,240,0.1);border-radius:6px;
+    padding:11px 14px;outline:none;transition:border-color 0.25s,box-shadow 0.25s;
+}
+.reg-field__input:focus{
+    border-color:rgba(76,201,240,0.4);
+    box-shadow:0 0 12px rgba(76,201,240,0.1);
+}
+.reg-field__input::placeholder{color:#3a4a60}
+.reg-field__input.error{border-color:rgba(255,107,107,0.5)}
+.reg-field__error{
+    font-family:'DM Sans',sans-serif;font-size:11px;color:#ff6b6b;
+    margin-top:4px;display:none;
+}
+.reg-field__error.show{display:block}
+
+.reg-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+
+.reg-btn{
+    width:100%;margin-top:8px;
+    font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;
+    letter-spacing:1px;text-transform:uppercase;
+    color:#060b18;background:linear-gradient(135deg,#4cc9f0 0%,#38b0d8 100%);
+    border:none;border-radius:6px;padding:14px;cursor:pointer;
+    transition:all 0.3s;position:relative;overflow:hidden;
+}
+.reg-btn:hover{box-shadow:0 0 30px rgba(76,201,240,0.3);transform:translateY(-1px)}
+.reg-btn:disabled{opacity:0.5;cursor:not-allowed;transform:none;box-shadow:none}
+
+.reg-error-msg{
+    font-family:'DM Sans',sans-serif;font-size:12px;color:#ff6b6b;
+    text-align:center;margin-top:14px;display:none;
+}
+.reg-error-msg.show{display:block}
+
+/* Success state */
+.reg-success{
+    display:none;text-align:center;padding:20px 0;
+}
+.reg-success.show{display:block}
+.reg-success__check{
+    width:64px;height:64px;margin:0 auto 20px;
+    border-radius:50%;background:rgba(61,255,162,0.1);
+    border:2px solid rgba(61,255,162,0.3);
+    display:flex;align-items:center;justify-content:center;
+    animation:check-pop 0.5s cubic-bezier(0.4,0,0.2,1);
+}
+.reg-success__check svg{color:#3dffa2}
+@keyframes check-pop{0%{transform:scale(0);opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
+.reg-success__title{
+    font-family:'Instrument Serif',Georgia,serif;
+    font-size:22px;color:#eaf0ff;margin-bottom:8px;
+}
+.reg-success__msg{
+    font-family:'DM Sans',sans-serif;font-size:13px;font-weight:300;
+    color:#6a7f9a;line-height:1.6;
+}
+
+/* Tab styles */
+.reg-tabs{
+    display:flex;gap:0;margin-bottom:24px;
+    border:1px solid rgba(76,201,240,0.12);border-radius:6px;overflow:hidden;
+}
+.reg-tab-btn{
+    flex:1;padding:10px 0;
+    font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;
+    letter-spacing:1px;text-transform:uppercase;
+    color:#5a6a80;background:transparent;
+    border:none;cursor:pointer;transition:all 0.25s;
+}
+.reg-tab-btn:hover{color:#9aacbf}
+.reg-tab-btn.active{
+    color:#060b18;
+    background:linear-gradient(135deg,#4cc9f0 0%,#38b0d8 100%);
+}
+.tab-pane{display:none}
+.tab-pane.active{display:block}
+
+.reg-login-error{
+    font-family:'DM Sans',sans-serif;font-size:12px;color:#ff6b6b;
+    text-align:center;margin-top:14px;display:none;
+}
+.reg-login-error.show{display:block}
+</style>
+</head>
+<body>
+
+<!-- Background layers -->
+<canvas id="wave-canvas"></canvas>
+<div class="bg-deep"></div>
+<div class="horizon"></div>
+
+<div class="orb orb--1"></div>
+<div class="orb orb--2"></div>
+<div class="orb orb--3"></div>
+<div class="orb orb--4"></div>
+
+<div class="god-rays">
+    <div class="god-ray" style="--r:3deg"></div>
+    <div class="god-ray" style="--r:-2deg"></div>
+    <div class="god-ray" style="--r:4deg"></div>
+    <div class="god-ray" style="--r:-3deg"></div>
+    <div class="god-ray" style="--r:2deg"></div>
+</div>
+
+<div class="particles" id="particles"></div>
+<div class="depth-line" id="depth-line"></div>
+
+<svg class="contours" viewBox="0 0 1440 600" preserveAspectRatio="none" fill="none" stroke="rgba(76,201,240,1)" stroke-width="1">
+    <path d="M0 100 C200 80, 400 130, 600 100 S1000 60, 1200 110, 1440 90" />
+    <path d="M0 200 C150 220, 350 170, 550 210 S850 240, 1100 190, 1440 220" />
+    <path d="M0 310 C250 290, 450 340, 700 300 S1050 270, 1300 330, 1440 310" />
+    <path d="M0 420 C180 440, 380 400, 580 430 S880 460, 1150 410, 1440 440" />
+    <path d="M0 520 C300 500, 500 540, 750 510 S1100 490, 1350 530, 1440 515" />
+</svg>
+
+<!-- Page content -->
+<div class="page">
+    <nav class="nav">
+        <div class="nav__mark">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 17c1.5-2 3-3 5-3s3.5 1 5 3 3 3 5 3 3.5-1 5-3"/><path d="M3 12c1.5-2 3-3 5-3s3.5 1 5 3 3 3 5 3 3.5-1 5-3"/></svg>
+            MFI Platform
+        </div>
+        <div style="display:flex;align-items:center;gap:24px">
+            <ul class="nav__links">
+                <li><a href="/map">Live Map</a></li>
+                <li><a href="/api/docs">API</a></li>
+                <li><a href="/landing-test" style="color:#3dffa2">Test Landing</a></li>
+            </ul>
+            <a href="#" class="nav-register" id="nav-login-btn" onclick="openLoginModal(event)" style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;text-decoration:none;color:#060b18;background:linear-gradient(135deg,#4cc9f0,#38b0d8);padding:7px 18px;border-radius:4px;font-weight:500;transition:all 0.3s">Login</a>
+            <div class="user-menu" id="user-menu" style="display:none">
+                <button class="user-menu__trigger" onclick="toggleUserMenu(event)">
+                    <span id="user-menu-name"></span>
+                    <svg class="user-menu__chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                </button>
+                <div class="user-menu__dropdown">
+                    <button class="user-menu__item" onclick="openProfileModal()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0112 0v1"/></svg>
+                        My Profile
+                    </button>
+                    <a href="/admin" class="user-menu__item" id="user-menu-admin" style="display:none">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                        Admin Dashboard
+                    </a>
+                    <div class="user-menu__divider"></div>
+                    <button class="user-menu__item user-menu__item--danger" onclick="doLogout()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+                        Logout
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Live Stats — Top -->
+    <div class="stats" id="stats">
+        <div class="stat">
+            <div class="stat__value" id="s-catches">&mdash;</div>
+            <div class="stat__label">Catches</div>
+        </div>
+        <div class="stat">
+            <div class="stat__value" id="s-days">&mdash;</div>
+            <div class="stat__label">Fishing Days</div>
+        </div>
+        <div class="stat">
+            <div class="stat__value" id="s-species">&mdash;</div>
+            <div class="stat__label">Species</div>
+        </div>
+        <div class="stat">
+            <div class="stat__value" id="s-range">&mdash;</div>
+            <div class="stat__label">Dataset Span</div>
+        </div>
+    </div>
+
+    <!-- Hero: Screenshot background + overlay content -->
+    <section class="hero">
+        <div class="hero__screen">
+            <img src="/images/map-full.png" alt="Marine Fishing Intelligence Map Dashboard">
+        </div>
+        <div class="hero__content">
+            <div class="hero__overline">Intelligence Platform</div>
+            <h1 class="hero__title">Marine Fishing<br><em>Intelligence</em></h1>
+            <p class="hero__sub">
+                Real-time catch mapping, NOAA weather buoy integration, and
+                species tracking across the Mid-Atlantic. Built on
+                satellite-derived fishing effort data and commercial landings records.
+            </p>
+            <div class="hero__actions">
+                <a href="/map" class="btn-enter">
+                    Open Map
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                </a>
+                <a href="/api/docs" class="btn-api">API Docs</a>
+                <a href="#" class="btn-api" onclick="openLoginModal(event)" style="border-bottom:1px solid rgba(76,201,240,0.3);color:rgba(76,201,240,0.7)">Login</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Feature Cards -->
+    <section class="features-section" id="features-section">
+        <h2 class="features-section__heading">Built for <em>Intelligence</em></h2>
+        <div class="features">
+            <div class="feat" id="feat-1">
+                <div class="feat__icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+                </div>
+                <div class="feat__title">Catch Mapping</div>
+                <div class="feat__desc">44,000+ geo-tagged catch records plotted in real time. Filter by species, date, conditions, and source. Clustered markers with instant detail popups.</div>
+            </div>
+            <div class="feat" id="feat-2">
+                <div class="feat__icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 18c2-3 4-4 6-4s4 1 6 4 4 4 6 4 4-1 6-4"/><path d="M2 12c2-3 4-4 6-4s4 1 6 4 4 4 6 4 4-1 6-4"/><path d="M2 6c2-3 4-4 6-4s4 1 6 4 4 4 6 4 4-1 6-4"/></svg>
+                </div>
+                <div class="feat__title">Weather Intelligence</div>
+                <div class="feat__desc">Live NOAA buoy data from 10 Mid-Atlantic stations. Air &amp; water temps, wind, waves, pressure, moon phase, and computed fishing scores.</div>
+                <div class="feat__img"><img src="/images/weather-bar.png" alt="Marine weather conditions bar" loading="lazy"></div>
+            </div>
+            <div class="feat" id="feat-3">
+                <div class="feat__icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 00-3-3.87M14 3.13a4 4 0 010 7.75"/><path d="M4 21v-2a4 4 0 013-3.87"/><circle cx="9" cy="7" r="4"/></svg>
+                </div>
+                <div class="feat__title">Species Tracking</div>
+                <div class="feat__desc">11 pelagic species tracked across the Atlantic — tuna, billfish, mahi, wahoo. Color-coded markers and filterable legend for instant identification.</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Species Ribbon -->
+    <div class="species-ribbon" id="species-ribbon">
+        <div class="species-ribbon__label">Tracked Species</div>
+        <div class="species-ribbon__row" id="species-row"></div>
+    </div>
+
+    <!-- Data Sources -->
+    <div class="sources-strip" id="sources-strip">
+        <div class="sources-strip__label">Data Sources</div>
+        <div class="sources-strip__row">
+            <span class="sources-strip__item">NOAA Fisheries</span>
+            <span class="sources-strip__item">NDBC Weather Buoys</span>
+            <span class="sources-strip__item">AIS Stream</span>
+            <span class="sources-strip__item">NOAA MRIP</span>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <span>Marine Fishing Intelligence Platform</span>
+        <span>&copy; 2026</span>
+    </footer>
+</div>
+
+<script>
+// ===== Wave canvas =====
+(function(){
+    var c = document.getElementById('wave-canvas');
+    var ctx = c.getContext('2d');
+    var w, h, time = 0;
+    function resize(){ w = c.width = window.innerWidth; h = c.height = window.innerHeight; }
+    window.addEventListener('resize', resize); resize();
+    function draw(){
+        time += 0.003; ctx.clearRect(0, 0, w, h);
+        for(var layer = 0; layer < 4; layer++){
+            var baseY = 30 + layer * 18, amp = 8 - layer * 1.5, freq = 0.003 + layer * 0.001, speed = time * (1 + layer * 0.3), alpha = 0.03 - layer * 0.006;
+            ctx.beginPath(); ctx.moveTo(0, 0);
+            for(var x = 0; x <= w; x += 3){ ctx.lineTo(x, baseY + Math.sin(x*freq+speed)*amp + Math.sin(x*freq*2.3+speed*1.4)*(amp*0.4) + Math.sin(x*freq*0.7+speed*0.6)*(amp*0.6)); }
+            ctx.lineTo(w, 0); ctx.closePath();
+            var grad = ctx.createLinearGradient(0, 0, 0, baseY+amp+20);
+            grad.addColorStop(0, 'rgba(10,30,60,'+(alpha*2)+')'); grad.addColorStop(1, 'rgba(76,201,240,'+alpha+')');
+            ctx.fillStyle = grad; ctx.fill();
+        }
+        for(var i = 0; i < 12; i++){
+            var cx = (Math.sin(time*0.8+i*1.7)*0.5+0.5)*w, cy = (Math.cos(time*0.5+i*2.1)*0.3+0.3)*h, r = 80+Math.sin(time+i)*40, a = 0.008+Math.sin(time*1.2+i)*0.004;
+            var grd = ctx.createRadialGradient(cx,cy,0,cx,cy,r); grd.addColorStop(0,'rgba(76,201,240,'+a+')'); grd.addColorStop(1,'rgba(76,201,240,0)');
+            ctx.fillStyle = grd; ctx.fillRect(cx-r,cy-r,r*2,r*2);
+        }
+        requestAnimationFrame(draw);
+    }
+    draw();
+})();
+
+// ===== Particles =====
+(function(){
+    var container = document.getElementById('particles');
+    for(var i=0;i<15;i++){var p=document.createElement('div');p.className='particle';var size=2+Math.random()*3;p.style.cssText='left:'+(Math.random()*100)+'%;width:'+size+'px;height:'+size+'px;background:rgba(76,201,240,0.6);box-shadow:0 0 '+(size*2)+'px rgba(76,201,240,0.3);animation-duration:'+(10+Math.random()*12)+'s;animation-delay:'+(Math.random()*20)+'s;--o:'+(0.3+Math.random()*0.4)+';--dx:'+(-30+Math.random()*60)+'px;';container.appendChild(p)}
+    for(var j=0;j<25;j++){var q=document.createElement('div');q.className='particle';var sz=1+Math.random()*1.5;q.style.cssText='left:'+(Math.random()*100)+'%;width:'+sz+'px;height:'+sz+'px;background:rgba(120,180,255,0.3);animation-duration:'+(20+Math.random()*25)+'s;animation-delay:'+(Math.random()*30)+'s;--o:'+(0.1+Math.random()*0.2)+';--dx:'+(-15+Math.random()*30)+'px;';container.appendChild(q)}
+    for(var k=0;k<5;k++){var g=document.createElement('div');g.className='particle';g.style.cssText='left:'+(Math.random()*100)+'%;width:4px;height:4px;background:rgba(61,255,162,0.5);box-shadow:0 0 8px rgba(61,255,162,0.3);animation-duration:'+(15+Math.random()*20)+'s;animation-delay:'+(Math.random()*25)+'s;--o:'+(0.2+Math.random()*0.3)+';--dx:'+(-40+Math.random()*80)+'px;';container.appendChild(g)}
+})();
+
+// ===== Depth ticks =====
+(function(){
+    var line = document.getElementById('depth-line');
+    for(var i=10;i<90;i+=5){var tick=document.createElement('div');tick.className='depth-tick';tick.style.top=i+'%';tick.style.width=(i%10===0?'16px':'8px');line.appendChild(tick)}
+})();
+
+// ===== Count-up animation =====
+function countUp(el, target, duration) {
+    var start = 0, startTime = null;
+    el.classList.add('counting');
+    function step(ts) {
+        if (!startTime) startTime = ts;
+        var progress = Math.min((ts - startTime) / duration, 1);
+        var eased = 1 - Math.pow(1 - progress, 3);
+        el.textContent = Math.floor(start + (target - start) * eased).toLocaleString();
+        if (progress < 1) { requestAnimationFrame(step); }
+        else { el.textContent = target.toLocaleString(); el.classList.remove('counting'); el.classList.add('done'); }
+    }
+    requestAnimationFrame(step);
+}
+
+// ===== Scroll reveal =====
+(function(){
+    var reveals = document.querySelectorAll('.features-section, .feat, .species-ribbon, .sources-strip');
+    var observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) { if (entry.isIntersecting) { entry.target.classList.add('in-view'); observer.unobserve(entry.target); } });
+    }, { threshold: 0.15 });
+    reveals.forEach(function(el) { observer.observe(el); });
+})();
+
+// ===== Feature card stagger =====
+(function(){
+    document.querySelectorAll('.feat').forEach(function(f, i) { f.style.transitionDelay = (i * 0.15) + 's'; });
+})();
+
+// ===== Load stats =====
+(async function(){
+    try {
+        var r = await fetch('/api/v1/catches/geojson?limit=1');
+        var d = await r.json();
+        if (d.metadata) {
+            var m = d.metadata;
+            countUp(document.getElementById('s-catches'), m.total_catches || 0, 1800);
+            countUp(document.getElementById('s-days'), m.fishing_days || 0, 1500);
+            countUp(document.getElementById('s-species'), m.species_count || 0, 1200);
+            if (m.date_range && m.date_range.start && m.date_range.end) {
+                document.getElementById('s-range').textContent = m.date_range.start.split('-')[0] + '\u2013' + m.date_range.end.split('-')[0];
+            }
+        }
+    } catch(e) { console.error(e); }
+})();
+
+// ===== Check if logged in — show user menu =====
+(async function(){
+    try {
+        var r = await fetch('/api/v1/admin/user-me', { credentials: 'same-origin' });
+        if (r.ok) {
+            var u = await r.json();
+            // Hide login button, show user menu
+            var loginBtn = document.getElementById('nav-login-btn');
+            if (loginBtn) loginBtn.style.display = 'none';
+            initUserMenu(u);
+        }
+    } catch(e) { /* not logged in */ }
+})();
+
+// ===== Load species =====
+(async function(){
+    try {
+        var r = await fetch('/api/v1/species');
+        var d = await r.json();
+        var row = document.getElementById('species-row');
+        (d.species || []).forEach(function(sp) {
+            var tag = document.createElement('div');
+            tag.className = 'species-tag';
+            tag.innerHTML = '<span class="species-dot" style="background:' + sp.color_hex + ';color:' + sp.color_hex + '"></span>' + sp.common_name;
+            row.appendChild(tag);
+        });
+    } catch(e) { console.error(e); }
+})();
+</script>
+
+<!-- User Menu & Profile Styles -->
+<style>
+.user-menu{position:relative;z-index:900}
+.user-menu__trigger{display:flex;align-items:center;gap:6px;background:none;border:1px solid rgba(76,201,240,0.15);border-radius:4px;padding:4px 10px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;color:#c0cddf;transition:all 0.2s;white-space:nowrap}
+.user-menu__trigger:hover{border-color:#4cc9f0;color:#4cc9f0}
+.user-menu__chevron{transition:transform 0.2s;opacity:0.5}
+.user-menu.open .user-menu__chevron{transform:rotate(180deg)}
+.user-menu__dropdown{display:none;position:fixed;min-width:180px;background:rgba(10,20,40,0.95);border:1px solid rgba(76,201,240,0.12);border-radius:6px;box-shadow:0 8px 32px rgba(0,0,0,0.5);overflow:hidden;z-index:910;backdrop-filter:blur(12px)}
+.user-menu.open .user-menu__dropdown{display:block}
+.user-menu__item{display:flex;align-items:center;gap:8px;width:100%;padding:10px 14px;background:none;border:none;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:500;letter-spacing:0.5px;text-transform:uppercase;color:#c0cddf;cursor:pointer;transition:background 0.2s,color 0.2s;text-decoration:none;text-align:left}
+.user-menu__item:hover{background:rgba(76,201,240,0.08);color:#4cc9f0}
+.user-menu__item--danger:hover{color:#ff6b6b}
+.user-menu__divider{height:1px;background:rgba(76,201,240,0.08)}
+.profile-overlay{display:none;position:fixed;inset:0;z-index:2000;align-items:center;justify-content:center;background:rgba(3,8,16,0.85);backdrop-filter:blur(12px)}
+.profile-overlay.open{display:flex}
+.profile-modal{width:100%;max-width:440px;background:rgba(10,20,40,0.9);border:1px solid rgba(76,201,240,0.12);border-radius:12px;box-shadow:0 16px 48px rgba(0,0,0,0.6);overflow:hidden;backdrop-filter:blur(20px)}
+.profile-modal__head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(76,201,240,0.08)}
+.profile-modal__title{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#eaf0ff}
+.profile-modal__close{background:none;border:1px solid rgba(76,201,240,0.12);color:#5a6a80;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:500;letter-spacing:1px;text-transform:uppercase;padding:4px 10px;border-radius:4px;cursor:pointer;transition:all 0.2s}
+.profile-modal__close:hover{color:#c0cddf;border-color:#4cc9f0}
+.profile-modal__body{padding:20px}
+.profile-modal__row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.profile-field{margin-bottom:14px}
+.profile-field__label{display:block;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;color:#5a6a80;margin-bottom:5px}
+.profile-field__input{width:100%;padding:9px 12px;background:rgba(255,255,255,0.03);border:1px solid rgba(76,201,240,0.1);border-radius:6px;color:#eaf0ff;font-family:'JetBrains Mono',monospace;font-size:12px;outline:none;transition:border-color 0.25s,box-shadow 0.25s}
+.profile-field__input:focus{border-color:rgba(76,201,240,0.4);box-shadow:0 0 12px rgba(76,201,240,0.1)}
+.profile-field__input::placeholder{color:#3a4a60}
+.profile-modal__divider{height:1px;background:rgba(76,201,240,0.08);margin:6px 0 14px}
+.profile-modal__actions{display:flex;gap:8px;margin-top:8px}
+.profile-modal__actions button{flex:1;padding:12px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;border:none;border-radius:6px;cursor:pointer;transition:all 0.3s}
+.profile-modal__actions .btn--primary{color:#060b18;background:linear-gradient(135deg,#4cc9f0,#38b0d8)}
+.profile-modal__actions .btn--primary:hover{box-shadow:0 0 20px rgba(76,201,240,0.3)}
+.profile-modal__actions .btn--ghost{color:#5a6a80;background:transparent;border:1px solid rgba(76,201,240,0.1)}
+.profile-modal__actions .btn--ghost:hover{border-color:rgba(76,201,240,0.3);color:#c0cddf}
+.profile-msg{font-family:'JetBrains Mono',monospace;font-size:11px;text-align:center;margin-top:10px;padding:6px 10px;border-radius:4px;display:none}
+.profile-msg.show{display:block}
+.profile-msg--ok{color:#3dffa2;background:rgba(61,255,162,0.08);border:1px solid rgba(61,255,162,0.15)}
+.profile-msg--err{color:#ff6b6b;background:rgba(255,107,107,0.08);border:1px solid rgba(255,107,107,0.15)}
+</style>
+
+<!-- Profile Modal -->
+<div class="profile-overlay" id="profile-overlay">
+    <div class="profile-modal">
+        <div class="profile-modal__head">
+            <div class="profile-modal__title">My Profile</div>
+            <button class="profile-modal__close" onclick="closeProfileModal()">Close</button>
+        </div>
+        <div class="profile-modal__body">
+            <div class="profile-modal__row">
+                <div class="profile-field">
+                    <label class="profile-field__label">First Name</label>
+                    <input type="text" class="profile-field__input" id="profile-first">
+                </div>
+                <div class="profile-field">
+                    <label class="profile-field__label">Last Name</label>
+                    <input type="text" class="profile-field__input" id="profile-last">
+                </div>
+            </div>
+            <div class="profile-field">
+                <label class="profile-field__label">Email</label>
+                <input type="email" class="profile-field__input" id="profile-email">
+            </div>
+            <div class="profile-modal__divider"></div>
+            <div class="profile-field">
+                <label class="profile-field__label">Current Password</label>
+                <input type="password" class="profile-field__input" id="profile-current-pass" placeholder="Required to change password">
+            </div>
+            <div class="profile-field">
+                <label class="profile-field__label">New Password</label>
+                <input type="password" class="profile-field__input" id="profile-new-pass" placeholder="Leave empty to keep current">
+            </div>
+            <div class="profile-modal__actions">
+                <button class="btn--primary" onclick="saveProfile()">Save</button>
+                <button class="btn--ghost" onclick="closeProfileModal()">Cancel</button>
+            </div>
+            <div class="profile-msg" id="profile-msg"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ===== User Menu & Profile (Landing) =====
+function initUserMenu(userData) {
+    var container = document.getElementById('user-menu');
+    if (!container) return;
+    var nameEl = document.getElementById('user-menu-name');
+    if (nameEl) nameEl.textContent = userData.first_name + ' ' + userData.last_name;
+    container.style.display = '';
+    var adminItem = document.getElementById('user-menu-admin');
+    if (adminItem) adminItem.style.display = userData.role === 'admin' ? '' : 'none';
+    var el;
+    el = document.getElementById('profile-first'); if (el) el.value = userData.first_name || '';
+    el = document.getElementById('profile-last'); if (el) el.value = userData.last_name || '';
+    el = document.getElementById('profile-email'); if (el) el.value = userData.email || '';
+}
+function toggleUserMenu(e) {
+    if (e) e.stopPropagation();
+    var menu = document.getElementById('user-menu');
+    if (!menu) return;
+    menu.classList.toggle('open');
+    if (menu.classList.contains('open')) {
+        var trigger = menu.querySelector('.user-menu__trigger');
+        var dropdown = menu.querySelector('.user-menu__dropdown');
+        if (trigger && dropdown) {
+            var rect = trigger.getBoundingClientRect();
+            dropdown.style.top = (rect.bottom + 6) + 'px';
+            dropdown.style.right = (window.innerWidth - rect.right) + 'px';
+        }
+    }
+}
+document.addEventListener('click', function(e) {
+    var menu = document.getElementById('user-menu');
+    if (menu && !menu.contains(e.target)) menu.classList.remove('open');
+});
+function openProfileModal() {
+    var menu = document.getElementById('user-menu');
+    if (menu) menu.classList.remove('open');
+    var overlay = document.getElementById('profile-overlay');
+    if (overlay) overlay.classList.add('open');
+    var cp = document.getElementById('profile-current-pass'); if (cp) cp.value = '';
+    var np = document.getElementById('profile-new-pass'); if (np) np.value = '';
+    var msg = document.getElementById('profile-msg');
+    if (msg) { msg.className = 'profile-msg'; msg.textContent = ''; }
+}
+function closeProfileModal() {
+    var overlay = document.getElementById('profile-overlay');
+    if (overlay) overlay.classList.remove('open');
+}
+async function saveProfile() {
+    var first = document.getElementById('profile-first').value.trim();
+    var last = document.getElementById('profile-last').value.trim();
+    var email = document.getElementById('profile-email').value.trim();
+    var currentPass = document.getElementById('profile-current-pass').value;
+    var newPass = document.getElementById('profile-new-pass').value;
+    var msg = document.getElementById('profile-msg');
+    msg.className = 'profile-msg'; msg.textContent = '';
+    if (!first || !last || !email) {
+        msg.textContent = 'First name, last name, and email are required';
+        msg.className = 'profile-msg profile-msg--err show'; return;
+    }
+    var body = { first_name: first, last_name: last, email: email };
+    if (newPass) { body.current_password = currentPass; body.new_password = newPass; }
+    try {
+        var resp = await fetch('/api/v1/admin/user-me', {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin', body: JSON.stringify(body)
+        });
+        var data = await resp.json();
+        if (!resp.ok) { msg.textContent = data.detail || 'Update failed'; msg.className = 'profile-msg profile-msg--err show'; return; }
+        msg.textContent = 'Profile updated'; msg.className = 'profile-msg profile-msg--ok show';
+        var nameEl = document.getElementById('user-menu-name');
+        if (nameEl) nameEl.textContent = data.first_name + ' ' + data.last_name;
+        document.getElementById('profile-current-pass').value = '';
+        document.getElementById('profile-new-pass').value = '';
+    } catch (e) { msg.textContent = 'Network error'; msg.className = 'profile-msg profile-msg--err show'; }
+}
+function doLogout() {
+    fetch('/api/v1/admin/user-logout', { method: 'POST', credentials: 'same-origin' })
+        .finally(function() { window.location.href = '/'; });
+}
+// Close profile modal on overlay click and Escape
+document.getElementById('profile-overlay').addEventListener('click', function(e) {
+    if (e.target === this) closeProfileModal();
+});
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        var prof = document.getElementById('profile-overlay');
+        if (prof && prof.classList.contains('open')) closeProfileModal();
+    }
+});
+</script>
+
+<!-- Registration Modal -->
+<div class="reg-overlay" id="reg-overlay">
+    <div class="reg-card">
+        <button class="reg-card__close" onclick="closeRegisterModal()" aria-label="Close">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+
+        <div class="reg-tabs">
+            <button class="reg-tab-btn active" id="tab-login-btn" onclick="switchTab('login')">Login</button>
+            <button class="reg-tab-btn" id="tab-register-btn" onclick="switchTab('register')">Register</button>
+        </div>
+
+        <!-- Login Tab -->
+        <div class="tab-pane active" id="tab-login">
+            <div class="reg-card__title">Welcome Back</div>
+            <div class="reg-card__sub">Sign in with your account</div>
+            <div class="reg-field">
+                <label class="reg-field__label">Email</label>
+                <input type="email" class="reg-field__input" id="login-email" placeholder="jane@example.com">
+            </div>
+            <div class="reg-field">
+                <label class="reg-field__label">Password</label>
+                <input type="password" class="reg-field__input" id="login-pass" placeholder="Your password">
+            </div>
+            <button class="reg-btn" id="login-btn" onclick="submitLogin()">Login</button>
+            <div class="reg-login-error" id="login-error-msg"></div>
+        </div>
+
+        <!-- Register Tab -->
+        <div class="tab-pane" id="tab-register">
+            <div id="reg-form-area">
+                <div class="reg-card__title">Create Account</div>
+                <div class="reg-card__sub">Register for access — admin approval required</div>
+
+                <div class="reg-row">
+                    <div class="reg-field">
+                        <label class="reg-field__label">First Name</label>
+                        <input type="text" class="reg-field__input" id="reg-first" placeholder="Jane">
+                        <div class="reg-field__error" id="reg-first-err"></div>
+                    </div>
+                    <div class="reg-field">
+                        <label class="reg-field__label">Last Name</label>
+                        <input type="text" class="reg-field__input" id="reg-last" placeholder="Doe">
+                        <div class="reg-field__error" id="reg-last-err"></div>
+                    </div>
+                </div>
+                <div class="reg-field">
+                    <label class="reg-field__label">Email</label>
+                    <input type="email" class="reg-field__input" id="reg-email" placeholder="jane@example.com">
+                    <div class="reg-field__error" id="reg-email-err"></div>
+                </div>
+                <div class="reg-field">
+                    <label class="reg-field__label">Password</label>
+                    <input type="password" class="reg-field__input" id="reg-pass" placeholder="Min. 6 characters">
+                    <div class="reg-field__error" id="reg-pass-err"></div>
+                </div>
+                <div class="reg-field">
+                    <label class="reg-field__label">Confirm Password</label>
+                    <input type="password" class="reg-field__input" id="reg-pass2" placeholder="Re-enter password">
+                    <div class="reg-field__error" id="reg-pass2-err"></div>
+                </div>
+                <button class="reg-btn" id="reg-btn" onclick="submitRegistration()">Register</button>
+                <div class="reg-error-msg" id="reg-error-msg"></div>
+            </div>
+
+            <div class="reg-success" id="reg-success">
+                <div class="reg-success__check">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                <div class="reg-success__title">Registration Submitted</div>
+                <div class="reg-success__msg">Your registration is pending admin approval.<br>You will be notified once your account is reviewed.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ===== Login/Registration Modal =====
+
+function switchTab(tab) {
+    document.getElementById('tab-login-btn').classList.toggle('active', tab === 'login');
+    document.getElementById('tab-register-btn').classList.toggle('active', tab === 'register');
+    document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+    document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+}
+
+function openLoginModal(e) {
+    if (e) e.preventDefault();
+    switchTab('login');
+    var overlay = document.getElementById('reg-overlay');
+    overlay.classList.add('opening');
+    requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+            overlay.classList.add('open');
+            overlay.classList.remove('opening');
+        });
+    });
+}
+
+function openRegisterModal(e) {
+    if (e) e.preventDefault();
+    switchTab('register');
+    var overlay = document.getElementById('reg-overlay');
+    overlay.classList.add('opening');
+    requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+            overlay.classList.add('open');
+            overlay.classList.remove('opening');
+        });
+    });
+}
+
+function closeRegisterModal() {
+    var overlay = document.getElementById('reg-overlay');
+    overlay.classList.remove('open');
+    setTimeout(function() {
+        // Reset login fields
+        document.getElementById('login-email').value = '';
+        document.getElementById('login-pass').value = '';
+        document.getElementById('login-error-msg').classList.remove('show');
+        // Reset register form
+        document.getElementById('reg-form-area').style.display = '';
+        document.getElementById('reg-success').classList.remove('show');
+        ['reg-first','reg-last','reg-email','reg-pass','reg-pass2'].forEach(function(id) {
+            var el = document.getElementById(id);
+            el.value = '';
+            el.classList.remove('error');
+        });
+        ['reg-first-err','reg-last-err','reg-email-err','reg-pass-err','reg-pass2-err'].forEach(function(id) {
+            var el = document.getElementById(id);
+            el.textContent = '';
+            el.classList.remove('show');
+        });
+        document.getElementById('reg-error-msg').classList.remove('show');
+    }, 300);
+}
+
+// Close on overlay click (not card)
+document.getElementById('reg-overlay').addEventListener('click', function(e) {
+    if (e.target === this) closeRegisterModal();
+});
+
+// Close on Escape
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && document.getElementById('reg-overlay').classList.contains('open')) {
+        closeRegisterModal();
+    }
+});
+
+// Submit login on Enter key in login fields
+document.getElementById('login-email').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') submitLogin();
+});
+document.getElementById('login-pass').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') submitLogin();
+});
+
+async function submitLogin() {
+    var email = document.getElementById('login-email').value.trim();
+    var pass = document.getElementById('login-pass').value;
+    var btn = document.getElementById('login-btn');
+    var errMsg = document.getElementById('login-error-msg');
+
+    errMsg.classList.remove('show');
+
+    if (!email || !pass) {
+        errMsg.textContent = 'Email and password are required';
+        errMsg.classList.add('show');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Signing in...';
+
+    try {
+        var resp = await fetch('/api/v1/admin/user-login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ email: email, password: pass })
+        });
+        var data = await resp.json();
+
+        if (!resp.ok) {
+            errMsg.textContent = data.detail || 'Login failed';
+            errMsg.classList.add('show');
+            return;
+        }
+
+        // Show admin link if user has admin role
+        if (data.user && data.user.role === 'admin') {
+            var adminLink = document.getElementById('admin-nav-link');
+            if (adminLink) adminLink.style.display = '';
+        }
+
+        window.location.href = '/map';
+    } catch (e) {
+        errMsg.textContent = 'Network error. Please try again.';
+        errMsg.classList.add('show');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Login';
+    }
+}
+
+function clearRegErrors() {
+    ['reg-first','reg-last','reg-email','reg-pass','reg-pass2'].forEach(function(id) {
+        document.getElementById(id).classList.remove('error');
+    });
+    ['reg-first-err','reg-last-err','reg-email-err','reg-pass-err','reg-pass2-err'].forEach(function(id) {
+        var el = document.getElementById(id);
+        el.textContent = '';
+        el.classList.remove('show');
+    });
+    document.getElementById('reg-error-msg').classList.remove('show');
+}
+
+function setRegFieldError(fieldId, errId, msg) {
+    document.getElementById(fieldId).classList.add('error');
+    var errEl = document.getElementById(errId);
+    errEl.textContent = msg;
+    errEl.classList.add('show');
+}
+
+async function submitRegistration() {
+    clearRegErrors();
+    var first = document.getElementById('reg-first').value.trim();
+    var last = document.getElementById('reg-last').value.trim();
+    var email = document.getElementById('reg-email').value.trim();
+    var pass = document.getElementById('reg-pass').value;
+    var pass2 = document.getElementById('reg-pass2').value;
+    var btn = document.getElementById('reg-btn');
+    var valid = true;
+
+    if (!first) { setRegFieldError('reg-first','reg-first-err','Required'); valid = false; }
+    if (!last) { setRegFieldError('reg-last','reg-last-err','Required'); valid = false; }
+    if (!email) { setRegFieldError('reg-email','reg-email-err','Required'); valid = false; }
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setRegFieldError('reg-email','reg-email-err','Invalid email format'); valid = false; }
+    if (!pass) { setRegFieldError('reg-pass','reg-pass-err','Required'); valid = false; }
+    else if (pass.length < 6) { setRegFieldError('reg-pass','reg-pass-err','Min. 6 characters'); valid = false; }
+    if (pass !== pass2) { setRegFieldError('reg-pass2','reg-pass2-err','Passwords do not match'); valid = false; }
+
+    if (!valid) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Submitting...';
+
+    try {
+        var resp = await fetch('/api/v1/admin/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ first_name: first, last_name: last, email: email, password: pass })
+        });
+        var data = await resp.json();
+
+        if (!resp.ok) {
+            var errMsg = document.getElementById('reg-error-msg');
+            errMsg.textContent = data.detail || 'Registration failed';
+            errMsg.classList.add('show');
+            return;
+        }
+
+        // Show success state
+        document.getElementById('reg-form-area').style.display = 'none';
+        document.getElementById('reg-success').classList.add('show');
+    } catch (e) {
+        var errMsg = document.getElementById('reg-error-msg');
+        errMsg.textContent = 'Network error. Please try again.';
+        errMsg.classList.add('show');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Register';
+    }
+}
+</script>
+</body>
+</html>
