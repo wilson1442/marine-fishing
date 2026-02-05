@@ -77,6 +77,22 @@ const API_ENDPOINTS = {
     tideCurrent: `${API_BASE}/tide/current`,
 };
 
+// Coastal city landmarks for reference on the map
+const coastalCities = [
+    { name: 'Boston', state: 'MA', lat: 42.3601, lon: -71.0589 },
+    { name: 'Providence', state: 'RI', lat: 41.8240, lon: -71.4128 },
+    { name: 'New York City', state: 'NY', lat: 40.7128, lon: -74.0060 },
+    { name: 'Atlantic City', state: 'NJ', lat: 39.3643, lon: -74.4229 },
+    { name: 'Philadelphia', state: 'PA', lat: 39.9526, lon: -75.1652 },
+    { name: 'Baltimore', state: 'MD', lat: 39.2904, lon: -76.6122 },
+    { name: 'Norfolk', state: 'VA', lat: 36.8508, lon: -76.2859 },
+    { name: 'Wilmington', state: 'NC', lat: 34.2257, lon: -77.9447 },
+    { name: 'Charleston', state: 'SC', lat: 32.7765, lon: -79.9311 },
+    { name: 'Savannah', state: 'GA', lat: 32.0809, lon: -81.0912 },
+    { name: 'Jacksonville', state: 'FL', lat: 30.3322, lon: -81.6557 },
+    { name: 'Miami', state: 'FL', lat: 25.7617, lon: -80.1918 },
+];
+
 const weatherConfig = {
     // Wave height color scale: calm -> light -> moderate -> rough
     waveColorScale: [

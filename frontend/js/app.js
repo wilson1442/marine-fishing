@@ -7,6 +7,7 @@ let speciesData = [];
 let speciesVisible = {}; // Track which species are visible on the map
 let lastGeoJSON = null; // Cache last loaded GeoJSON for filtering
 let mapReady = false;
+let cityLandmarksLayer;
 
 // Vessel layer groups
 let vesselLayers = {
@@ -72,6 +73,8 @@ document.addEventListener('DOMContentLoaded', async function () {
     initSpeciesToggleAll();
     initLayerGroupToggles();
     initTidePanel();
+    initCityLandmarksToggle();
+    loadCityLandmarks();
 
     // Run data fetches in parallel, don't let one block another
     await Promise.allSettled([
@@ -146,6 +149,10 @@ function initMap() {
     // Separate layer for buoy station markers (not clustered)
     buoysLayer = L.layerGroup();
     map.addLayer(buoysLayer);
+
+    // Layer for city landmark markers
+    cityLandmarksLayer = L.layerGroup();
+    map.addLayer(cityLandmarksLayer);
 
     // Initialize vessel layer groups
     Object.keys(vesselLayers).forEach(function (key) {
@@ -1861,4 +1868,58 @@ async function loadTidePredictions(stationId) {
         console.error('Error loading tide predictions:', error);
         list.innerHTML = '<div class="tide-panel__empty">Error loading predictions</div>';
     }
+}
+
+// ---- City Landmarks ----
+
+function loadCityLandmarks() {
+    if (!cityLandmarksLayer || typeof coastalCities === 'undefined') return;
+
+    coastalCities.forEach(function (city) {
+        var icon = L.divIcon({
+            className: 'city-landmark',
+            html: '<div class="city-landmark__icon">' +
+                '<svg viewBox="0 0 24 24" width="16" height="16" fill="#8a9bb8" stroke="none">' +
+                '<path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>' +
+                '</svg>' +
+                '</div>' +
+                '<div class="city-landmark__label">' + city.name + '</div>',
+            iconSize: [80, 36],
+            iconAnchor: [40, 8],
+            popupAnchor: [0, -8]
+        });
+
+        var marker = L.marker([city.lat, city.lon], { icon: icon });
+        marker.bindPopup(
+            '<div class="catch-popup">' +
+            '<div class="catch-popup__species" style="color:#6b7da0">' + city.name + ', ' + city.state + '</div>' +
+            '<div class="catch-popup__grid">' +
+            '<div class="catch-popup__field"><div class="catch-popup__label">Latitude</div><div class="catch-popup__val">' + city.lat.toFixed(4) + '</div></div>' +
+            '<div class="catch-popup__field"><div class="catch-popup__label">Longitude</div><div class="catch-popup__val">' + city.lon.toFixed(4) + '</div></div>' +
+            '</div></div>'
+        );
+        cityLandmarksLayer.addLayer(marker);
+    });
+}
+
+function toggleCityLandmarks(visible) {
+    if (!cityLandmarksLayer || !map) return;
+    if (visible) {
+        if (!map.hasLayer(cityLandmarksLayer)) {
+            map.addLayer(cityLandmarksLayer);
+        }
+    } else {
+        if (map.hasLayer(cityLandmarksLayer)) {
+            map.removeLayer(cityLandmarksLayer);
+        }
+    }
+}
+
+function initCityLandmarksToggle() {
+    var toggle = document.getElementById('city-landmarks-toggle');
+    if (!toggle) return;
+
+    toggle.addEventListener('change', function () {
+        toggleCityLandmarks(this.checked);
+    });
 }

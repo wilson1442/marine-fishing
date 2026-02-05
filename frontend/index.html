@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="/css/vendor/MarkerCluster.css" />
     <link rel="stylesheet" href="/css/vendor/MarkerCluster.Default.css" />
 
-    <link rel="stylesheet" href="/css/style.css?v=23" />
+    <link rel="stylesheet" href="/css/style.css?v=25" />
 </head>
 <body>
     <div class="scanline-overlay"></div>
@@ -254,6 +254,21 @@
                             <span class="layer-group__chevron">&#9662;</span>
                         </div>
                     </div>
+                    <!-- REF — Reference Layers -->
+                    <div class="layer-group" data-group="ref">
+                        <div class="layer-group__header">
+                            <span class="map-layer-toggles__badge" style="background:#6b7da0">REF</span>
+                            <span class="map-layer-toggles__title">Reference</span>
+                            <span class="layer-group__chevron">&#9662;</span>
+                        </div>
+                        <div class="layer-group__body">
+                            <label class="map-layer-toggle">
+                                <input type="checkbox" id="city-landmarks-toggle" checked />
+                                <span class="map-layer-toggle__swatch" style="background:#6b7da0"></span>
+                                <span class="map-layer-toggle__name">City Landmarks</span>
+                            </label>
+                        </div>
+                    </div>
                 </div>
                 <!-- Tide predictions panel (floating, top-right) -->
                 <div class="tide-panel" id="tide-panel" style="display:none">
@@ -386,7 +401,7 @@
 
     <script src="/js/vendor/leaflet.js"></script>
     <script src="/js/vendor/leaflet.markercluster.js"></script>
-    <script src="/js/config.js?v=22"></script>
-    <script src="/js/app.js?v=22"></script>
+    <script src="/js/config.js?v=23"></script>
+    <script src="/js/app.js?v=23"></script>
 </body>
 </html>

@@ -1292,6 +1292,41 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     flex-shrink: 0;
 }
 
+/* ---- City Landmark markers ---- */
+.city-landmark {
+    background: none !important;
+    border: none !important;
+    display: flex !important;
+    flex-direction: column;
+    align-items: center;
+    width: auto !important;
+    height: auto !important;
+    overflow: visible !important;
+}
+.city-landmark__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.city-landmark__icon svg {
+    display: block;
+    filter: drop-shadow(0 1px 1px rgba(0,0,0,0.4));
+}
+.city-landmark__label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    color: #fff;
+    text-align: center;
+    white-space: nowrap;
+    background: rgba(10, 21, 37, 0.85);
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-top: 2px;
+    letter-spacing: 0.3px;
+    border: 1px solid rgba(107, 125, 160, 0.4);
+}
+
 /* ---- Vessel-shaped map markers ---- */
 .vessel-icon {
     background: none !important;
