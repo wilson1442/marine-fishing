@@ -111,6 +111,14 @@ if settings.serve_frontend and os.path.exists(settings.frontend_dir):
             return FileResponse(explorer_path)
         return {"message": "Data explorer not found. API available at /api/docs"}
 
+    # Login page
+    @app.get("/login")
+    async def serve_login():
+        login_path = os.path.join(settings.frontend_dir, "login.html")
+        if os.path.exists(login_path):
+            return FileResponse(login_path)
+        return {"message": "Login page not found."}
+
     # Test landing page (preview new design)
     @app.get("/landing-test")
     async def serve_landing_test():

@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login — Angler Suite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300;1,9..40,400&family=JetBrains+Mono:wght@300;400;500&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+    --primary: #3a8fd9;
+    --primary-light: #5aa3e3;
+    --primary-dark: #2d7bc4;
+    --primary-glow: rgba(58, 143, 217, 0.35);
+    --accent: #f58220;
+    --accent-light: #ff9a40;
+    --accent-glow: rgba(245, 130, 32, 0.3);
+    --radar-green: #2ecc71;
+    --radar-glow: rgba(46, 204, 113, 0.25);
+    --bg-deep: #0a1525;
+    --bg-card: rgba(58, 143, 217, 0.04);
+    --text-bright: #ffffff;
+    --text-main: #b8c5d6;
+    --text-muted: #7a8ca0;
+    --text-dim: #4a5a70;
+    --border: rgba(58, 143, 217, 0.12);
+    --border-hover: rgba(58, 143, 217, 0.3);
+    --red: #ff6b6b;
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { height: 100%; }
+body {
+    min-height: 100%;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    background: var(--bg-deep);
+    color: var(--text-main);
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Background */
+.bg-gradient {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background:
+        radial-gradient(ellipse 120% 60% at 50% 0%, rgba(58, 143, 217, 0.12) 0%, transparent 50%),
+        radial-gradient(ellipse 80% 50% at 0% 80%, rgba(245, 130, 32, 0.06) 0%, transparent 50%),
+        radial-gradient(ellipse 60% 40% at 100% 70%, rgba(46, 204, 113, 0.05) 0%, transparent 50%);
+    pointer-events: none;
+}
+
+/* Navigation */
+.nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 48px;
+    position: relative;
+    z-index: 10;
+    background: linear-gradient(180deg, rgba(10, 21, 37, 0.98) 0%, rgba(10, 21, 37, 0.9) 50%, transparent 100%);
+}
+
+.nav__brand {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    text-decoration: none;
+}
+
+.nav__logo {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    object-fit: contain;
+}
+
+.nav__title {
+    display: flex;
+    flex-direction: column;
+}
+
+.nav__title-main {
+    font-family: 'Oswald', sans-serif;
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    background: linear-gradient(180deg, #ffffff 0%, #a0b0c0 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.nav__title-main span {
+    color: var(--accent);
+    -webkit-text-fill-color: var(--accent);
+}
+
+.nav__title-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    font-weight: 400;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--primary);
+}
+
+.nav__back {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: color 0.3s;
+}
+
+.nav__back:hover { color: var(--accent); }
+
+/* Main content */
+.main {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 24px;
+    position: relative;
+    z-index: 10;
+}
+
+/* Auth container */
+.auth {
+    width: 100%;
+    max-width: 420px;
+}
+
+.auth__header {
+    text-align: center;
+    margin-bottom: 32px;
+}
+
+.auth__title {
+    font-family: 'Oswald', sans-serif;
+    font-size: 32px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--text-bright);
+    margin-bottom: 8px;
+}
+
+.auth__subtitle {
+    font-size: 14px;
+    color: var(--text-muted);
+}
+
+/* Tabs */
+.auth__tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 24px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 4px;
+}
+
+.auth__tab {
+    flex: 1;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    padding: 12px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.auth__tab:hover { color: var(--text-main); }
+
+.auth__tab.active {
+    color: var(--bg-deep);
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%);
+}
+
+/* Forms */
+.auth__form {
+    display: none;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px;
+}
+
+.auth__form.active { display: block; }
+
+.field {
+    margin-bottom: 20px;
+}
+
+.field__label {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+}
+
+.field__input {
+    width: 100%;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: 14px;
+    color: var(--text-bright);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+    outline: none;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.field__input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.field__input::placeholder { color: var(--text-dim); }
+
+.field__row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.field__row .field { margin-bottom: 0; }
+
+/* Button */
+.btn {
+    width: 100%;
+    font-family: 'Oswald', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--bg-deep);
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%);
+    border: none;
+    border-radius: 6px;
+    padding: 16px 24px;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin-top: 8px;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 30px var(--accent-glow);
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* Messages */
+.auth__message {
+    display: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.auth__message.visible { display: block; }
+
+.auth__message--error {
+    color: var(--red);
+    background: rgba(255, 107, 107, 0.1);
+    border: 1px solid rgba(255, 107, 107, 0.2);
+}
+
+.auth__message--success {
+    color: var(--radar-green);
+    background: rgba(46, 204, 113, 0.1);
+    border: 1px solid rgba(46, 204, 113, 0.2);
+}
+
+/* Footer link */
+.auth__footer {
+    text-align: center;
+    margin-top: 24px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.auth__footer a {
+    color: var(--primary);
+    text-decoration: none;
+    transition: color 0.3s;
+}
+
+.auth__footer a:hover { color: var(--accent); }
+
+/* Responsive */
+@media (max-width: 768px) {
+    .nav { padding: 12px 24px; }
+    .nav__logo { width: 40px; height: 40px; }
+    .auth__form { padding: 24px; }
+    .field__row { grid-template-columns: 1fr; gap: 0; }
+    .field__row .field { margin-bottom: 20px; }
+}
+</style>
+</head>
+<body>
+
+<div class="bg-gradient"></div>
+
+<nav class="nav">
+    <a href="/" class="nav__brand">
+        <img src="/images/logo.jpg" alt="Angler Suite" class="nav__logo">
+        <div class="nav__title">
+            <span class="nav__title-main">Angler <span>Suite</span></span>
+            <span class="nav__title-sub">Marine Fishing Intelligence</span>
+        </div>
+    </a>
+    <a href="/" class="nav__back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        Back to Home
+    </a>
+</nav>
+
+<main class="main">
+    <div class="auth">
+        <div class="auth__header">
+            <h1 class="auth__title">Welcome</h1>
+            <p class="auth__subtitle">Sign in to access the platform</p>
+        </div>
+
+        <div class="auth__tabs">
+            <button class="auth__tab active" data-tab="login" onclick="switchTab('login')">Sign In</button>
+            <button class="auth__tab" data-tab="register" onclick="switchTab('register')">Register</button>
+        </div>
+
+        <!-- Login Form -->
+        <form class="auth__form active" id="login-form" onsubmit="handleLogin(event)">
+            <div class="auth__message" id="login-message"></div>
+
+            <div class="field">
+                <label class="field__label" for="login-email">Email</label>
+                <input type="email" class="field__input" id="login-email" placeholder="you@example.com" required>
+            </div>
+
+            <div class="field">
+                <label class="field__label" for="login-password">Password</label>
+                <input type="password" class="field__input" id="login-password" placeholder="Enter your password" required>
+            </div>
+
+            <button type="submit" class="btn" id="login-btn">Sign In</button>
+        </form>
+
+        <!-- Register Form -->
+        <form class="auth__form" id="register-form" onsubmit="handleRegister(event)">
+            <div class="auth__message" id="register-message"></div>
+
+            <div class="field__row">
+                <div class="field">
+                    <label class="field__label" for="reg-first">First Name</label>
+                    <input type="text" class="field__input" id="reg-first" placeholder="John" required>
+                </div>
+                <div class="field">
+                    <label class="field__label" for="reg-last">Last Name</label>
+                    <input type="text" class="field__input" id="reg-last" placeholder="Doe" required>
+                </div>
+            </div>
+
+            <div class="field">
+                <label class="field__label" for="reg-email">Email</label>
+                <input type="email" class="field__input" id="reg-email" placeholder="you@example.com" required>
+            </div>
+
+            <div class="field">
+                <label class="field__label" for="reg-password">Password</label>
+                <input type="password" class="field__input" id="reg-password" placeholder="At least 6 characters" required minlength="6">
+            </div>
+
+            <button type="submit" class="btn" id="register-btn">Create Account</button>
+
+            <p class="auth__footer">
+                Registration requires admin approval.<br>
+                You'll be notified when your account is activated.
+            </p>
+        </form>
+    </div>
+</main>
+
+<script>
+var API = '/api/v1/admin';
+
+// Check if already logged in
+(async function() {
+    try {
+        var resp = await fetch(API + '/user-me', { credentials: 'same-origin' });
+        if (resp.ok) {
+            window.location.href = '/map';
+        }
+    } catch (e) { /* not logged in */ }
+})();
+
+function switchTab(tab) {
+    // Update tab buttons
+    document.querySelectorAll('.auth__tab').forEach(function(btn) {
+        btn.classList.toggle('active', btn.dataset.tab === tab);
+    });
+    // Update forms
+    document.getElementById('login-form').classList.toggle('active', tab === 'login');
+    document.getElementById('register-form').classList.toggle('active', tab === 'register');
+    // Clear messages
+    hideMessage('login-message');
+    hideMessage('register-message');
+}
+
+function showMessage(id, text, type) {
+    var el = document.getElementById(id);
+    el.textContent = text;
+    el.className = 'auth__message visible auth__message--' + type;
+}
+
+function hideMessage(id) {
+    var el = document.getElementById(id);
+    el.className = 'auth__message';
+    el.textContent = '';
+}
+
+async function handleLogin(e) {
+    e.preventDefault();
+    var btn = document.getElementById('login-btn');
+    var email = document.getElementById('login-email').value.trim();
+    var password = document.getElementById('login-password').value;
+
+    hideMessage('login-message');
+    btn.disabled = true;
+    btn.textContent = 'Signing in...';
+
+    try {
+        var resp = await fetch(API + '/user-login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ email: email, password: password })
+        });
+
+        var data = await resp.json();
+
+        if (resp.ok) {
+            showMessage('login-message', 'Login successful! Redirecting...', 'success');
+            setTimeout(function() {
+                window.location.href = '/map';
+            }, 500);
+        } else {
+            showMessage('login-message', data.detail || 'Login failed', 'error');
+            btn.disabled = false;
+            btn.textContent = 'Sign In';
+        }
+    } catch (err) {
+        showMessage('login-message', 'Network error. Please try again.', 'error');
+        btn.disabled = false;
+        btn.textContent = 'Sign In';
+    }
+}
+
+async function handleRegister(e) {
+    e.preventDefault();
+    var btn = document.getElementById('register-btn');
+    var firstName = document.getElementById('reg-first').value.trim();
+    var lastName = document.getElementById('reg-last').value.trim();
+    var email = document.getElementById('reg-email').value.trim();
+    var password = document.getElementById('reg-password').value;
+
+    hideMessage('register-message');
+    btn.disabled = true;
+    btn.textContent = 'Creating account...';
+
+    try {
+        var resp = await fetch(API + '/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                first_name: firstName,
+                last_name: lastName,
+                email: email,
+                password: password
+            })
+        });
+
+        var data = await resp.json();
+
+        if (resp.ok) {
+            showMessage('register-message', 'Registration submitted! Please wait for admin approval.', 'success');
+            document.getElementById('register-form').reset();
+            btn.disabled = false;
+            btn.textContent = 'Create Account';
+        } else {
+            showMessage('register-message', data.detail || 'Registration failed', 'error');
+            btn.disabled = false;
+            btn.textContent = 'Create Account';
+        }
+    } catch (err) {
+        showMessage('register-message', 'Network error. Please try again.', 'error');
+        btn.disabled = false;
+        btn.textContent = 'Create Account';
+    }
+}
+</script>
+
+</body>
+</html>
