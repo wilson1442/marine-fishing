@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Marine Fishing Intelligence Platform</title>
+    <title>Angler Suite — Live Map</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300;1,9..40,400&family=JetBrains+Mono:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="/css/vendor/leaflet.css" />
     <link rel="stylesheet" href="/css/vendor/MarkerCluster.css" />
     <link rel="stylesheet" href="/css/vendor/MarkerCluster.Default.css" />
 
-    <link rel="stylesheet" href="/css/style.css?v=22" />
+    <link rel="stylesheet" href="/css/style.css?v=23" />
 </head>
 <body>
     <div class="scanline-overlay"></div>
@@ -128,10 +128,10 @@
         <!-- Center: Map + Header + Weather -->
         <main class="main-stage">
             <header class="topbar">
-                <div class="topbar__brand">
-                    <svg class="topbar__icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 17c1.5-2 3-3 5-3s3.5 1 5 3 3 3 5 3 3.5-1 5-3"/><path d="M3 12c1.5-2 3-3 5-3s3.5 1 5 3 3 3 5 3 3.5-1 5-3"/><path d="M12 2v5M12 22v-3"/></svg>
-                    <span class="topbar__name">Marine Fishing Intelligence</span>
-                </div>
+                <a href="/" class="topbar__brand" style="text-decoration:none">
+                    <img src="/images/logo.jpg" alt="Angler Suite" class="topbar__logo">
+                    <span class="topbar__name">Angler <span>Suite</span></span>
+                </a>
                 <div class="user-menu" id="user-menu" style="display:none">
                     <button class="user-menu__trigger" onclick="toggleUserMenu(event)">
                         <span id="user-menu-name"></span>
