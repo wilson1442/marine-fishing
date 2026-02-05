@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 
 from app.config import get_settings
-from app.api.routes import catches, species, weather, admin, explorer, vessels
+from app.api.routes import catches, species, weather, admin, explorer, vessels, tide
 from app.scheduler import init_scheduler, shutdown_scheduler
 
 settings = get_settings()
@@ -55,6 +55,7 @@ app.include_router(weather.router, prefix="/api/v1/weather", tags=["weather"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
 app.include_router(explorer.router, prefix="/api/v1/admin/explorer", tags=["explorer"])
 app.include_router(vessels.router, prefix="/api/v1/vessels", tags=["vessels"])
+app.include_router(tide.router, prefix="/api/v1/tide", tags=["tide"])
 
 
 # Health check endpoint

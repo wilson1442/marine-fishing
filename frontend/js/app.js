@@ -70,6 +70,8 @@ document.addEventListener('DOMContentLoaded', async function () {
     initWeatherOverlay();
     initSSTOverlay();
     initSpeciesToggleAll();
+    initLayerGroupToggles();
+    initTidePanel();
 
     // Run data fetches in parallel, don't let one block another
     await Promise.allSettled([
@@ -110,6 +112,9 @@ function initMap() {
         attribution: mapConfig.baseLayers.ocean.attribution,
         maxZoom: mapConfig.baseLayers.ocean.maxZoom
     }).addTo(map);
+
+    // Add scale bar
+    L.control.scale({ imperial: true, metric: true, position: 'bottomright', maxWidth: 150 }).addTo(map);
 
     // Initialize marker cluster group
     if (typeof L.markerClusterGroup === 'function') {
@@ -939,39 +944,132 @@ var WeatherHeatmapLayer = L.Layer.extend({
 
         if (this._points.length === 0) return;
 
-        // Compute blob radius in pixels from lat step
+        var opacity = 0.45;
+        var power = 2.0;
+
+        // Pre-compute pixel positions for each data point
+        var pts = [];
+        this._points.forEach(function (pt) {
+            if (pt.wave_height_m == null) return;
+            var cp = map.latLngToContainerPoint([pt.lat, pt.lon]);
+            pts.push({ x: cp.x + padX, y: cp.y + padY, wh: pt.wave_height_m });
+        });
+
+        if (pts.length === 0) return;
+
+        // Pre-parse wave color scale into RGB
+        var waveScale = weatherConfig.waveColorScale;
+        var scaleRgb = [];
+        for (var s = 0; s < waveScale.length; s++) {
+            var hex = waveScale[s].color;
+            scaleRgb.push({
+                max: waveScale[s].max,
+                r: parseInt(hex.slice(1, 3), 16),
+                g: parseInt(hex.slice(3, 5), 16),
+                b: parseInt(hex.slice(5, 7), 16)
+            });
+        }
+
+        function getWaveRgbInterp(heightM) {
+            if (heightM <= scaleRgb[0].max) return scaleRgb[0];
+            for (var i = 1; i < scaleRgb.length; i++) {
+                if (heightM < scaleRgb[i].max) {
+                    var lo = scaleRgb[i - 1];
+                    var hi = scaleRgb[i];
+                    var range = hi.max - lo.max;
+                    if (range <= 0 || !isFinite(range)) return hi;
+                    var t = (heightM - lo.max) / range;
+                    return {
+                        r: Math.round(lo.r + (hi.r - lo.r) * t),
+                        g: Math.round(lo.g + (hi.g - lo.g) * t),
+                        b: Math.round(lo.b + (hi.b - lo.b) * t)
+                    };
+                }
+            }
+            return scaleRgb[scaleRgb.length - 1];
+        }
+
+        // Render at reduced resolution then scale up for smooth continuous fill
+        var step = 6;
+        var lowW = Math.ceil(width / step);
+        var lowH = Math.ceil(height / step);
+
+        var offCanvas = document.createElement('canvas');
+        offCanvas.width = lowW;
+        offCanvas.height = lowH;
+        var offCtx = offCanvas.getContext('2d');
+        var imgData = offCtx.createImageData(lowW, lowH);
+        var pixels = imgData.data;
+
+        // Bounding box of data points with generous padding
+        var minPx = Infinity, maxPx = -Infinity, minPy = Infinity, maxPy = -Infinity;
+        for (var k = 0; k < pts.length; k++) {
+            if (pts[k].x < minPx) minPx = pts[k].x;
+            if (pts[k].x > maxPx) maxPx = pts[k].x;
+            if (pts[k].y < minPy) minPy = pts[k].y;
+            if (pts[k].y > maxPy) maxPy = pts[k].y;
+        }
         var center = map.getCenter();
         var p1 = map.latLngToContainerPoint([center.lat - this._latStep / 2, center.lng]);
         var p2 = map.latLngToContainerPoint([center.lat + this._latStep / 2, center.lng]);
         var pixelStep = Math.abs(p2.y - p1.y);
-        var radius = pixelStep * 1.4;
+        var extPad = Math.max(pixelStep * 3, 80);
+        var bboxL = Math.max(0, Math.floor((minPx - extPad) / step));
+        var bboxR = Math.min(lowW, Math.ceil((maxPx + extPad) / step));
+        var bboxT = Math.max(0, Math.floor((minPy - extPad) / step));
+        var bboxB = Math.min(lowH, Math.ceil((maxPy + extPad) / step));
 
-        var self = this;
-        this._points.forEach(function (pt) {
-            var cp = map.latLngToContainerPoint([pt.lat, pt.lon]);
-            var x = cp.x + padX;
-            var y = cp.y + padY;
-            var color = getWaveColor(pt.wave_height_m);
-            var rgb = self._hexToRgb(color);
+        // IDW interpolation — all points, no distance cutoff
+        for (var py = bboxT; py < bboxB; py++) {
+            var realY = py * step;
+            for (var px = bboxL; px < bboxR; px++) {
+                var realX = px * step;
 
-            var gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
-            gradient.addColorStop(0, 'rgba(' + rgb + ',0.5)');
-            gradient.addColorStop(0.45, 'rgba(' + rgb + ',0.35)');
-            gradient.addColorStop(0.75, 'rgba(' + rgb + ',0.15)');
-            gradient.addColorStop(1, 'rgba(' + rgb + ',0)');
+                var weightSum = 0;
+                var valSum = 0;
 
-            ctx.fillStyle = gradient;
-            ctx.beginPath();
-            ctx.arc(x, y, radius, 0, Math.PI * 2);
-            ctx.fill();
-        });
-    },
+                for (var k = 0; k < pts.length; k++) {
+                    var dx = realX - pts[k].x;
+                    var dy = realY - pts[k].y;
+                    var distSq = dx * dx + dy * dy;
+                    if (distSq < 1) distSq = 1;
+                    var w = 1 / Math.pow(distSq, power / 2);
+                    weightSum += w;
+                    valSum += w * pts[k].wh;
+                }
 
-    _hexToRgb: function (hex) {
-        var r = parseInt(hex.slice(1, 3), 16);
-        var g = parseInt(hex.slice(3, 5), 16);
-        var b = parseInt(hex.slice(5, 7), 16);
-        return r + ',' + g + ',' + b;
+                var interpWH = valSum / weightSum;
+                var c = getWaveRgbInterp(interpWH);
+
+                // Soft edge fade
+                var minDistSq = Infinity;
+                for (var k = 0; k < pts.length; k++) {
+                    var dx = realX - pts[k].x;
+                    var dy = realY - pts[k].y;
+                    var d = dx * dx + dy * dy;
+                    if (d < minDistSq) minDistSq = d;
+                }
+                var minDist = Math.sqrt(minDistSq);
+                var edgeFade = 1;
+                var fadeStart = extPad * 0.5;
+                if (minDist > fadeStart) {
+                    edgeFade = Math.max(0, 1 - (minDist - fadeStart) / (extPad - fadeStart));
+                }
+
+                var idx = (py * lowW + px) * 4;
+                pixels[idx] = c.r;
+                pixels[idx + 1] = c.g;
+                pixels[idx + 2] = c.b;
+                pixels[idx + 3] = Math.round(255 * opacity * edgeFade);
+            }
+        }
+
+        offCtx.putImageData(imgData, 0, 0);
+
+        // Draw scaled up with bilinear smoothing
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(offCanvas, 0, 0, lowW, lowH, 0, 0, width, height);
     }
 });
 
@@ -1412,44 +1510,146 @@ var SSTContourLayer = L.Layer.extend({
 
         if (this._points.length === 0) return;
 
-        // Compute radius from grid step — overlap for smooth blending
+        var self = this;
+        var opacity = 0.55;
+
+        // Pre-compute pixel positions for each data point
+        var pts = [];
+        this._points.forEach(function (pt) {
+            if (pt.sst_f == null) return;
+            var cp = map.latLngToContainerPoint([pt.lat, pt.lon]);
+            pts.push({ x: cp.x + padX, y: cp.y + padY, sst: pt.sst_f });
+        });
+
+        if (pts.length === 0) return;
+
+        // Render at reduced resolution then scale up for smooth continuous fill
+        var step = 6; // render every 6th pixel
+        var lowW = Math.ceil(width / step);
+        var lowH = Math.ceil(height / step);
+
+        // Use offscreen canvas at low res, then draw scaled up
+        var offCanvas = document.createElement('canvas');
+        offCanvas.width = lowW;
+        offCanvas.height = lowH;
+        var offCtx = offCanvas.getContext('2d');
+        var imgData = offCtx.createImageData(lowW, lowH);
+        var pixels = imgData.data;
+
+        // IDW power parameter — lower = smoother blend across sparse points
+        var power = 2.0;
+
+        // Pre-parse SST color scale into RGB arrays for fast lookup
+        var sstScale = weatherConfig.sstColorScale;
+        var scaleRgb = [];
+        for (var s = 0; s < sstScale.length; s++) {
+            var hex = sstScale[s].color;
+            scaleRgb.push({
+                max: sstScale[s].max,
+                r: parseInt(hex.slice(1, 3), 16),
+                g: parseInt(hex.slice(3, 5), 16),
+                b: parseInt(hex.slice(5, 7), 16)
+            });
+        }
+
+        // Interpolate color between two adjacent scale entries for smooth gradients
+        function getSSTRgbInterp(tempF) {
+            if (tempF <= scaleRgb[0].max) return scaleRgb[0];
+            for (var i = 1; i < scaleRgb.length; i++) {
+                if (tempF < scaleRgb[i].max) {
+                    var lo = scaleRgb[i - 1];
+                    var hi = scaleRgb[i];
+                    var range = hi.max - lo.max;
+                    if (range <= 0 || !isFinite(range)) return hi;
+                    var t = (tempF - lo.max) / range;
+                    return {
+                        r: Math.round(lo.r + (hi.r - lo.r) * t),
+                        g: Math.round(lo.g + (hi.g - lo.g) * t),
+                        b: Math.round(lo.b + (hi.b - lo.b) * t)
+                    };
+                }
+            }
+            return scaleRgb[scaleRgb.length - 1];
+        }
+
+        // Compute bounding box of data points to limit fill area
+        var minPx = Infinity, maxPx = -Infinity, minPy = Infinity, maxPy = -Infinity;
+        for (var k = 0; k < pts.length; k++) {
+            if (pts[k].x < minPx) minPx = pts[k].x;
+            if (pts[k].x > maxPx) maxPx = pts[k].x;
+            if (pts[k].y < minPy) minPy = pts[k].y;
+            if (pts[k].y > maxPy) maxPy = pts[k].y;
+        }
+        // Generous padding around data extent
         var center = map.getCenter();
         var p1 = map.latLngToContainerPoint([center.lat - this._latStep / 2, center.lng]);
         var p2 = map.latLngToContainerPoint([center.lat + this._latStep / 2, center.lng]);
         var pixelStep = Math.abs(p2.y - p1.y);
-        var radius = pixelStep * 1.5;
+        var extPad = Math.max(pixelStep * 3, 80);
+        var bboxL = Math.max(0, Math.floor((minPx - extPad) / step));
+        var bboxR = Math.min(lowW, Math.ceil((maxPx + extPad) / step));
+        var bboxT = Math.max(0, Math.floor((minPy - extPad) / step));
+        var bboxB = Math.min(lowH, Math.ceil((maxPy + extPad) / step));
 
-        var self = this;
+        // No distance cutoff — every pixel uses ALL data points for smooth interpolation
+        for (var py = bboxT; py < bboxB; py++) {
+            var realY = py * step;
+            for (var px = bboxL; px < bboxR; px++) {
+                var realX = px * step;
 
-        // Render smooth radial gradients with NOAA SST colors
-        this._points.forEach(function (pt) {
-            if (pt.sst_f == null) return;
+                var weightSum = 0;
+                var valSum = 0;
 
-            var cp = map.latLngToContainerPoint([pt.lat, pt.lon]);
-            var x = cp.x + padX;
-            var y = cp.y + padY;
-            var color = getSSTColor(pt.sst_f);
-            var rgb = self._hexToRgb(color);
+                for (var k = 0; k < pts.length; k++) {
+                    var dx = realX - pts[k].x;
+                    var dy = realY - pts[k].y;
+                    var distSq = dx * dx + dy * dy;
+                    if (distSq < 1) distSq = 1;
+                    var w = 1 / Math.pow(distSq, power / 2);
+                    weightSum += w;
+                    valSum += w * pts[k].sst;
+                }
 
-            var gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
-            gradient.addColorStop(0, 'rgba(' + rgb + ',0.6)');
-            gradient.addColorStop(0.5, 'rgba(' + rgb + ',0.45)');
-            gradient.addColorStop(0.8, 'rgba(' + rgb + ',0.2)');
-            gradient.addColorStop(1, 'rgba(' + rgb + ',0)');
+                var interpSST = valSum / weightSum;
+                var c = getSSTRgbInterp(interpSST);
 
-            ctx.fillStyle = gradient;
-            ctx.beginPath();
-            ctx.arc(x, y, radius, 0, Math.PI * 2);
-            ctx.fill();
-        });
+                // Soft edge fade based on distance to nearest data point
+                var minDistSq = Infinity;
+                for (var k = 0; k < pts.length; k++) {
+                    var dx = realX - pts[k].x;
+                    var dy = realY - pts[k].y;
+                    var d = dx * dx + dy * dy;
+                    if (d < minDistSq) minDistSq = d;
+                }
+                var minDist = Math.sqrt(minDistSq);
+                var edgeFade = 1;
+                var fadeStart = extPad * 0.5;
+                if (minDist > fadeStart) {
+                    edgeFade = Math.max(0, 1 - (minDist - fadeStart) / (extPad - fadeStart));
+                }
 
-        // Draw temperature labels
+                var idx = (py * lowW + px) * 4;
+                pixels[idx] = c.r;
+                pixels[idx + 1] = c.g;
+                pixels[idx + 2] = c.b;
+                pixels[idx + 3] = Math.round(255 * opacity * edgeFade);
+            }
+        }
+
+        offCtx.putImageData(imgData, 0, 0);
+
+        // Draw scaled up with bilinear interpolation (smoothing)
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(offCanvas, 0, 0, lowW, lowH, 0, 0, width, height);
+
+        // Draw temperature labels on top
         ctx.globalAlpha = 1.0;
         ctx.font = '10px "JetBrains Mono", monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
-        var labelInterval = this._points.length > 60 ? 3 : 2;
+        var labelInterval = this._points.length > 120 ? 5 : this._points.length > 60 ? 3 : 2;
         this._points.forEach(function (pt, idx) {
             if (pt.sst_f == null) return;
             if (idx % labelInterval !== 0) return;
@@ -1543,4 +1743,122 @@ function onMapMoveSST() {
     sstGridDebounceTimer = setTimeout(function () {
         loadSSTGrid();
     }, weatherConfig.gridDebounceMs);
+}
+
+// ---- Collapsible Layer Groups ----
+
+function initLayerGroupToggles() {
+    var groups = document.querySelectorAll('.layer-group');
+    groups.forEach(function (group) {
+        var header = group.querySelector('.layer-group__header');
+        if (!header) return;
+
+        // Tides group opens/closes the tide panel instead
+        if (group.dataset.group === 'tides') {
+            header.addEventListener('click', function (e) {
+                e.stopPropagation();
+                toggleTidePanel();
+            });
+            return;
+        }
+
+        header.addEventListener('click', function (e) {
+            // Don't collapse if clicking on a checkbox inside
+            if (e.target.tagName === 'INPUT') return;
+            group.classList.toggle('collapsed');
+        });
+    });
+}
+
+// ---- Tide Predictions Panel ----
+
+function toggleTidePanel() {
+    var panel = document.getElementById('tide-panel');
+    if (!panel) return;
+    if (panel.style.display === 'none') {
+        panel.style.display = '';
+    } else {
+        panel.style.display = 'none';
+    }
+}
+
+function initTidePanel() {
+    var closeBtn = document.getElementById('tide-panel-close');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', function () {
+            document.getElementById('tide-panel').style.display = 'none';
+        });
+    }
+
+    var select = document.getElementById('tide-station-select');
+    if (select) {
+        select.addEventListener('change', function () {
+            if (this.value) {
+                loadTidePredictions(this.value);
+            } else {
+                document.getElementById('tide-predictions-list').innerHTML =
+                    '<div class="tide-panel__empty">Select a station</div>';
+            }
+        });
+    }
+
+    loadTideStations();
+}
+
+async function loadTideStations() {
+    try {
+        var response = await fetch(API_ENDPOINTS.tideStations);
+        var data = await response.json();
+        var select = document.getElementById('tide-station-select');
+        if (!select || !data.stations) return;
+
+        data.stations.forEach(function (st) {
+            var option = document.createElement('option');
+            // Support both old proxy API (id/name) and new database API (station_id/station_name)
+            option.value = st.station_id || st.id;
+            var label = st.station_name || st.name;
+            if (st.state) label += ', ' + st.state;
+            option.textContent = label;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error loading tide stations:', error);
+    }
+}
+
+async function loadTidePredictions(stationId) {
+    var list = document.getElementById('tide-predictions-list');
+    if (!list) return;
+    list.innerHTML = '<div class="tide-panel__empty">Loading...</div>';
+
+    try {
+        var response = await fetch(API_ENDPOINTS.tidePredictions + '?station_id=' + encodeURIComponent(stationId) + '&hours=48');
+        var data = await response.json();
+
+        if (!data.predictions || data.predictions.length === 0) {
+            list.innerHTML = '<div class="tide-panel__empty">No predictions available</div>';
+            return;
+        }
+
+        var html = '';
+        data.predictions.forEach(function (p) {
+            var d = new Date(p.t);
+            var timeStr = d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }) +
+                ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            var isHigh = p.type === 'H';
+            var badgeClass = isHigh ? 'tide-row__badge--high' : 'tide-row__badge--low';
+            var badgeText = isHigh ? 'HIGH' : 'LOW';
+            var height = p.v != null ? parseFloat(p.v).toFixed(1) + ' ft' : '--';
+
+            html += '<div class="tide-row">' +
+                '<span class="tide-row__time">' + timeStr + '</span>' +
+                '<span class="tide-row__height">' + height + '</span>' +
+                '<span class="tide-row__badge ' + badgeClass + '">' + badgeText + '</span>' +
+                '</div>';
+        });
+        list.innerHTML = html;
+    } catch (error) {
+        console.error('Error loading tide predictions:', error);
+        list.innerHTML = '<div class="tide-panel__empty">Error loading predictions</div>';
+    }
 }

@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="/css/vendor/MarkerCluster.css" />
     <link rel="stylesheet" href="/css/vendor/MarkerCluster.Default.css" />
 
-    <link rel="stylesheet" href="/css/style.css?v=17" />
+    <link rel="stylesheet" href="/css/style.css?v=22" />
 </head>
 <body>
     <div class="scanline-overlay"></div>
@@ -184,57 +184,89 @@
                 </div>
                 <!-- Map layer toggles overlay (top-left) -->
                 <div class="map-layer-toggles" id="map-layer-toggles">
-                    <div class="map-layer-toggles__header">
-                        <span class="map-layer-toggles__badge" id="ais-source-badge-map">AIS</span>
-                        <span class="map-layer-toggles__title">Live Layers</span>
+                    <!-- AIS — Vessel Tracking -->
+                    <div class="layer-group" data-group="ais">
+                        <div class="layer-group__header">
+                            <span class="map-layer-toggles__badge" id="ais-source-badge-map">AIS</span>
+                            <span class="map-layer-toggles__title">Vessel Tracking</span>
+                            <span class="layer-group__chevron">&#9662;</span>
+                        </div>
+                        <div class="layer-group__body">
+                            <label class="map-layer-toggle">
+                                <input type="checkbox" class="gfw-layer-toggle" data-layer="live_vessels" />
+                                <span class="map-layer-toggle__swatch" style="background:#ff6b35"></span>
+                                <span class="map-layer-toggle__name">Live Vessels</span>
+                                <span class="map-layer-toggle__count" id="gfw-count-live_vessels"></span>
+                            </label>
+                            <label class="map-layer-toggle">
+                                <input type="checkbox" class="gfw-layer-toggle" data-layer="fishing_activity" />
+                                <span class="map-layer-toggle__swatch" style="background:#ff6b35"></span>
+                                <span class="map-layer-toggle__name">Fishing Activity</span>
+                                <span class="map-layer-toggle__count" id="gfw-count-fishing_activity"></span>
+                            </label>
+                            <label class="map-layer-toggle">
+                                <input type="checkbox" class="gfw-layer-toggle" data-layer="loitering" />
+                                <span class="map-layer-toggle__swatch" style="background:#ffd166"></span>
+                                <span class="map-layer-toggle__name">Loitering</span>
+                                <span class="map-layer-toggle__count" id="gfw-count-loitering"></span>
+                            </label>
+                            <label class="map-layer-toggle">
+                                <input type="checkbox" class="gfw-layer-toggle" data-layer="ais_presence" />
+                                <span class="map-layer-toggle__swatch" style="background:#118ab2"></span>
+                                <span class="map-layer-toggle__name">AIS Presence</span>
+                                <span class="map-layer-toggle__count" id="gfw-count-ais_presence"></span>
+                            </label>
+                            <label class="map-layer-toggle">
+                                <input type="checkbox" class="gfw-layer-toggle" data-layer="effort_heatmap" />
+                                <span class="map-layer-toggle__swatch" style="background:#ff9f1c"></span>
+                                <span class="map-layer-toggle__name">Effort Heatmap</span>
+                                <span class="map-layer-toggle__count" id="gfw-count-effort_heatmap"></span>
+                            </label>
+                        </div>
                     </div>
-                    <label class="map-layer-toggle">
-                        <input type="checkbox" class="gfw-layer-toggle" data-layer="live_vessels" />
-                        <span class="map-layer-toggle__swatch" style="background:#ff6b35"></span>
-                        <span class="map-layer-toggle__name">Live Vessels</span>
-                        <span class="map-layer-toggle__count" id="gfw-count-live_vessels"></span>
-                    </label>
-                    <label class="map-layer-toggle">
-                        <input type="checkbox" class="gfw-layer-toggle" data-layer="fishing_activity" />
-                        <span class="map-layer-toggle__swatch" style="background:#ff6b35"></span>
-                        <span class="map-layer-toggle__name">Fishing Activity</span>
-                        <span class="map-layer-toggle__count" id="gfw-count-fishing_activity"></span>
-                    </label>
-                    <label class="map-layer-toggle">
-                        <input type="checkbox" class="gfw-layer-toggle" data-layer="loitering" />
-                        <span class="map-layer-toggle__swatch" style="background:#ffd166"></span>
-                        <span class="map-layer-toggle__name">Loitering</span>
-                        <span class="map-layer-toggle__count" id="gfw-count-loitering"></span>
-                    </label>
-                    <label class="map-layer-toggle">
-                        <input type="checkbox" class="gfw-layer-toggle" data-layer="ais_presence" />
-                        <span class="map-layer-toggle__swatch" style="background:#118ab2"></span>
-                        <span class="map-layer-toggle__name">AIS Presence</span>
-                        <span class="map-layer-toggle__count" id="gfw-count-ais_presence"></span>
-                    </label>
-                    <label class="map-layer-toggle">
-                        <input type="checkbox" class="gfw-layer-toggle" data-layer="effort_heatmap" />
-                        <span class="map-layer-toggle__swatch" style="background:#ff9f1c"></span>
-                        <span class="map-layer-toggle__name">Effort Heatmap</span>
-                        <span class="map-layer-toggle__count" id="gfw-count-effort_heatmap"></span>
-                    </label>
-                    <div class="map-layer-toggles__divider"></div>
-                    <div class="map-layer-toggles__header">
-                        <span class="map-layer-toggles__badge" style="background:#4cc9f0">WX</span>
-                        <span class="map-layer-toggles__title">Marine Weather</span>
+                    <!-- WX — Ocean & Weather -->
+                    <div class="layer-group" data-group="wx">
+                        <div class="layer-group__header">
+                            <span class="map-layer-toggles__badge" style="background:#4cc9f0">WX</span>
+                            <span class="map-layer-toggles__title">Ocean &amp; Weather</span>
+                            <span class="layer-group__chevron">&#9662;</span>
+                        </div>
+                        <div class="layer-group__body">
+                            <label class="map-layer-toggle">
+                                <input type="checkbox" id="weather-overlay-toggle" />
+                                <span class="map-layer-toggle__swatch" style="background:#4cc9f0"></span>
+                                <span class="map-layer-toggle__name">Weather Grid</span>
+                                <span class="map-layer-toggle__count" id="weather-grid-count"></span>
+                            </label>
+                            <label class="map-layer-toggle">
+                                <input type="checkbox" id="sst-overlay-toggle" />
+                                <span class="map-layer-toggle__swatch" style="background:#f46d43"></span>
+                                <span class="map-layer-toggle__name">SST Heatmap</span>
+                                <span class="map-layer-toggle__count" id="sst-grid-count"></span>
+                            </label>
+                        </div>
                     </div>
-                    <label class="map-layer-toggle">
-                        <input type="checkbox" id="weather-overlay-toggle" />
-                        <span class="map-layer-toggle__swatch" style="background:#4cc9f0"></span>
-                        <span class="map-layer-toggle__name">Weather Grid</span>
-                        <span class="map-layer-toggle__count" id="weather-grid-count"></span>
-                    </label>
-                    <label class="map-layer-toggle">
-                        <input type="checkbox" id="sst-overlay-toggle" />
-                        <span class="map-layer-toggle__swatch" style="background:#f46d43"></span>
-                        <span class="map-layer-toggle__name">SST Heatmap</span>
-                        <span class="map-layer-toggle__count" id="sst-grid-count"></span>
-                    </label>
+                    <!-- TD — Tide Predictions -->
+                    <div class="layer-group" data-group="tides">
+                        <div class="layer-group__header layer-group__header--tides" id="tide-group-header">
+                            <span class="map-layer-toggles__badge" style="background:#ffa94d">TD</span>
+                            <span class="map-layer-toggles__title">Tide Predictions</span>
+                            <span class="layer-group__chevron">&#9662;</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- Tide predictions panel (floating, top-right) -->
+                <div class="tide-panel" id="tide-panel" style="display:none">
+                    <div class="tide-panel__header">
+                        <span class="tide-panel__title">Tide Predictions</span>
+                        <button class="tide-panel__close" id="tide-panel-close">&times;</button>
+                    </div>
+                    <div class="tide-panel__body">
+                        <select class="tide-panel__select" id="tide-station-select">
+                            <option value="">Select Station</option>
+                        </select>
+                        <div class="tide-panel__list" id="tide-predictions-list"></div>
+                    </div>
                 </div>
                 <!-- Species legend overlay at bottom of map -->
                 <div class="species-overlay" id="species-overlay">
@@ -354,7 +386,7 @@
 
     <script src="/js/vendor/leaflet.js"></script>
     <script src="/js/vendor/leaflet.markercluster.js"></script>
-    <script src="/js/config.js?v=18"></script>
-    <script src="/js/app.js?v=18"></script>
+    <script src="/js/config.js?v=22"></script>
+    <script src="/js/app.js?v=22"></script>
 </body>
 </html>
