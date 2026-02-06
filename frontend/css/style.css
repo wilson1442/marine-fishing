@@ -387,6 +387,28 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .topbar__toggle:hover { color: var(--cyan); border-color: var(--cyan); }
 .topbar__toggle svg path { stroke: currentColor; stroke-width: 2; fill: none; }
 
+.topbar__admin-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: rgba(245, 130, 32, 0.1);
+    border: 1px solid rgba(245, 130, 32, 0.3);
+    border-radius: var(--radius);
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    text-decoration: none;
+    transition: all var(--transition);
+}
+.topbar__admin-btn:hover {
+    background: rgba(245, 130, 32, 0.2);
+    border-color: var(--accent);
+}
+
 /* ---- Map ---- */
 .map-wrap {
     flex: 1;

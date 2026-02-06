@@ -1292,10 +1292,16 @@ function initUserMenu(userData) {
     if (nameEl) nameEl.textContent = userData.first_name + ' ' + userData.last_name;
     container.style.display = '';
 
-    // Show/hide admin link
+    // Show/hide admin link in dropdown
     var adminItem = document.getElementById('user-menu-admin');
     if (adminItem) {
         adminItem.style.display = userData.role === 'admin' ? '' : 'none';
+    }
+
+    // Show/hide admin button in topbar
+    var adminBtn = document.getElementById('admin-btn');
+    if (adminBtn) {
+        adminBtn.style.display = userData.role === 'admin' ? 'flex' : 'none';
     }
 
     // Pre-fill profile modal
