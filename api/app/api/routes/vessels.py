@@ -11,7 +11,7 @@ from sqlalchemy import text
 from typing import Optional
 from datetime import date, datetime
 
-from app.api.deps import get_db
+from app.api.deps import get_db, require_api_access
 
 router = APIRouter()
 
@@ -24,7 +24,8 @@ router = APIRouter()
 def get_live_vessels(
     bbox: Optional[str] = Query(None, description="SW_lng,SW_lat,NE_lng,NE_lat"),
     limit: int = Query(500, ge=1, le=5000),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _auth: dict = Depends(require_api_access)
 ):
     """Get latest position per vessel as GeoJSON for map display."""
     query = """
@@ -92,7 +93,8 @@ def get_live_vessels(
 def get_vessel_tracks(
     mmsi: str,
     hours: int = Query(6, ge=1, le=6, description="Hours of track history"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _auth: dict = Depends(require_api_access)
 ):
     """Get position history for a vessel as GeoJSON LineString."""
     result = db.execute(text("""
@@ -143,7 +145,8 @@ def search_vessels(
     source: Optional[str] = Query(None),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _auth: dict = Depends(require_api_access)
 ):
     """Search vessels in the database."""
     query = """
@@ -218,7 +221,8 @@ def get_fishing_activity(
     bbox: Optional[str] = Query(None, description="SW_lng,SW_lat,NE_lng,NE_lat"),
     limit: int = Query(500, ge=1, le=5000),
     offset: int = Query(0, ge=0),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _auth: dict = Depends(require_api_access)
 ):
     """Get detected fishing activity as GeoJSON."""
     query = """
@@ -303,7 +307,8 @@ def get_loitering_events(
     bbox: Optional[str] = Query(None),
     limit: int = Query(500, ge=1, le=5000),
     offset: int = Query(0, ge=0),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _auth: dict = Depends(require_api_access)
 ):
     """Get detected loitering events as GeoJSON."""
     query = """
@@ -385,7 +390,8 @@ def get_ais_presence(
     bbox: Optional[str] = Query(None),
     resolution: float = Query(0.1, description="Grid cell size in degrees"),
     limit: int = Query(2000, ge=1, le=10000),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _auth: dict = Depends(require_api_access)
 ):
     """Get AIS vessel presence data aggregated from position history."""
     query = """
@@ -460,7 +466,8 @@ def get_effort_heatmap(
     flag_country: Optional[str] = Query(None),
     bbox: Optional[str] = Query(None),
     limit: int = Query(2000, ge=1, le=10000),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _auth: dict = Depends(require_api_access)
 ):
     """Get fishing effort heatmap data."""
     query = """
@@ -532,7 +539,7 @@ def get_effort_heatmap(
 # ------------------------------------------------------------------
 
 @router.get("/summary")
-def get_vessels_summary(db: Session = Depends(get_db)):
+def get_vessels_summary(db: Session = Depends(get_db), _auth: dict = Depends(require_api_access)):
     """Get summary statistics for all AIS vessel data."""
     stats = {}
 
@@ -582,7 +589,7 @@ def get_vessels_summary(db: Session = Depends(get_db)):
 # ------------------------------------------------------------------
 
 @router.get("/{mmsi}")
-def get_vessel_detail(mmsi: str, db: Session = Depends(get_db)):
+def get_vessel_detail(mmsi: str, db: Session = Depends(get_db), _auth: dict = Depends(require_api_access)):
     """Get detailed vessel info by MMSI with activity stats."""
     result = db.execute(text("""
         SELECT

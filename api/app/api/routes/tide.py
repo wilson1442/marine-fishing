@@ -9,7 +9,7 @@ from sqlalchemy import text
 from typing import Optional
 from datetime import datetime, timezone, timedelta
 
-from app.api.deps import get_db
+from app.api.deps import get_db, require_api_access
 
 router = APIRouter()
 
@@ -19,7 +19,8 @@ def get_tide_stations(
     active_only: bool = Query(True),
     state: Optional[str] = Query(None, description="Filter by state code (e.g., NY, NJ)"),
     station_type: Optional[str] = Query(None, description="Filter by type: inlet, harbor, bay"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _auth: dict = Depends(require_api_access)
 ):
     """List all tide stations with optional filters."""
     query = """
@@ -71,7 +72,8 @@ def get_tide_stations(
 def get_tide_predictions(
     station_id: Optional[str] = Query(None, description="NOAA station ID"),
     hours: int = Query(48, ge=1, le=168, description="Hours of predictions to return"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _auth: dict = Depends(require_api_access)
 ):
     """Get tide predictions (high/low times) from database."""
     now = datetime.now(timezone.utc)
@@ -117,7 +119,8 @@ def get_tide_predictions(
 def get_water_levels(
     station_id: Optional[str] = Query(None, description="NOAA station ID"),
     hours: int = Query(24, ge=1, le=168, description="Hours of history to return"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _auth: dict = Depends(require_api_access)
 ):
     """Get recent water level observations from database."""
     now = datetime.now(timezone.utc)
@@ -163,7 +166,8 @@ def get_water_levels(
 @router.get("/current")
 def get_current_tides(
     station_id: Optional[str] = Query(None, description="NOAA station ID"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _auth: dict = Depends(require_api_access)
 ):
     """
     Get current tide status for a station: next high/low and current water level.
@@ -270,7 +274,8 @@ def _get_station_current(db: Session, station_id: str, now: datetime) -> Optiona
 @router.get("/stations/{station_id}")
 def get_station_detail(
     station_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _auth: dict = Depends(require_api_access)
 ):
     """Get detailed info for a specific tide station including recent data."""
     # Station info

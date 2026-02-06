@@ -15,7 +15,7 @@ import gzip
 from datetime import datetime
 from urllib.parse import urlparse
 
-from app.api.deps import get_db, get_current_admin, _create_token, _verify_token
+from app.api.deps import get_db, get_current_admin, _create_token, _verify_token, generate_api_key
 from app.config import get_settings
 
 router = APIRouter()
@@ -86,6 +86,32 @@ class RegistrationUpdate(BaseModel):
     password: Optional[str] = None
     status: Optional[str] = None
     role: Optional[str] = None
+
+
+class ApiKeyCreate(BaseModel):
+    label: str
+    duration: str  # 1_week, 1_month, 3_months, 6_months, 12_months, never
+
+
+# ---------- API Keys Table ----------
+
+def _ensure_api_keys_table(db: Session):
+    """Create the api_keys table if it doesn't exist."""
+    db.execute(text("""
+        CREATE TABLE IF NOT EXISTS api_keys (
+            id SERIAL PRIMARY KEY,
+            key_hash VARCHAR(128) NOT NULL,
+            key_prefix VARCHAR(11) NOT NULL,
+            label VARCHAR(255) NOT NULL,
+            created_by INTEGER,
+            created_at TIMESTAMP DEFAULT NOW(),
+            expires_at TIMESTAMP,
+            last_used_at TIMESTAMP,
+            is_active BOOLEAN DEFAULT TRUE,
+            request_count INTEGER DEFAULT 0
+        )
+    """))
+    db.commit()
 
 
 # ---------- Registered Users Table ----------
@@ -1530,5 +1556,121 @@ def delete_registration(reg_id: int, current_user: dict = Depends(get_current_ad
     db.commit()
 
     return {"id": reg_id, "message": "Registration deleted"}
+
+
+# ---------- API Key Management ----------
+
+@router.get("/api-keys")
+def list_api_keys(current_user: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
+    """List all API keys (prefix, label, dates, stats). Never returns the full key."""
+    _ensure_api_keys_table(db)
+
+    rows = db.execute(text("""
+        SELECT
+            ak.id, ak.key_prefix, ak.label, ak.created_at, ak.expires_at,
+            ak.last_used_at, ak.is_active, ak.request_count,
+            ru.first_name, ru.last_name
+        FROM api_keys ak
+        LEFT JOIN registered_users ru ON ak.created_by = ru.id
+        ORDER BY ak.created_at DESC
+    """)).fetchall()
+
+    keys = []
+    for row in rows:
+        created_by_name = None
+        if row.first_name or row.last_name:
+            created_by_name = ((row.first_name or "") + " " + (row.last_name or "")).strip()
+        keys.append({
+            "id": row.id,
+            "key_prefix": row.key_prefix,
+            "label": row.label,
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+            "expires_at": row.expires_at.isoformat() if row.expires_at else None,
+            "last_used_at": row.last_used_at.isoformat() if row.last_used_at else None,
+            "is_active": row.is_active,
+            "request_count": row.request_count or 0,
+            "created_by": created_by_name,
+        })
+
+    return {"api_keys": keys, "total": len(keys)}
+
+
+@router.post("/api-keys")
+def create_api_key(body: ApiKeyCreate, current_user: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
+    """Create a new API key. Returns the full key ONCE - it cannot be retrieved again."""
+    _ensure_api_keys_table(db)
+
+    if not body.label or not body.label.strip():
+        raise HTTPException(status_code=400, detail="Label is required")
+
+    # Calculate expiration
+    duration_map = {
+        "1_week": 7,
+        "1_month": 30,
+        "3_months": 90,
+        "6_months": 180,
+        "12_months": 365,
+        "never": None,
+    }
+    if body.duration not in duration_map:
+        raise HTTPException(status_code=400, detail="Invalid duration")
+
+    days = duration_map[body.duration]
+    expires_at = None
+    if days:
+        from datetime import timedelta
+        expires_at = datetime.utcnow() + timedelta(days=days)
+
+    # Generate the key
+    full_key, key_hash, key_prefix = generate_api_key()
+
+    # Store in database
+    result = db.execute(text("""
+        INSERT INTO api_keys (key_hash, key_prefix, label, created_by, expires_at)
+        VALUES (:key_hash, :key_prefix, :label, :created_by, :expires_at)
+        RETURNING id
+    """), {
+        "key_hash": key_hash,
+        "key_prefix": key_prefix,
+        "label": body.label.strip(),
+        "created_by": current_user["user_id"],
+        "expires_at": expires_at,
+    })
+    db.commit()
+    new_id = result.fetchone().id
+
+    return {
+        "id": new_id,
+        "key": full_key,  # Only returned once!
+        "key_prefix": key_prefix,
+        "label": body.label.strip(),
+        "expires_at": expires_at.isoformat() if expires_at else None,
+        "message": "API key created. Save this key now - it will not be shown again.",
+    }
+
+
+@router.delete("/api-keys/{key_id}")
+def revoke_api_key(key_id: int, current_user: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
+    """Revoke an API key (soft delete by setting is_active=false)."""
+    _ensure_api_keys_table(db)
+
+    existing = db.execute(
+        text("SELECT id, is_active FROM api_keys WHERE id = :id"),
+        {"id": key_id}
+    ).fetchone()
+
+    if not existing:
+        raise HTTPException(status_code=404, detail="API key not found")
+
+    if not existing.is_active:
+        raise HTTPException(status_code=400, detail="API key is already revoked")
+
+    db.execute(
+        text("UPDATE api_keys SET is_active = false WHERE id = :id"),
+        {"id": key_id}
+    )
+    db.commit()
+
+    return {"id": key_id, "message": "API key revoked"}
 
 

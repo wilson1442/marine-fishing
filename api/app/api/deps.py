@@ -4,6 +4,7 @@ import hashlib
 import json
 import base64
 import time
+import secrets
 from datetime import datetime
 
 from fastapi import Request, HTTPException, Depends
@@ -21,6 +22,116 @@ def get_db() -> Generator:
         yield db
     finally:
         db.close()
+
+
+# ---------- API Key helpers ----------
+
+def generate_api_key() -> tuple[str, str, str]:
+    """Generate a new API key.
+    Returns (full_key, key_hash, key_prefix) where:
+    - full_key: mf_ + 32 hex chars (returned to user once)
+    - key_hash: SHA-256 hash of full_key (stored in DB)
+    - key_prefix: mf_ + first 8 chars (for display)
+    """
+    random_part = secrets.token_hex(16)  # 32 hex chars
+    full_key = f"mf_{random_part}"
+    key_hash = hashlib.sha256(full_key.encode()).hexdigest()
+    key_prefix = f"mf_{random_part[:8]}"
+    return full_key, key_hash, key_prefix
+
+
+def hash_api_key(key: str) -> str:
+    """Hash an API key for comparison."""
+    return hashlib.sha256(key.encode()).hexdigest()
+
+
+def validate_api_key(db: Session, key: str) -> dict | None:
+    """Validate an API key. Returns key info if valid, None otherwise."""
+    if not key or not key.startswith("mf_"):
+        return None
+
+    key_hash = hash_api_key(key)
+
+    row = db.execute(
+        text("""
+            SELECT id, key_prefix, label, is_active, expires_at, request_count
+            FROM api_keys
+            WHERE key_hash = :key_hash
+        """),
+        {"key_hash": key_hash}
+    ).fetchone()
+
+    if not row:
+        return None
+
+    if not row.is_active:
+        return None
+
+    if row.expires_at and row.expires_at < datetime.utcnow():
+        return None
+
+    # Update last_used_at and request_count
+    db.execute(
+        text("""
+            UPDATE api_keys
+            SET last_used_at = NOW(), request_count = request_count + 1
+            WHERE id = :id
+        """),
+        {"id": row.id}
+    )
+    db.commit()
+
+    return {
+        "id": row.id,
+        "key_prefix": row.key_prefix,
+        "label": row.label,
+        "auth_type": "api_key"
+    }
+
+
+def require_api_access(request: Request, db: Session = Depends(get_db)) -> dict:
+    """
+    FastAPI dependency: Allow access if any of:
+    1. Valid X-API-Key header provided
+    2. Valid user_token session cookie (logged-in user)
+    3. Same-origin request (frontend) via Sec-Fetch-Site header
+    """
+    # Check 1: API Key header
+    api_key = request.headers.get("X-API-Key")
+    if api_key:
+        key_info = validate_api_key(db, api_key)
+        if key_info:
+            return key_info
+        raise HTTPException(status_code=401, detail="Invalid or expired API key")
+
+    # Check 2: Session cookie (logged-in user)
+    token = request.cookies.get("user_token")
+    if token:
+        payload = _verify_token(token)
+        if payload:
+            # Verify user still exists and is approved
+            row = db.execute(
+                text("SELECT id, email, status, expires_at FROM registered_users WHERE id = :id"),
+                {"id": payload["user_id"]}
+            ).fetchone()
+            if row and row.status == "approved":
+                if not row.expires_at or row.expires_at >= datetime.utcnow():
+                    return {
+                        "user_id": row.id,
+                        "username": row.email,
+                        "auth_type": "session"
+                    }
+
+    # Check 3: Same-origin request (frontend)
+    sec_fetch_site = request.headers.get("Sec-Fetch-Site")
+    if sec_fetch_site == "same-origin":
+        return {"auth_type": "same_origin"}
+
+    # No valid authentication
+    raise HTTPException(
+        status_code=401,
+        detail="Authentication required. Provide X-API-Key header, login, or access from the frontend."
+    )
 
 
 # ---------- Token helpers ----------

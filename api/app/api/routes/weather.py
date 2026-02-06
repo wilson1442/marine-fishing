@@ -4,7 +4,7 @@ from sqlalchemy import text
 from typing import Optional
 from datetime import date
 
-from app.api.deps import get_db
+from app.api.deps import get_db, require_api_access
 
 router = APIRouter()
 
@@ -14,7 +14,8 @@ def get_current_weather(
     station_id: Optional[str] = Query(None, description="Buoy station ID"),
     lat: Optional[float] = Query(None, description="Latitude"),
     lon: Optional[float] = Query(None, description="Longitude"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _auth: dict = Depends(require_api_access)
 ):
     """Get most recent weather observations. Optionally filter by station_id or nearest buoy to lat/lon."""
 
@@ -66,7 +67,8 @@ def get_historical_weather(
     station_id: Optional[str] = Query(None, description="Buoy station ID"),
     lat: Optional[float] = Query(None),
     lon: Optional[float] = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _auth: dict = Depends(require_api_access)
 ):
     """Get weather observations for a specific date."""
 
@@ -105,7 +107,8 @@ def get_historical_weather(
 @router.get("/buoys")
 def get_buoy_stations(
     active_only: bool = Query(True),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _auth: dict = Depends(require_api_access)
 ):
     """List all buoy stations."""
     query = """
@@ -139,7 +142,8 @@ def get_buoy_stations(
 def get_buoy_data(
     station_id: str,
     limit: int = Query(24, ge=1, le=168, description="Number of observations (default: 24 hours)"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _auth: dict = Depends(require_api_access)
 ):
     """Get recent observations for a specific buoy station."""
     query = """
@@ -168,6 +172,7 @@ async def get_marine_weather_grid(
     west: float = Query(..., description="West bound longitude"),
     zoom: int = Query(6, ge=1, le=18, description="Map zoom level"),
     density: Optional[str] = Query(None, description="Grid density: 'high' for SST contour mode"),
+    _auth: dict = Depends(require_api_access)
 ):
     """Fetch marine weather grid from Open-Meteo for the visible map bounds."""
     import asyncio
@@ -178,10 +183,10 @@ async def get_marine_weather_grid(
     if zoom < 4:
         return {"points": [], "count": 0}
 
-    # High density mode for SST contour rendering (~150 points)
+    # High density mode for SST contour rendering (~300 points)
     if density == 'high':
-        max_points = 150
-        steps = min(12, max(5, zoom))
+        max_points = 300
+        steps = min(18, max(7, zoom + 2))
         if steps * steps > max_points:
             steps = int(math.sqrt(max_points))
     else:
@@ -291,6 +296,7 @@ async def get_marine_weather_grid(
 async def get_marine_weather_point(
     lat: float = Query(..., description="Latitude"),
     lon: float = Query(..., description="Longitude"),
+    _auth: dict = Depends(require_api_access)
 ):
     """Fetch detailed marine weather for a single point from Open-Meteo (current + 24h forecast)."""
     import asyncio
@@ -467,6 +473,103 @@ async def get_marine_weather_point(
         "moon_illumination": moon_illumination,
         "fishing_score": fishing_score,
     }
+
+    if redis_client:
+        try:
+            await redis_client.set(cache_key, json_mod.dumps(result), ex=CACHE_TTL)
+        except Exception:
+            pass
+        await redis_client.aclose()
+
+    return result
+
+
+@router.get("/tides/stations")
+def get_tide_stations(_auth: dict = Depends(require_api_access)):
+    """Return hardcoded list of NOAA CO-OPS tide stations along US East Coast."""
+    stations = [
+        {"id": "8443970", "name": "Boston, MA", "lat": 42.3539, "lon": -71.0503},
+        {"id": "8449130", "name": "Nantucket Island, MA", "lat": 41.2853, "lon": -70.0964},
+        {"id": "8452660", "name": "Newport, RI", "lat": 41.5043, "lon": -71.3261},
+        {"id": "8461490", "name": "New London, CT", "lat": 41.3550, "lon": -72.0900},
+        {"id": "8510560", "name": "Montauk, NY", "lat": 41.0486, "lon": -71.9597},
+        {"id": "8518750", "name": "The Battery, NY", "lat": 40.7006, "lon": -74.0142},
+        {"id": "8531680", "name": "Sandy Hook, NJ", "lat": 40.4669, "lon": -74.0094},
+        {"id": "8534720", "name": "Atlantic City, NJ", "lat": 39.3550, "lon": -74.4183},
+        {"id": "8545240", "name": "Philadelphia, PA", "lat": 39.9333, "lon": -75.1417},
+        {"id": "8557380", "name": "Lewes, DE", "lat": 38.7828, "lon": -75.1192},
+        {"id": "8570283", "name": "Ocean City, MD", "lat": 38.3283, "lon": -75.0911},
+        {"id": "8638863", "name": "Virginia Beach, VA", "lat": 36.8314, "lon": -75.9694},
+        {"id": "8665530", "name": "Charleston, SC", "lat": 32.7817, "lon": -79.9250},
+    ]
+    return {"stations": stations}
+
+
+@router.get("/tides/predictions")
+async def get_tide_predictions(
+    station: str = Query(..., description="NOAA CO-OPS station ID"),
+    hours: int = Query(48, ge=1, le=168, description="Hours of predictions"),
+    _auth: dict = Depends(require_api_access)
+):
+    """Proxy NOAA CO-OPS API for tide predictions (high/low)."""
+    import httpx
+    import json as json_mod
+    from datetime import datetime, timezone, timedelta
+
+    # Redis cache
+    redis_client = None
+    try:
+        import redis.asyncio as aioredis
+        from app.config import get_settings
+        redis_client = aioredis.from_url(get_settings().redis_url, decode_responses=True)
+        await redis_client.ping()
+    except Exception:
+        redis_client = None
+
+    cache_key = f"tide_pred:{station}:{hours}"
+    CACHE_TTL = 3600  # 1 hour
+
+    if redis_client:
+        try:
+            cached = await redis_client.get(cache_key)
+            if cached:
+                await redis_client.aclose()
+                return json_mod.loads(cached)
+        except Exception:
+            pass
+
+    now = datetime.now(timezone.utc)
+    begin = now.strftime("%Y%m%d %H:%M")
+    end = (now + timedelta(hours=hours)).strftime("%Y%m%d %H:%M")
+
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter",
+                params={
+                    "begin_date": begin,
+                    "end_date": end,
+                    "station": station,
+                    "product": "predictions",
+                    "datum": "MLLW",
+                    "units": "english",
+                    "time_zone": "lst_ldt",
+                    "interval": "hilo",
+                    "format": "json",
+                    "application": "marine_fishing_platform",
+                },
+                timeout=15.0,
+            )
+            if resp.status_code != 200:
+                return {"predictions": [], "error": "NOAA API returned " + str(resp.status_code)}
+            data = resp.json()
+    except Exception as e:
+        if redis_client:
+            await redis_client.aclose()
+        return {"predictions": [], "error": str(e)}
+
+    predictions = data.get("predictions", [])
+    result = {"station": station, "predictions": predictions}
 
     if redis_client:
         try:

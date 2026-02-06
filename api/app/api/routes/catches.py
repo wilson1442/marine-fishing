@@ -4,7 +4,7 @@ from sqlalchemy import text, func
 from typing import Optional, List
 from datetime import date
 
-from app.api.deps import get_db
+from app.api.deps import get_db, require_api_access
 from app.models.catch import Catch
 from app.models.species import Species
 from app.models.fishing_conditions import FishingConditions
@@ -23,7 +23,8 @@ def get_catches_geojson(
     source: Optional[str] = Query(None, description="Data sources (comma-separated)"),
     limit: int = Query(500, ge=1, le=5000, description="Max records"),
     offset: int = Query(0, ge=0, description="Pagination offset"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _auth: dict = Depends(require_api_access)
 ):
     """
     Get catches as GeoJSON FeatureCollection for map display.
@@ -191,7 +192,7 @@ def get_catches_geojson(
 
 
 @router.get("/stats")
-def get_catch_stats(db: Session = Depends(get_db)):
+def get_catch_stats(db: Session = Depends(get_db), _auth: dict = Depends(require_api_access)):
     """Get aggregated catch statistics by species"""
     query = """
         SELECT

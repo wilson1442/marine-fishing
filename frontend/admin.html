@@ -489,7 +489,6 @@ textarea.field__input{resize:vertical;min-height:60px}
                 <li><a href="/">Home</a></li>
                 <li><a href="/map">Live Map</a></li>
                 <li><a href="/explorer">Explorer</a></li>
-                <li><a href="/api/docs">API Docs</a></li>
             </ul>
         </nav>
         <div class="user-menu" id="user-menu" style="display:none">
@@ -525,6 +524,7 @@ textarea.field__input{resize:vertical;min-height:60px}
         <button class="tab-btn" data-tab="synchistory" onclick="switchTab('synchistory')">Sync History</button>
         <button class="tab-btn" data-tab="backups" onclick="switchTab('backups')">Backups</button>
         <button class="tab-btn" data-tab="users" onclick="switchTab('users')">Users <span class="tab-badge" id="tab-users-badge" style="display:none">0</span></button>
+        <button class="tab-btn" data-tab="apikeys" onclick="switchTab('apikeys')">API Keys</button>
     </div>
 
     <!-- TAB: Overview -->
@@ -767,6 +767,92 @@ textarea.field__input{resize:vertical;min-height:60px}
     </section>
 
     </div><!-- /tab-users -->
+
+    <!-- TAB: API Keys -->
+    <div class="tab-panel" id="tab-apikeys">
+
+    <section class="section">
+        <div class="section__head">
+            <h2 class="section__title">API Keys</h2>
+        </div>
+        <div class="tbl-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Key Prefix</th>
+                        <th>Label</th>
+                        <th>Created</th>
+                        <th>Expires</th>
+                        <th>Last Used</th>
+                        <th>Requests</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="apikeys-tbody">
+                    <tr><td colspan="8" class="empty">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="form-panel" data-collapsed="true" id="add-apikey-panel">
+            <button class="form-panel__toggle" onclick="togglePanel('add-apikey-panel')">
+                <span>+ Create API Key</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="form-panel__body">
+                <div class="form-grid">
+                    <div class="field">
+                        <label class="field__label">Label</label>
+                        <input type="text" class="field__input" id="apikey-label" placeholder="e.g. Partner App, Mobile Client">
+                    </div>
+                    <div class="field">
+                        <label class="field__label">Expiration</label>
+                        <select class="field__input" id="apikey-duration">
+                            <option value="1_week">1 Week</option>
+                            <option value="1_month">1 Month</option>
+                            <option value="3_months">3 Months</option>
+                            <option value="6_months" selected>6 Months</option>
+                            <option value="12_months">12 Months</option>
+                            <option value="never">Never Expires</option>
+                        </select>
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn btn--primary" onclick="createApiKey()">Create API Key</button>
+                        <button class="btn btn--ghost" onclick="togglePanel('add-apikey-panel')">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    </div><!-- /tab-apikeys -->
+
+    <!-- API Key Modal -->
+    <div class="log-modal-overlay" id="apikey-modal-overlay" onclick="closeApiKeyModal(event)">
+        <div class="log-modal" style="max-width:520px">
+            <div class="log-modal__head">
+                <div class="log-modal__title">API Key Created</div>
+                <button class="log-modal__close" onclick="closeApiKeyModal()">Close</button>
+            </div>
+            <div class="log-modal__body" style="padding:20px">
+                <div style="margin-bottom:16px;padding:12px;background:rgba(240,165,0,0.1);border:1px solid rgba(240,165,0,0.25);border-radius:4px">
+                    <div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--amber);margin-bottom:6px">
+                        Save this key now - it will not be shown again!
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="field__label">Your API Key</label>
+                    <div style="display:flex;gap:8px">
+                        <input type="text" class="field__input" id="apikey-display" readonly style="flex:1;font-family:var(--font-mono);font-size:12px">
+                        <button class="btn btn--ghost" onclick="copyApiKey()">Copy</button>
+                    </div>
+                </div>
+                <div style="margin-top:16px;font-size:11px;color:var(--text-dim)">
+                    Use this key in the <code style="color:var(--cyan)">X-API-Key</code> header when making API requests.
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Log Modal -->
     <div class="log-modal-overlay" id="log-modal-overlay" onclick="closeLogModal(event)">
@@ -1115,7 +1201,8 @@ async function loadAll() {
         authFetch(API + '/backups').then(function(r) { return r.json(); }),
         authFetch(API + '/backups/ssh-pubkey').then(function(r) { return r.ok ? r.json() : null; }),
         authFetch(API + '/backups/schedule').then(function(r) { return r.ok ? r.json() : null; }),
-        authFetch(API + '/registrations').then(function(r) { return r.json(); })
+        authFetch(API + '/registrations').then(function(r) { return r.json(); }),
+        authFetch(API + '/api-keys').then(function(r) { return r.json(); })
     ]);
 
     if (results[0].status === 'fulfilled') populateDashboard(results[0].value);
@@ -1130,6 +1217,7 @@ async function loadAll() {
     }
     if (results[6].status === 'fulfilled') _registrationsCache = results[6].value.registrations || [];
     populateAllUsers();
+    if (results[7].status === 'fulfilled') populateApiKeys(results[7].value);
 }
 
 // ===== Populate Functions =====
@@ -1776,6 +1864,7 @@ document.addEventListener('keydown', function(e) {
         closeLogModal();
         closeEditUserModal();
         closeProfileModal();
+        closeApiKeyModal();
     }
 });
 
@@ -1790,6 +1879,130 @@ function switchTab(tabName) {
     document.querySelectorAll('.tab-panel').forEach(function(panel) {
         panel.classList.toggle('active', panel.id === 'tab-' + tabName);
     });
+}
+
+// ===== API Keys =====
+
+async function loadApiKeys() {
+    try {
+        var resp = await authFetch(API + '/api-keys');
+        var data = await resp.json();
+        populateApiKeys(data);
+    } catch (err) {
+        if (err.message !== 'Session expired') showToast('Failed to load API keys', 'error');
+    }
+}
+
+function populateApiKeys(data) {
+    var tbody = document.getElementById('apikeys-tbody');
+    if (!data.api_keys || data.api_keys.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="empty">No API keys created yet. Click "Create API Key" to get started.</td></tr>';
+        return;
+    }
+    var html = '';
+    data.api_keys.forEach(function(k) {
+        var statusClass = k.is_active ? 'ok' : 'fail';
+        var statusText = k.is_active ? 'Active' : 'Revoked';
+        var expiresText = k.expires_at ? formatDate(k.expires_at) : '<span style="color:var(--text-dim)">Never</span>';
+        var lastUsedText = k.last_used_at ? timeAgo(k.last_used_at) : '<span style="color:var(--text-dim)">Never</span>';
+
+        // Check if expired
+        if (k.is_active && k.expires_at) {
+            var expDate = new Date(ensureUTC(k.expires_at));
+            if (expDate < new Date()) {
+                statusClass = 'fail';
+                statusText = 'Expired';
+            }
+        }
+
+        html += '<tr>' +
+            '<td><code style="color:var(--cyan);font-size:11px">' + escHtml(k.key_prefix) + '...</code></td>' +
+            '<td>' + escHtml(k.label) + '</td>' +
+            '<td style="white-space:nowrap">' + formatDate(k.created_at) + '</td>' +
+            '<td style="white-space:nowrap">' + expiresText + '</td>' +
+            '<td style="white-space:nowrap">' + lastUsedText + '</td>' +
+            '<td>' + (k.request_count || 0).toLocaleString() + '</td>' +
+            '<td><span class="badge badge--' + statusClass + '">' + statusText + '</span></td>' +
+            '<td>' +
+                (k.is_active ? '<button class="btn btn--danger btn--sm" onclick="revokeApiKey(' + k.id + ',\'' + escHtml(k.label).replace(/'/g,'&#39;') + '\')">Revoke</button>' : '<span style="color:var(--text-dim);font-size:10px">—</span>') +
+            '</td>' +
+            '</tr>';
+    });
+    tbody.innerHTML = html;
+}
+
+async function createApiKey() {
+    var label = document.getElementById('apikey-label').value.trim();
+    var duration = document.getElementById('apikey-duration').value;
+
+    if (!label) {
+        showToast('Label is required', 'error');
+        return;
+    }
+
+    try {
+        var resp = await authFetch(API + '/api-keys', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ label: label, duration: duration })
+        });
+        var data = await resp.json();
+        if (!resp.ok) {
+            showToast(data.detail || 'Failed to create API key', 'error');
+            return;
+        }
+
+        // Show the key in modal
+        document.getElementById('apikey-display').value = data.key;
+        document.getElementById('apikey-modal-overlay').classList.add('visible');
+
+        // Clear form and collapse
+        document.getElementById('apikey-label').value = '';
+        togglePanel('add-apikey-panel');
+
+        // Refresh list
+        loadApiKeys();
+        showToast('API key created', 'ok');
+
+    } catch (err) {
+        if (err.message !== 'Session expired') showToast('Failed to create API key: ' + err.message, 'error');
+    }
+}
+
+async function revokeApiKey(id, label) {
+    if (!confirm('Revoke API key "' + label + '"? This will immediately disable all requests using this key.')) return;
+
+    try {
+        var resp = await authFetch(API + '/api-keys/' + id, { method: 'DELETE' });
+        var data = await resp.json();
+        if (!resp.ok) {
+            showToast(data.detail || 'Failed to revoke API key', 'error');
+            return;
+        }
+        showToast('API key revoked', 'ok');
+        loadApiKeys();
+    } catch (err) {
+        if (err.message !== 'Session expired') showToast('Failed to revoke API key: ' + err.message, 'error');
+    }
+}
+
+function copyApiKey() {
+    var input = document.getElementById('apikey-display');
+    input.select();
+    input.setSelectionRange(0, 99999);
+    try {
+        navigator.clipboard.writeText(input.value);
+        showToast('API key copied to clipboard', 'ok');
+    } catch (err) {
+        // Fallback for older browsers
+        document.execCommand('copy');
+        showToast('API key copied to clipboard', 'ok');
+    }
+}
+
+function closeApiKeyModal(event) {
+    if (event && event.target !== event.currentTarget) return;
+    document.getElementById('apikey-modal-overlay').classList.remove('visible');
 }
 
 // ===== Init =====
