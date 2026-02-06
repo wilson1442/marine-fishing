@@ -722,7 +722,7 @@ function countUp(el, target, duration) {
 .user-menu__trigger:hover{border-color:#4cc9f0;color:#4cc9f0}
 .user-menu__chevron{transition:transform 0.2s;opacity:0.5}
 .user-menu.open .user-menu__chevron{transform:rotate(180deg)}
-.user-menu__dropdown{display:none;position:fixed;min-width:180px;background:rgba(10,20,40,0.95);border:1px solid rgba(76,201,240,0.12);border-radius:6px;box-shadow:0 8px 32px rgba(0,0,0,0.5);overflow:hidden;z-index:910;backdrop-filter:blur(12px)}
+.user-menu__dropdown{display:none;position:absolute;top:100%;right:0;margin-top:6px;min-width:180px;background:rgba(10,20,40,0.95);border:1px solid rgba(76,201,240,0.12);border-radius:6px;box-shadow:0 8px 32px rgba(0,0,0,0.5);overflow:hidden;z-index:910;backdrop-filter:blur(12px)}
 .user-menu.open .user-menu__dropdown{display:block}
 .user-menu__item{display:flex;align-items:center;gap:8px;width:100%;padding:10px 14px;background:none;border:none;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:500;letter-spacing:0.5px;text-transform:uppercase;color:#c0cddf;cursor:pointer;transition:background 0.2s,color 0.2s;text-decoration:none;text-align:left}
 .user-menu__item:hover{background:rgba(76,201,240,0.08);color:#4cc9f0}
@@ -815,15 +815,6 @@ function toggleUserMenu(e) {
     var menu = document.getElementById('user-menu');
     if (!menu) return;
     menu.classList.toggle('open');
-    if (menu.classList.contains('open')) {
-        var trigger = menu.querySelector('.user-menu__trigger');
-        var dropdown = menu.querySelector('.user-menu__dropdown');
-        if (trigger && dropdown) {
-            var rect = trigger.getBoundingClientRect();
-            dropdown.style.top = (rect.bottom + 6) + 'px';
-            dropdown.style.right = (window.innerWidth - rect.right) + 'px';
-        }
-    }
 }
 document.addEventListener('click', function(e) {
     var menu = document.getElementById('user-menu');

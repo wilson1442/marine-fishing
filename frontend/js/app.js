@@ -1310,15 +1310,6 @@ function toggleUserMenu(e) {
     var menu = document.getElementById('user-menu');
     if (!menu) return;
     menu.classList.toggle('open');
-    if (menu.classList.contains('open')) {
-        var trigger = menu.querySelector('.user-menu__trigger');
-        var dropdown = menu.querySelector('.user-menu__dropdown');
-        if (trigger && dropdown) {
-            var rect = trigger.getBoundingClientRect();
-            dropdown.style.top = (rect.bottom + 6) + 'px';
-            dropdown.style.right = (window.innerWidth - rect.right) + 'px';
-        }
-    }
 }
 
 // Close dropdown when clicking outside

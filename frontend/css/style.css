@@ -1414,7 +1414,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 .user-menu__dropdown {
     display: none;
-    position: fixed;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 6px;
     min-width: 180px;
     background: var(--deep);
     border: 1px solid var(--steel);
