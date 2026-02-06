@@ -47,6 +47,14 @@ class ScheduledBackupUpdate(BaseModel):
     enabled: bool
 
 
+class AisPurgeScheduleUpdate(BaseModel):
+    enabled: bool
+
+
+class AisRollingPurgeScheduleUpdate(BaseModel):
+    enabled: bool
+
+
 class RegistrationCreate(BaseModel):
     first_name: str
     last_name: str
@@ -182,14 +190,28 @@ def get_dashboard(current_user: dict = Depends(get_current_admin), db: Session =
 def get_data_sources(current_user: dict = Depends(get_current_admin), db: Session = Depends(get_db)):
     """List all data sources with their last sync status."""
 
-    # Auto-cleanup stale 'running' entries older than 1 hour
+    # Auto-cleanup stale 'running' entries
+    # For streaming sources (like AIS), check the heartbeat in metadata
+    # For other sources, use 1 hour timeout from started_at
     db.execute(text("""
         UPDATE data_sync_log
         SET status = 'failed',
             completed_at = NOW(),
             error_message = 'Process terminated unexpectedly (stale running entry)'
         WHERE status = 'running'
-          AND started_at < NOW() - INTERVAL '1 hour'
+          AND (
+            -- Non-streaming: stale if started more than 1 hour ago
+            (sync_type != 'streaming' AND started_at < NOW() - INTERVAL '1 hour')
+            OR
+            -- Streaming: stale if heartbeat is more than 10 minutes old (or no heartbeat and started > 10 min ago)
+            (sync_type = 'streaming' AND (
+                (metadata->>'last_heartbeat' IS NOT NULL
+                 AND (metadata->>'last_heartbeat')::timestamptz < NOW() - INTERVAL '10 minutes')
+                OR
+                (metadata->>'last_heartbeat' IS NULL
+                 AND started_at < NOW() - INTERVAL '10 minutes')
+            ))
+          )
     """))
     db.commit()
 
@@ -688,6 +710,181 @@ def set_backup_schedule(body: ScheduledBackupUpdate, current_user: dict = Depend
         "daily_enabled": body.enabled,
         "message": "Daily backup enabled" if body.enabled else "Daily backup disabled",
     }
+
+
+# ---------- AIS Data Purge ----------
+
+def run_daily_ais_purge():
+    """Backup database then purge AIS position and event data (called by APScheduler at 23:55)."""
+    from sqlalchemy import create_engine
+    from app.config import get_settings
+
+    settings = get_settings()
+    db_info = _parse_database_url(settings.database_url)
+
+    # Step 1: Create backup first
+    os.makedirs(settings.backup_dir, exist_ok=True)
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    backup_filename = f"marine_fishing_{timestamp}.sql.gz"
+    backup_filepath = os.path.join(settings.backup_dir, backup_filename)
+
+    env = os.environ.copy()
+    env["PGPASSWORD"] = db_info["password"]
+
+    try:
+        pg_dump_bin = _find_executable("pg_dump")
+        gzip_bin = _find_executable("gzip")
+
+        pg_dump_cmd = [
+            pg_dump_bin,
+            "-h", db_info["host"],
+            "-p", db_info["port"],
+            "-U", db_info["user"],
+            "-d", db_info["dbname"],
+            "--no-password",
+        ]
+        dump_proc = subprocess.Popen(
+            pg_dump_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=env,
+        )
+
+        with open(backup_filepath, "wb") as f:
+            gzip_proc = subprocess.Popen(
+                [gzip_bin],
+                stdin=dump_proc.stdout,
+                stdout=f,
+                stderr=subprocess.PIPE,
+            )
+            dump_proc.stdout.close()
+            gzip_proc.wait(timeout=600)
+
+        dump_proc.wait(timeout=600)
+
+        if dump_proc.returncode != 0:
+            stderr = dump_proc.stderr.read().decode("utf-8", errors="replace")
+            if os.path.exists(backup_filepath):
+                os.remove(backup_filepath)
+            print(f"[ais-purge] Backup failed, aborting purge: {stderr[:500]}")
+            return
+
+        file_size = os.path.getsize(backup_filepath)
+        print(f"[ais-purge] Pre-purge backup created: {backup_filename} ({_format_file_size(file_size)})")
+
+    except Exception as e:
+        if os.path.exists(backup_filepath):
+            os.remove(backup_filepath)
+        print(f"[ais-purge] Backup failed, aborting purge: {e}")
+        return
+
+    # Step 2: Purge AIS data
+    try:
+        engine = create_engine(settings.database_url)
+        with engine.connect() as conn:
+            # Delete in order to respect foreign key constraints if any
+            result_loitering = conn.execute(text("DELETE FROM detected_loitering_events"))
+            result_fishing = conn.execute(text("DELETE FROM detected_fishing_events"))
+            result_positions = conn.execute(text("DELETE FROM vessel_positions"))
+            conn.commit()
+
+            print(f"[ais-purge] Purged: {result_positions.rowcount} positions, "
+                  f"{result_fishing.rowcount} fishing events, {result_loitering.rowcount} loitering events")
+
+    except Exception as e:
+        print(f"[ais-purge] Purge failed: {e}")
+
+
+@router.get("/ais-purge/schedule")
+def get_ais_purge_schedule(current_user: dict = Depends(get_current_admin)):
+    """Get the current daily AIS purge schedule status."""
+    data = _read_schedule_file()
+    return {"ais_purge_enabled": data.get("ais_purge_enabled", False)}
+
+
+@router.put("/ais-purge/schedule")
+def set_ais_purge_schedule(body: AisPurgeScheduleUpdate, current_user: dict = Depends(get_current_admin)):
+    """Enable or disable the daily AIS data purge (runs at 23:55)."""
+    from app.scheduler import set_daily_ais_purge
+
+    data = _read_schedule_file()
+    data["ais_purge_enabled"] = body.enabled
+    _write_schedule_file(data)
+
+    set_daily_ais_purge(body.enabled)
+
+    return {
+        "ais_purge_enabled": body.enabled,
+        "message": "Daily AIS purge enabled (runs at 23:55 UTC)" if body.enabled else "Daily AIS purge disabled",
+    }
+
+
+@router.post("/ais-purge/run")
+def run_ais_purge_now(current_user: dict = Depends(get_current_admin)):
+    """Manually trigger the AIS data purge (with backup)."""
+    run_daily_ais_purge()
+    return {"message": "AIS purge completed. Check server logs for details."}
+
+
+# ---------- AIS Rolling Purge (6-hour retention) ----------
+
+def run_rolling_ais_purge():
+    """Delete AIS data older than 6 hours (called by APScheduler every hour)."""
+    from sqlalchemy import create_engine
+    from app.config import get_settings
+
+    settings = get_settings()
+
+    try:
+        engine = create_engine(settings.database_url)
+        with engine.connect() as conn:
+            result_positions = conn.execute(text(
+                "DELETE FROM vessel_positions WHERE received_at < NOW() - INTERVAL '6 hours'"
+            ))
+            result_fishing = conn.execute(text(
+                "DELETE FROM detected_fishing_events WHERE start_time < NOW() - INTERVAL '6 hours'"
+            ))
+            result_loitering = conn.execute(text(
+                "DELETE FROM detected_loitering_events WHERE start_time < NOW() - INTERVAL '6 hours'"
+            ))
+            conn.commit()
+
+            print(f"[ais-rolling-purge] Purged: {result_positions.rowcount} positions, "
+                  f"{result_fishing.rowcount} fishing events, {result_loitering.rowcount} loitering events")
+
+    except Exception as e:
+        print(f"[ais-rolling-purge] Purge failed: {e}")
+
+
+@router.get("/ais-rolling-purge/schedule")
+def get_ais_rolling_purge_schedule(current_user: dict = Depends(get_current_admin)):
+    """Get the current hourly AIS rolling purge schedule status."""
+    data = _read_schedule_file()
+    return {"ais_rolling_purge_enabled": data.get("ais_rolling_purge_enabled", False)}
+
+
+@router.put("/ais-rolling-purge/schedule")
+def set_ais_rolling_purge_schedule(body: AisRollingPurgeScheduleUpdate, current_user: dict = Depends(get_current_admin)):
+    """Enable or disable the hourly AIS rolling purge (keeps only last 6 hours of data)."""
+    from app.scheduler import set_rolling_ais_purge
+
+    data = _read_schedule_file()
+    data["ais_rolling_purge_enabled"] = body.enabled
+    _write_schedule_file(data)
+
+    set_rolling_ais_purge(body.enabled)
+
+    return {
+        "ais_rolling_purge_enabled": body.enabled,
+        "message": "Hourly AIS rolling purge enabled (keeps last 6 hours)" if body.enabled else "Hourly AIS rolling purge disabled",
+    }
+
+
+@router.post("/ais-rolling-purge/run")
+def run_ais_rolling_purge_now(current_user: dict = Depends(get_current_admin)):
+    """Manually trigger the AIS rolling purge (deletes data older than 6 hours)."""
+    run_rolling_ais_purge()
+    return {"message": "AIS rolling purge completed. Check server logs for details."}
 
 
 # ---------- SSH Key Management ----------

@@ -37,7 +37,7 @@ def get_live_vessels(
             ST_AsGeoJSON(vp.location)::json as geojson
         FROM vessel_positions vp
         JOIN vessels v ON v.mmsi = vp.mmsi
-        WHERE vp.received_at > NOW() - INTERVAL '24 hours'
+        WHERE vp.received_at > NOW() - INTERVAL '6 hours'
     """
     params = {}
 
@@ -91,7 +91,7 @@ def get_live_vessels(
 @router.get("/tracks/{mmsi}")
 def get_vessel_tracks(
     mmsi: str,
-    hours: int = Query(24, ge=1, le=168, description="Hours of track history"),
+    hours: int = Query(6, ge=1, le=6, description="Hours of track history"),
     db: Session = Depends(get_db)
 ):
     """Get position history for a vessel as GeoJSON LineString."""
@@ -537,7 +537,7 @@ def get_vessels_summary(db: Session = Depends(get_db)):
     stats = {}
 
     queries = {
-        "live_vessels": "SELECT COUNT(DISTINCT mmsi) FROM vessel_positions WHERE received_at > NOW() - INTERVAL '24 hours'",
+        "live_vessels": "SELECT COUNT(DISTINCT mmsi) FROM vessel_positions WHERE received_at > NOW() - INTERVAL '6 hours'",
         "fishing_events": "SELECT COUNT(*) FROM detected_fishing_events",
         "loitering_events": "SELECT COUNT(*) FROM detected_loitering_events",
         "vessels": "SELECT COUNT(*) FROM vessels",

@@ -1664,8 +1664,8 @@ var SSTContourLayer = L.Layer.extend({
             var cp = map.latLngToContainerPoint([pt.lat, pt.lon]);
             var tx = cp.x + padX;
             var ty = cp.y + padY;
-            var tempC = Math.round((pt.sst_f - 32) * 5 / 9);
-            var label = tempC + '\u00B0';
+            var tempF = Math.round(pt.sst_f);
+            var label = tempF + '\u00B0F';
 
             ctx.strokeStyle = 'rgba(0,0,0,0.7)';
             ctx.lineWidth = 2.5;
