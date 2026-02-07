@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     admin_secret_key: str = secrets.token_hex(32)
     admin_token_expiry_hours: int = 24
 
+    # Zoho CRM
+    zoho_client_id: str = ""
+    zoho_client_secret: str = ""
+    zoho_refresh_token: str = ""
+    zoho_api_domain: str = "https://www.zohoapis.com"
+
     # Backups
     backup_dir: str = "/opt/marine-fishing/backups"
     ssh_key_dir: str = "/opt/marine-fishing/.ssh"

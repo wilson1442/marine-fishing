@@ -498,45 +498,11 @@ body {
     box-shadow: 0 0 20px var(--primary-glow);
 }
 
-/* Hero visual (map preview) */
+/* Hero visual — lead capture form */
 .hero__visual {
     position: relative;
     opacity: 0;
     animation: fade-up 0.8s ease 0.4s forwards;
-}
-
-.hero__preview {
-    position: relative;
-    border-radius: 12px;
-    overflow: hidden;
-    border: 1px solid var(--border);
-    box-shadow:
-        0 0 0 1px rgba(255, 255, 255, 0.03),
-        0 30px 100px rgba(0, 0, 0, 0.5),
-        0 0 60px var(--primary-glow);
-}
-
-.hero__preview img {
-    display: block;
-    width: 100%;
-    height: auto;
-}
-
-.hero__preview::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(135deg, rgba(58, 143, 217, 0.08) 0%, transparent 40%);
-    pointer-events: none;
-}
-
-.hero__preview::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: 12px;
-    box-shadow: inset 0 0 60px rgba(10, 21, 37, 0.5);
-    pointer-events: none;
 }
 
 .hero__glow {
@@ -561,6 +527,126 @@ body {
     background: var(--accent);
     opacity: 0.4;
 }
+
+.lead-form-card {
+    position: relative;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: rgba(10, 21, 37, 0.7);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.03),
+        0 30px 100px rgba(0, 0, 0, 0.5),
+        0 0 60px var(--primary-glow);
+    padding: 36px 32px;
+}
+
+.lead-form-card__title {
+    font-family: 'Oswald', sans-serif;
+    font-size: 22px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-bright);
+    margin-bottom: 4px;
+}
+
+.lead-form-card__sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--primary);
+    margin-bottom: 24px;
+}
+
+.lead-form-card .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+.lead-form-card .form-group {
+    margin-bottom: 14px;
+}
+
+.lead-form-card label {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+.lead-form-card input,
+.lead-form-card select,
+.lead-form-card textarea {
+    width: 100%;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 16px;
+    font-weight: 400;
+    color: var(--text-bright);
+    background: rgba(58, 143, 217, 0.06);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 11px 14px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.lead-form-card input::placeholder,
+.lead-form-card textarea::placeholder {
+    color: var(--text-dim);
+}
+
+.lead-form-card input:focus,
+.lead-form-card select:focus,
+.lead-form-card textarea:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(58, 143, 217, 0.15);
+}
+
+.lead-form-card select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%237a8ca0' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 36px;
+}
+
+.lead-form-card select option {
+    background: var(--bg-deep);
+    color: var(--text-main);
+}
+
+.lead-form-card textarea {
+    resize: vertical;
+    min-height: 64px;
+    max-height: 140px;
+}
+
+.lead-form-card .btn--submit {
+    width: 100%;
+    justify-content: center;
+    margin-top: 4px;
+}
+
+.lead-form-card .form-msg {
+    margin-top: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    text-align: center;
+    min-height: 20px;
+}
+
+.lead-form-card .form-msg--success { color: var(--radar-green); }
+.lead-form-card .form-msg--error { color: #e74c3c; }
 
 /* ===== STATS BAR ===== */
 .stats-bar {
@@ -880,6 +966,8 @@ body {
     .hero__desc { margin: 0 auto 40px; }
     .hero__actions { justify-content: center; }
     .features__grid { grid-template-columns: 1fr 1fr; }
+    .lead-form-card { max-width: 520px; margin: 0 auto; }
+    .lead-form-card__title, .lead-form-card__sub { text-align: center; }
 }
 
 @media (max-width: 768px) {
@@ -911,6 +999,8 @@ body {
     .hero__actions { flex-direction: column; width: 100%; }
     .btn { width: 100%; justify-content: center; }
     .hero__title, .hero__title-accent { font-size: 36px; }
+    .lead-form-card .form-row { grid-template-columns: 1fr; }
+    .lead-form-card { padding: 28px 20px; }
 }
 </style>
 </head>
@@ -988,8 +1078,50 @@ body {
             <div class="hero__visual">
                 <div class="hero__glow hero__glow--1"></div>
                 <div class="hero__glow hero__glow--2"></div>
-                <div class="hero__preview">
-                    <img src="/images/map-full.png" alt="Angler Suite Map Dashboard">
+                <div class="lead-form-card">
+                    <div class="lead-form-card__title">Get Intel Access</div>
+                    <div class="lead-form-card__sub">Request early access to the platform</div>
+                    <form id="lead-form" autocomplete="on">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="lf-first">First Name *</label>
+                                <input type="text" id="lf-first" name="first_name" required placeholder="John" autocomplete="given-name">
+                            </div>
+                            <div class="form-group">
+                                <label for="lf-last">Last Name *</label>
+                                <input type="text" id="lf-last" name="last_name" required placeholder="Doe" autocomplete="family-name">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="lf-email">Email *</label>
+                            <input type="email" id="lf-email" name="email" required placeholder="john@example.com" autocomplete="email">
+                        </div>
+                        <div class="form-group">
+                            <label for="lf-region">Region</label>
+                            <select id="lf-region" name="region">
+                                <option value="">Select your region</option>
+                                <option value="Mid-Atlantic">Mid-Atlantic</option>
+                                <option value="Northeast">Northeast</option>
+                                <option value="Southeast">Southeast</option>
+                                <option value="Gulf Coast">Gulf Coast</option>
+                                <option value="West Coast">West Coast</option>
+                                <option value="Pacific Northwest">Pacific Northwest</option>
+                                <option value="Great Lakes">Great Lakes</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="lf-message">Message <span style="color:var(--text-dim)">(optional)</span></label>
+                            <textarea id="lf-message" name="message" rows="2" placeholder="What species or areas are you interested in?"></textarea>
+                        </div>
+                        <button type="submit" class="btn btn--primary btn--submit">
+                            Request Access
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <path d="M5 12h14M12 5l7 7-7 7"/>
+                            </svg>
+                        </button>
+                        <div class="form-msg" id="lead-form-msg"></div>
+                    </form>
                 </div>
             </div>
         </div>
@@ -1135,6 +1267,51 @@ function countUp(el, target, duration) {
             }
         }
     } catch (e) { console.error(e); }
+})();
+
+// Lead form submission
+(function() {
+    var form = document.getElementById('lead-form');
+    var msg = document.getElementById('lead-form-msg');
+    if (!form) return;
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        msg.textContent = '';
+        msg.className = 'form-msg';
+        var btn = form.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+        try {
+            var body = {
+                first_name: form.first_name.value.trim(),
+                last_name: form.last_name.value.trim(),
+                email: form.email.value.trim(),
+                region: form.region.value,
+                message: form.message.value.trim()
+            };
+            var resp = await fetch('/api/v1/leads', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(body)
+            });
+            var data = await resp.json();
+            if (resp.ok) {
+                msg.textContent = data.message || 'Thank you! We\'ll be in touch shortly.';
+                msg.className = 'form-msg form-msg--success';
+                form.reset();
+            } else {
+                var errText = data.detail;
+                if (Array.isArray(errText)) errText = errText.map(function(e){ return e.msg; }).join(', ');
+                msg.textContent = errText || 'Something went wrong. Please try again.';
+                msg.className = 'form-msg form-msg--error';
+            }
+        } catch (err) {
+            msg.textContent = 'Network error. Please try again.';
+            msg.className = 'form-msg form-msg--error';
+        }
+        btn.disabled = false;
+        btn.style.opacity = '';
+    });
 })();
 
 // Load species
