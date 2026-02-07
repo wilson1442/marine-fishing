@@ -104,11 +104,21 @@ class AISStreamHarvester(BaseHarvester):
             self.conn.commit()
             if updated:
                 self.logger.info(f"Cleaned up {updated} stale 'running' sync log entries")
+
+            # Set initial heartbeat on current sync log
+            if self.sync_log_id:
+                with self.conn.cursor() as cur:
+                    cur.execute("""
+                        UPDATE data_sync_log
+                        SET metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('last_heartbeat', NOW())
+                        WHERE id = %s
+                    """, (self.sync_log_id,))
+                self.conn.commit()
         except Exception as e:
             self.logger.error(f"Error cleaning up stale sync logs: {e}")
 
     def _update_sync_log_progress(self):
-        """Periodically update the sync log with current stats."""
+        """Periodically update the sync log with current stats and heartbeat."""
         now = time.time()
         if now - self._last_sync_log_update < 300:  # Every 5 minutes
             return
@@ -121,7 +131,8 @@ class AISStreamHarvester(BaseHarvester):
                     SET records_processed = %s,
                         records_inserted = %s,
                         records_updated = %s,
-                        records_skipped = %s
+                        records_skipped = %s,
+                        metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('last_heartbeat', NOW())
                     WHERE id = %s
                 """, (
                     self._stats.get('processed', 0),
