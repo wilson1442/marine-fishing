@@ -323,11 +323,36 @@ body {
 
 /* Responsive */
 @media (max-width: 768px) {
-    .nav { padding: 12px 24px; }
+    .nav { padding: 12px 20px; }
     .nav__logo { width: 40px; height: 40px; }
+    .nav__title-sub { display: none; }
+    .nav__back { font-size: 9px; letter-spacing: 1px; gap: 4px; }
+    .nav__back svg { width: 14px; height: 14px; }
+    .main { padding: 24px 16px; align-items: flex-start; padding-top: 32px; }
+    .auth { max-width: 100%; }
+    .auth__title { font-size: 26px; letter-spacing: 1.5px; }
+    .auth__subtitle { font-size: 13px; }
+    .auth__header { margin-bottom: 24px; }
+    .auth__tabs { margin-bottom: 20px; }
+    .auth__tab { padding: 12px 12px; font-size: 10px; }
     .auth__form { padding: 24px; }
+    .field__input { font-size: 16px; padding: 14px 14px; }
     .field__row { grid-template-columns: 1fr; gap: 0; }
     .field__row .field { margin-bottom: 20px; }
+    .btn { padding: 16px 20px; font-size: 14px; }
+}
+
+@media (max-width: 400px) {
+    .nav { padding: 10px 14px; }
+    .nav__logo { width: 36px; height: 36px; }
+    .nav__title-main { font-size: 17px; }
+    .main { padding: 16px 12px; padding-top: 24px; }
+    .auth__title { font-size: 22px; }
+    .auth__tabs { padding: 3px; }
+    .auth__tab { padding: 10px 8px; font-size: 9px; letter-spacing: 0.5px; }
+    .auth__form { padding: 18px; border-radius: 10px; }
+    .auth__message { font-size: 11px; padding: 10px 12px; }
+    .auth__footer { font-size: 11px; margin-top: 18px; }
 }
 </style>
 </head>

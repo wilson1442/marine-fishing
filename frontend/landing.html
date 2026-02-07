@@ -300,6 +300,32 @@ body {
 
 .nav__links a:hover { color: var(--accent); }
 
+.nav__actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.nav__login-mobile {
+    display: none;
+    font-family: 'Oswald', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-main);
+    text-decoration: none;
+    padding: 10px 20px;
+    border: 1px solid var(--border-hover);
+    border-radius: 6px;
+    transition: all 0.3s;
+}
+
+.nav__login-mobile:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
 .nav__cta {
     display: inline-flex;
     align-items: center;
@@ -859,6 +885,7 @@ body {
 @media (max-width: 768px) {
     .nav { padding: 12px 24px; }
     .nav__links { display: none; }
+    .nav__login-mobile { display: inline-flex; }
     .nav__logo { width: 40px; height: 40px; }
     .hero { padding: 32px 24px 60px; }
     .hero__title, .hero__title-accent { font-size: 44px; }
@@ -930,12 +957,15 @@ body {
             <li><a href="/login">Login</a></li>
         </ul>
 
-        <a href="/map" class="nav__cta">
-            Launch Map
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <path d="M5 12h14M12 5l7 7-7 7"/>
-            </svg>
-        </a>
+        <div class="nav__actions">
+            <a href="/login" class="nav__login-mobile">Login</a>
+            <a href="/map" class="nav__cta">
+                Launch Map
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+            </a>
+        </div>
     </nav>
 
     <!-- Hero -->
