@@ -96,7 +96,7 @@ async def _push_to_zoho(lead: LeadRequest) -> tuple[bool, str | None, str | None
                 "Email": lead.email,
                 "City": lead.region,
                 "Description": lead.message,
-                "Lead_Source": "Website",
+                "Lead_Source": "Website Early Access",
             }
         ]
     }
