@@ -453,7 +453,73 @@ body {
 .hero__actions {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+/* Big glowing CTA button */
+.btn--cta {
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    padding: 20px 48px;
+    background: linear-gradient(135deg, var(--accent) 0%, #ff9a40 50%, var(--accent) 100%);
+    background-size: 200% 200%;
+    animation: cta-shimmer 3s ease-in-out infinite;
+    border-radius: 8px;
+    box-shadow:
+        0 0 20px rgba(245, 130, 32, 0.4),
+        0 0 60px rgba(245, 130, 32, 0.2),
+        0 8px 32px rgba(0, 0, 0, 0.4);
+    position: relative;
+    overflow: hidden;
+}
+
+.btn--cta::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-light), var(--gold), var(--accent));
+    background-size: 300% 300%;
+    animation: cta-border 4s ease-in-out infinite;
+    z-index: -1;
+    opacity: 0.7;
+}
+
+.btn--cta::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 60%);
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.btn--cta:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow:
+        0 0 40px rgba(245, 130, 32, 0.6),
+        0 0 80px rgba(245, 130, 32, 0.3),
+        0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.btn--cta:hover::after {
+    opacity: 1;
+}
+
+@keyframes cta-shimmer {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+@keyframes cta-border {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
 }
 
 .btn {
@@ -498,7 +564,7 @@ body {
     box-shadow: 0 0 20px var(--primary-glow);
 }
 
-/* Hero visual — lead capture form */
+/* Hero visual — map card */
 .hero__visual {
     position: relative;
     opacity: 0;
@@ -528,7 +594,7 @@ body {
     opacity: 0.4;
 }
 
-.lead-form-card {
+.hero__map-card {
     position: relative;
     border-radius: 12px;
     border: 1px solid var(--border);
@@ -539,27 +605,98 @@ body {
         0 0 0 1px rgba(255, 255, 255, 0.03),
         0 30px 100px rgba(0, 0, 0, 0.5),
         0 0 60px var(--primary-glow);
-    padding: 36px 32px;
+    overflow: hidden;
 }
 
-.lead-form-card__title {
-    font-family: 'Oswald', sans-serif;
-    font-size: 22px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    color: var(--text-bright);
-    margin-bottom: 4px;
+.hero__map-card img {
+    width: 100%;
+    display: block;
+    border-radius: 11px;
 }
 
-.lead-form-card__sub {
+/* ===== INTEL ACCESS SECTION ===== */
+.intel-section {
+    position: relative;
+    padding: 80px 48px;
+    background: linear-gradient(180deg, rgba(10, 21, 37, 0.9) 0%, rgba(58, 143, 217, 0.03) 50%, rgba(10, 21, 37, 0.9) 100%);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+}
+
+.intel-section__inner {
+    max-width: 640px;
+    margin: 0 auto;
+    position: relative;
+}
+
+.intel-section__header {
+    text-align: center;
+    margin-bottom: 36px;
+}
+
+.intel-section__label {
     font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
-    font-weight: 400;
-    letter-spacing: 2px;
+    font-weight: 500;
+    letter-spacing: 3px;
     text-transform: uppercase;
-    color: var(--primary);
-    margin-bottom: 24px;
+    color: var(--accent);
+    margin-bottom: 16px;
+}
+
+.intel-section__title {
+    font-family: 'Oswald', sans-serif;
+    font-size: clamp(28px, 4vw, 40px);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--text-bright);
+    margin-bottom: 12px;
+}
+
+.intel-section__desc {
+    font-size: 15px;
+    color: var(--text-muted);
+    line-height: 1.7;
+}
+
+.intel-section__glow {
+    position: absolute;
+    width: 350px;
+    height: 350px;
+    border-radius: 50%;
+    filter: blur(80px);
+    z-index: 0;
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.intel-section__glow--1 {
+    top: -100px;
+    left: -100px;
+    background: var(--primary);
+}
+
+.intel-section__glow--2 {
+    bottom: -100px;
+    right: -80px;
+    background: var(--accent);
+    opacity: 0.3;
+}
+
+.lead-form-card {
+    position: relative;
+    z-index: 1;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: rgba(10, 21, 37, 0.7);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.03),
+        0 30px 100px rgba(0, 0, 0, 0.5),
+        0 0 60px var(--primary-glow);
+    padding: 36px 32px;
 }
 
 .lead-form-card .form-row {
@@ -965,9 +1102,9 @@ body {
     }
     .hero__desc { margin: 0 auto 40px; }
     .hero__actions { justify-content: center; }
+    .hero__map-card { max-width: 600px; margin: 0 auto; }
     .features__grid { grid-template-columns: 1fr 1fr; }
     .lead-form-card { max-width: 520px; margin: 0 auto; }
-    .lead-form-card__title, .lead-form-card__sub { text-align: center; }
 }
 
 @media (max-width: 768px) {
@@ -977,6 +1114,7 @@ body {
     .nav__logo { width: 40px; height: 40px; }
     .hero { padding: 32px 24px 60px; }
     .hero__title, .hero__title-accent { font-size: 44px; }
+    .intel-section { padding: 60px 24px; }
     .stats-bar { padding: 24px; }
     .stats-bar__inner { flex-wrap: wrap; justify-content: center; gap: 32px; }
     .stat { flex: 0 0 40%; }
@@ -997,10 +1135,12 @@ body {
 
 @media (max-width: 480px) {
     .hero__actions { flex-direction: column; width: 100%; }
-    .btn { width: 100%; justify-content: center; }
+    .hero__actions .btn { width: 100%; justify-content: center; }
     .hero__title, .hero__title-accent { font-size: 36px; }
+    .btn--cta { padding: 18px 36px; font-size: 14px; }
     .lead-form-card .form-row { grid-template-columns: 1fr; }
     .lead-form-card { padding: 28px 20px; }
+    .intel-section { padding: 48px 16px; }
 }
 </style>
 </head>
@@ -1071,6 +1211,12 @@ body {
                     and AIS vessel tracking across the Mid-Atlantic. Your tactical advantage on the water.
                 </p>
                 <div class="hero__actions">
+                    <a href="#intel-access" class="btn btn--cta">
+                        Get Intel Access
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <path d="M5 12h14M12 5l7 7-7 7"/>
+                        </svg>
+                    </a>
                     <a href="/map" class="btn btn--outline">Explore Map</a>
                 </div>
             </div>
@@ -1078,51 +1224,65 @@ body {
             <div class="hero__visual">
                 <div class="hero__glow hero__glow--1"></div>
                 <div class="hero__glow hero__glow--2"></div>
-                <div class="lead-form-card">
-                    <div class="lead-form-card__title">Get Intel Access</div>
-                    <div class="lead-form-card__sub">Request early access to the platform</div>
-                    <form id="lead-form" autocomplete="on">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="lf-first">First Name *</label>
-                                <input type="text" id="lf-first" name="first_name" required placeholder="John" autocomplete="given-name">
-                            </div>
-                            <div class="form-group">
-                                <label for="lf-last">Last Name *</label>
-                                <input type="text" id="lf-last" name="last_name" required placeholder="Doe" autocomplete="family-name">
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="lf-email">Email *</label>
-                            <input type="email" id="lf-email" name="email" required placeholder="john@example.com" autocomplete="email">
-                        </div>
-                        <div class="form-group">
-                            <label for="lf-region">Region</label>
-                            <select id="lf-region" name="region">
-                                <option value="">Select your region</option>
-                                <option value="Mid-Atlantic">Mid-Atlantic</option>
-                                <option value="Northeast">Northeast</option>
-                                <option value="Southeast">Southeast</option>
-                                <option value="Gulf Coast">Gulf Coast</option>
-                                <option value="West Coast">West Coast</option>
-                                <option value="Pacific Northwest">Pacific Northwest</option>
-                                <option value="Great Lakes">Great Lakes</option>
-                                <option value="Other">Other</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="lf-message">Message <span style="color:var(--text-dim)">(optional)</span></label>
-                            <textarea id="lf-message" name="message" rows="2" placeholder="What species or areas are you interested in?"></textarea>
-                        </div>
-                        <button type="submit" class="btn btn--primary btn--submit">
-                            Request Access
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                                <path d="M5 12h14M12 5l7 7-7 7"/>
-                            </svg>
-                        </button>
-                        <div class="form-msg" id="lead-form-msg"></div>
-                    </form>
+                <div class="hero__map-card">
+                    <img src="/images/map-full.png" alt="Angler Suite live fishing map">
                 </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Intel Access Form -->
+    <section class="intel-section" id="intel-access">
+        <div class="intel-section__glow intel-section__glow--1"></div>
+        <div class="intel-section__glow intel-section__glow--2"></div>
+        <div class="intel-section__inner">
+            <div class="intel-section__header">
+                <div class="intel-section__label">Early Access</div>
+                <h2 class="intel-section__title">Get Intel Access</h2>
+                <p class="intel-section__desc">Request early access to the platform and start getting your tactical advantage on the water.</p>
+            </div>
+            <div class="lead-form-card">
+                <form id="lead-form" autocomplete="on">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="lf-first">First Name *</label>
+                            <input type="text" id="lf-first" name="first_name" required placeholder="John" autocomplete="given-name">
+                        </div>
+                        <div class="form-group">
+                            <label for="lf-last">Last Name *</label>
+                            <input type="text" id="lf-last" name="last_name" required placeholder="Doe" autocomplete="family-name">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="lf-email">Email *</label>
+                        <input type="email" id="lf-email" name="email" required placeholder="john@example.com" autocomplete="email">
+                    </div>
+                    <div class="form-group">
+                        <label for="lf-region">Region</label>
+                        <select id="lf-region" name="region">
+                            <option value="">Select your region</option>
+                            <option value="Mid-Atlantic">Mid-Atlantic</option>
+                            <option value="Northeast">Northeast</option>
+                            <option value="Southeast">Southeast</option>
+                            <option value="Gulf Coast">Gulf Coast</option>
+                            <option value="West Coast">West Coast</option>
+                            <option value="Pacific Northwest">Pacific Northwest</option>
+                            <option value="Great Lakes">Great Lakes</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="lf-message">Message <span style="color:var(--text-dim)">(optional)</span></label>
+                        <textarea id="lf-message" name="message" rows="2" placeholder="What species or areas are you interested in?"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn--primary btn--submit">
+                        Request Access
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <path d="M5 12h14M12 5l7 7-7 7"/>
+                        </svg>
+                    </button>
+                    <div class="form-msg" id="lead-form-msg"></div>
+                </form>
             </div>
         </div>
     </section>
