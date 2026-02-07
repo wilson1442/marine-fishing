@@ -527,19 +527,21 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     min-height: 1.3em;
 }
 
-/* ---- Species overlay (bottom of map) ---- */
+/* ---- Species overlay (right sidebar on map) ---- */
 .species-overlay {
     position: absolute;
-    bottom: 0;
-    left: 0;
+    top: 0;
     right: 0;
+    bottom: 0;
+    width: 192px;
     z-index: 2;
     display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: 12px;
-    padding: 10px 16px;
-    background: linear-gradient(180deg, rgba(10,21,37,0) 0%, rgba(10,21,37,0.85) 40%, rgba(10,21,37,0.95) 100%);
+    padding: 10px 12px;
+    background: linear-gradient(270deg, rgba(10,21,37,0.95) 60%, rgba(10,21,37,0) 100%);
     pointer-events: none;
+    overflow-y: auto;
 }
 
 .species-overlay__label {
@@ -551,6 +553,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     color: var(--text-dim);
     flex-shrink: 0;
     pointer-events: auto;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
 }
 
 .species-overlay__toggle {
@@ -569,6 +573,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     flex-shrink: 0;
     transition: all var(--transition);
     backdrop-filter: blur(8px);
+    width: 100%;
+    text-align: center;
 }
 .species-overlay__toggle:hover {
     border-color: var(--accent);
@@ -578,9 +584,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 .species-overlay__items {
     display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
+    flex-direction: column;
+    gap: 4px;
     pointer-events: auto;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
 }
 
 .legend-item {
@@ -651,6 +660,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     font-weight: 400;
     color: var(--text);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .legend-code {
@@ -658,6 +669,25 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     font-size: 9px;
     color: var(--text-dim);
     margin-left: 2px;
+    display: none;
+}
+
+.species-overlay::-webkit-scrollbar,
+.species-overlay__items::-webkit-scrollbar {
+    width: 4px;
+}
+.species-overlay::-webkit-scrollbar-track,
+.species-overlay__items::-webkit-scrollbar-track {
+    background: transparent;
+}
+.species-overlay::-webkit-scrollbar-thumb,
+.species-overlay__items::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 2px;
+}
+.species-overlay::-webkit-scrollbar-thumb:hover,
+.species-overlay__items::-webkit-scrollbar-thumb:hover {
+    background: var(--border-hover);
 }
 
 /* ---- Leaflet popup ---- */
@@ -1124,7 +1154,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .tide-panel {
     position: absolute;
     top: 10px;
-    right: 50px;
+    right: 202px;
     z-index: 800;
     width: 260px;
     background: rgba(10, 21, 37, 0.92);
@@ -1635,8 +1665,23 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     }
     .panel--filters.open { transform: translateX(0); }
 
-    .species-overlay { gap: 8px; padding: 6px 10px; }
-    .legend-code { display: none; }
+    .species-overlay {
+        top: auto;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: auto;
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        background: linear-gradient(180deg, rgba(10,21,37,0) 0%, rgba(10,21,37,0.85) 40%, rgba(10,21,37,0.95) 100%);
+        overflow-y: visible;
+    }
+    .species-overlay__label { padding-bottom: 0; border-bottom: none; }
+    .species-overlay__toggle { width: auto; text-align: left; }
+    .species-overlay__items { flex-direction: row; flex-wrap: wrap; gap: 6px; overflow-y: visible; flex: none; min-height: auto; }
+    .tide-panel { right: 50px; }
     .map-layer-toggles { min-width: 160px; }
 
     .topbar__toggle { display: block; }
