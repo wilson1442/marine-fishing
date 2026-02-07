@@ -280,34 +280,13 @@ body {
     color: var(--primary);
 }
 
-.nav__links {
-    display: flex;
-    align-items: center;
-    gap: 32px;
-    list-style: none;
-}
-
-.nav__links a {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    font-weight: 400;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    text-decoration: none;
-    transition: color 0.3s;
-}
-
-.nav__links a:hover { color: var(--accent); }
-
 .nav__actions {
     display: flex;
     align-items: center;
     gap: 12px;
 }
 
-.nav__login-mobile {
-    display: none;
+.nav__login-btn {
     font-family: 'Oswald', sans-serif;
     font-size: 12px;
     font-weight: 500;
@@ -315,15 +294,16 @@ body {
     text-transform: uppercase;
     color: var(--text-main);
     text-decoration: none;
-    padding: 10px 20px;
+    padding: 12px 24px;
     border: 1px solid var(--border-hover);
     border-radius: 6px;
     transition: all 0.3s;
 }
 
-.nav__login-mobile:hover {
+.nav__login-btn:hover {
     color: var(--accent);
     border-color: var(--accent);
+    background: rgba(245, 130, 32, 0.05);
 }
 
 .nav__cta {
@@ -1109,8 +1089,6 @@ body {
 
 @media (max-width: 768px) {
     .nav { padding: 12px 24px; }
-    .nav__links { display: none; }
-    .nav__login-mobile { display: inline-flex; }
     .nav__logo { width: 40px; height: 40px; }
     .hero { padding: 32px 24px 60px; }
     .hero__title, .hero__title-accent { font-size: 44px; }
@@ -1182,13 +1160,8 @@ body {
             </div>
         </div>
 
-        <ul class="nav__links">
-            <li><a href="/map">Live Map</a></li>
-            <li><a href="/login">Login</a></li>
-        </ul>
-
         <div class="nav__actions">
-            <a href="/login" class="nav__login-mobile">Login</a>
+            <a href="/login" class="nav__login-btn">Login</a>
             <a href="/map" class="nav__cta">
                 Launch Map
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
