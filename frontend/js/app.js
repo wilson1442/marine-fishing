@@ -31,10 +31,8 @@ let vesselLayerState = {
 let liveRefreshInterval = null;
 
 // Weather overlay state
-let weatherGridLayer = null;
+let weatherTileLayer = null;
 let weatherOverlayActive = false;
-let weatherMoveHandler = null;
-let weatherRefreshTimer = null;
 
 // Chlorophyll overlay state
 let chlorophyllWmsLayer = null;
@@ -838,121 +836,30 @@ function initWeatherOverlay() {
 }
 
 function addWeatherLayer() {
-    if (weatherGridLayer) {
-        map.removeLayer(weatherGridLayer);
-    }
-    weatherGridLayer = L.layerGroup().addTo(map);
+    if (weatherTileLayer) map.removeLayer(weatherTileLayer);
 
-    // Fetch grid for the current viewport
-    fetchWeatherGrid();
-
-    // Re-fetch on pan/zoom with debounce
-    weatherMoveHandler = function () {
-        clearTimeout(weatherRefreshTimer);
-        weatherRefreshTimer = setTimeout(fetchWeatherGrid, 600);
-    };
-    map.on('moveend', weatherMoveHandler);
-
-    showWeatherLegend();
-}
-
-function fetchWeatherGrid() {
-    if (!weatherOverlayActive || !weatherGridLayer) return;
-
-    var bounds = map.getBounds();
-    var params = new URLSearchParams({
-        north: bounds.getNorth().toFixed(2),
-        south: bounds.getSouth().toFixed(2),
-        east: bounds.getEast().toFixed(2),
-        west: bounds.getWest().toFixed(2),
+    weatherTileLayer = L.tileLayer(API_ENDPOINTS.marineWeatherTiles + '/{z}/{x}/{y}.png', {
+        transparent: true,
+        opacity: 0.6,
     });
 
-    setText('weather-grid-count', '...');
+    weatherTileLayer.on('tileerror', function (e) {
+        console.error('Weather tile error:', e.tile ? e.tile.src : e);
+        setText('weather-grid-count', 'ERR');
+    });
+    weatherTileLayer.on('tileload', function () {
+        setText('weather-grid-count', 'ON');
+    });
 
-    fetch(API_ENDPOINTS.marineWeatherGridData + '?' + params, { credentials: 'same-origin' })
-        .then(function (r) {
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            return r.json();
-        })
-        .then(function (data) {
-            if (!weatherOverlayActive || !weatherGridLayer) return;
-            weatherGridLayer.clearLayers();
-
-            if (!data.points || data.points.length === 0) {
-                setText('weather-grid-count', '0');
-                return;
-            }
-
-            var latStep = data.lat_step || 1.0;
-            var lonStep = data.lon_step || 1.0;
-            var halfLat = latStep / 2;
-            var halfLon = lonStep / 2;
-            var scale = waveHeightGridConfig.colorScale;
-
-            data.points.forEach(function (pt) {
-                var color = '#6b7da0';
-                if (pt.wave_height_m != null) {
-                    for (var i = 0; i < scale.length; i++) {
-                        if (pt.wave_height_m < scale[i].max) {
-                            color = scale[i].color;
-                            break;
-                        }
-                    }
-                }
-
-                var cellBounds = [
-                    [pt.lat - halfLat, pt.lon - halfLon],
-                    [pt.lat + halfLat, pt.lon + halfLon],
-                ];
-
-                var rect = L.rectangle(cellBounds, {
-                    color: 'none',
-                    fillColor: color,
-                    fillOpacity: waveHeightGridConfig.opacity,
-                    weight: 0,
-                });
-
-                rect.bindPopup(createWeatherGridPopup(pt));
-                weatherGridLayer.addLayer(rect);
-            });
-
-            setText('weather-grid-count', 'ON');
-        })
-        .catch(function (err) {
-            console.error('[Weather Grid] Fetch error:', err);
-            setText('weather-grid-count', 'ERR');
-        });
-}
-
-function createWeatherGridPopup(pt) {
-    var waveColor = getWaveColor(pt.wave_height_m);
-    var latLabel = Math.abs(pt.lat).toFixed(2) + '\u00B0' + (pt.lat >= 0 ? 'N' : 'S');
-    var lonLabel = Math.abs(pt.lon).toFixed(2) + '\u00B0' + (pt.lon >= 0 ? 'E' : 'W');
-
-    return '<div class="catch-popup">' +
-        '<div class="wx-popup__title">Marine Weather</div>' +
-        '<div style="font-family:var(--font-mono);font-size:9px;color:var(--text-dim);margin-bottom:6px">' +
-            latLabel + ', ' + lonLabel + '</div>' +
-        '<div class="catch-popup__grid">' +
-        field('Waves', pt.wave_height_m != null ? '<span style="color:' + waveColor + '">' + (pt.wave_height_m * 3.281).toFixed(1) + ' ft</span> (' + pt.wave_height_m.toFixed(1) + 'm)' : 'N/A') +
-        field('Direction', pt.wave_direction != null ? pt.wave_direction + '\u00B0' : 'N/A') +
-        field('Period', pt.wave_period_s != null ? pt.wave_period_s + 's' : 'N/A') +
-        field('Swell', pt.swell_height_m != null ? pt.swell_height_m.toFixed(1) + 'm' : 'N/A') +
-        field('Current', pt.current_velocity_ms != null ? pt.current_velocity_ms + ' m/s' : 'N/A') +
-        field('Cur. Dir', pt.current_direction != null ? pt.current_direction + '\u00B0' : 'N/A') +
-        field('SST', pt.sst_f != null ? pt.sst_f + '\u00B0F' : 'N/A') +
-        '</div></div>';
+    weatherTileLayer.addTo(map);
+    showWeatherLegend();
+    setText('weather-grid-count', 'ON');
 }
 
 function removeWeatherLayer() {
-    if (weatherMoveHandler) {
-        map.off('moveend', weatherMoveHandler);
-        weatherMoveHandler = null;
-    }
-    clearTimeout(weatherRefreshTimer);
-    if (weatherGridLayer) {
-        map.removeLayer(weatherGridLayer);
-        weatherGridLayer = null;
+    if (weatherTileLayer) {
+        map.removeLayer(weatherTileLayer);
+        weatherTileLayer = null;
     }
     hideWeatherLegend();
     setText('weather-grid-count', '');
@@ -965,7 +872,7 @@ function showWeatherLegend() {
     var legend = document.createElement('div');
     legend.className = 'weather-legend';
     legend.innerHTML =
-        '<div class="weather-legend__title">Waves (m)</div>' +
+        '<div class="weather-legend__title">Waves (ft)</div>' +
         '<div class="weather-legend__bar">' +
         waveHeightGridConfig.colorScale.map(function (s) {
             return '<div class="weather-legend__stop" style="background:' + s.color + '" title="' + s.label + '"></div>';

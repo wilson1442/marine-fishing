@@ -72,6 +72,7 @@ const API_ENDPOINTS = {
     vesselsSearch: `${API_BASE}/vessels/search`,
     marineWeatherGrid: `${API_BASE}/weather/marine/grid`,
     marineWeatherGridData: `${API_BASE}/weather/marine/grid-data`,
+    marineWeatherTiles: `${API_BASE}/weather/marine/tiles`,
     marineWeatherPoint: `${API_BASE}/weather/marine/point`,
     tideStations: `${API_BASE}/tide/stations`,
     tidePredictions: `${API_BASE}/tide/predictions`,
@@ -105,15 +106,14 @@ const weatherConfig = {
 };
 
 const waveHeightGridConfig = {
-    opacity: 0.55,
     colorScale: [
-        { max: 0.5,  color: '#b000d0', label: '<0.5m' },
-        { max: 1.0,  color: '#0055d4', label: '1m' },
-        { max: 2.0,  color: '#00d0c0', label: '2m' },
-        { max: 3.0,  color: '#00b000', label: '3m' },
-        { max: 4.0,  color: '#d8b800', label: '4m' },
-        { max: 5.0,  color: '#d02000', label: '5m' },
-        { max: Infinity, color: '#a00000', label: '>5m' },
+        { max: 2,    color: '#b000d0', label: '<2ft' },
+        { max: 4,    color: '#0055d4', label: '4ft' },
+        { max: 6,    color: '#00d0c0', label: '6ft' },
+        { max: 10,   color: '#00b000', label: '10ft' },
+        { max: 13,   color: '#d8b800', label: '13ft' },
+        { max: 16,   color: '#d02000', label: '16ft' },
+        { max: Infinity, color: '#a00000', label: '>16ft' },
     ],
 };
 

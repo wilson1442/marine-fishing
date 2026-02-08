@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import Optional
 from datetime import date
+import math
 
 from app.api.deps import get_db, require_api_access
 
@@ -330,6 +332,181 @@ def get_marine_weather_grid_data(
 
     # Grid step matches harvester GRID_STEP (1.0 degree)
     return {"points": points, "count": len(points), "lat_step": 1.0, "lon_step": 1.0}
+
+
+# ---------- Wave Height Tile Renderer ----------
+
+# Smooth color ramp for wave height in feet.
+# Each entry is (feet_threshold, (r, g, b)).
+# _wave_color_smooth() interpolates between adjacent stops for a gradient.
+_WAVE_RAMP = [
+    (0.0,  (176, 0, 208)),    # #b000d0  — flat calm
+    (2.0,  (0, 85, 212)),     # #0055d4
+    (4.0,  (0, 208, 192)),    # #00d0c0
+    (6.0,  (0, 176, 0)),      # #00b000
+    (10.0, (216, 184, 0)),    # #d8b800
+    (13.0, (208, 32, 0)),     # #d02000
+    (16.0, (160, 0, 0)),      # #a00000  — heavy seas
+]
+
+
+def _wave_color_smooth(height_ft):
+    """Return (r, g, b) with smooth gradient interpolation between ramp stops."""
+    if height_ft is None:
+        return None
+    if height_ft <= _WAVE_RAMP[0][0]:
+        return _WAVE_RAMP[0][1]
+    for i in range(len(_WAVE_RAMP) - 1):
+        lo_val, lo_rgb = _WAVE_RAMP[i]
+        hi_val, hi_rgb = _WAVE_RAMP[i + 1]
+        if height_ft <= hi_val:
+            t = (height_ft - lo_val) / (hi_val - lo_val)
+            return (
+                int(lo_rgb[0] + (hi_rgb[0] - lo_rgb[0]) * t),
+                int(lo_rgb[1] + (hi_rgb[1] - lo_rgb[1]) * t),
+                int(lo_rgb[2] + (hi_rgb[2] - lo_rgb[2]) * t),
+            )
+    return _WAVE_RAMP[-1][1]
+
+
+def _tile_bounds(z, x, y):
+    """Convert tile coords to (west, south, east, north) in EPSG:4326."""
+    n = 2 ** z
+    west = x / n * 360.0 - 180.0
+    east = (x + 1) / n * 360.0 - 180.0
+    north = math.degrees(math.atan(math.sinh(math.pi * (1 - 2 * y / n))))
+    south = math.degrees(math.atan(math.sinh(math.pi * (1 - 2 * (y + 1) / n))))
+    return west, south, east, north
+
+
+_EMPTY_TILE = None  # cached transparent PNG
+
+
+def _get_empty_tile():
+    global _EMPTY_TILE
+    if _EMPTY_TILE is None:
+        from PIL import Image
+        import io
+        img = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
+        buf = io.BytesIO()
+        img.save(buf, format="PNG", compress_level=1)
+        _EMPTY_TILE = buf.getvalue()
+    return _EMPTY_TILE
+
+
+@router.get("/marine/tiles/{z}/{x}/{y}.png")
+def get_marine_tile(z: int, x: int, y: int, db: Session = Depends(get_db),
+                    _auth: dict = Depends(require_api_access)):
+    """Render a 256x256 PNG tile of wave height with smooth gradient and land masking."""
+    from PIL import Image, ImageFilter
+    import io
+    import numpy as np
+
+    TILE_SIZE = 256
+    GRID_STEP = 1.0
+    M_TO_FT = 3.28084
+
+    west, south, east, north = _tile_bounds(z, x, y)
+
+    # Fetch grid points with margin for interpolation at tile edges
+    margin = GRID_STEP * 2
+    rows = db.execute(text("""
+        SELECT lat, lon, wave_height_m
+        FROM marine_weather_grid
+        WHERE lat BETWEEN :south AND :north
+          AND lon BETWEEN :west AND :east
+          AND fetched_at = (SELECT MAX(fetched_at) FROM marine_weather_grid)
+    """), {
+        "south": south - margin, "north": north + margin,
+        "west": west - margin, "east": east + margin,
+    }).fetchall()
+
+    if not rows:
+        return Response(content=_get_empty_tile(), media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=1800"})
+
+    # Build flat arrays for vectorised interpolation
+    pts_lat = []
+    pts_lon = []
+    pts_val = []  # in feet
+    for r in rows:
+        wh = r.wave_height_m
+        if wh is not None:
+            pts_lat.append(float(r.lat))
+            pts_lon.append(float(r.lon))
+            pts_val.append(float(wh) * M_TO_FT)
+
+    if not pts_val:
+        return Response(content=_get_empty_tile(), media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=1800"})
+
+    pts_lat = np.array(pts_lat)
+    pts_lon = np.array(pts_lon)
+    pts_val = np.array(pts_val)
+
+    # Build pixel coordinate grids
+    py = np.arange(TILE_SIZE)
+    px = np.arange(TILE_SIZE)
+    lats = north - (north - south) * py / TILE_SIZE  # shape (256,)
+    lons = west + (east - west) * px / TILE_SIZE      # shape (256,)
+    grid_lat, grid_lon = np.meshgrid(lats, lons, indexing='ij')  # (256,256)
+
+    # IDW interpolation: for each pixel, compute weighted average of nearby points
+    # Use power=2 for smooth falloff; max_dist limits land bleed
+    max_dist = GRID_STEP * 1.45  # just over 1 cell — suppresses land bleed
+    result = np.full((TILE_SIZE, TILE_SIZE), np.nan)
+    w_sum = np.zeros((TILE_SIZE, TILE_SIZE))
+    v_sum = np.zeros((TILE_SIZE, TILE_SIZE))
+
+    for k in range(len(pts_val)):
+        dlat = grid_lat - pts_lat[k]
+        dlon = grid_lon - pts_lon[k]
+        dist = np.sqrt(dlat * dlat + dlon * dlon)
+        dist = np.maximum(dist, 0.001)  # avoid division by zero
+        mask = dist < max_dist
+        if not np.any(mask):
+            continue
+        w = 1.0 / (dist * dist)
+        w[~mask] = 0.0
+        w_sum += w
+        v_sum += w * pts_val[k]
+
+    valid = w_sum > 0
+    result[valid] = v_sum[valid] / w_sum[valid]
+
+    # Build RGBA image from interpolated values
+    img_data = np.zeros((TILE_SIZE, TILE_SIZE, 4), dtype=np.uint8)
+
+    for i in range(len(_WAVE_RAMP) - 1):
+        lo_val, lo_rgb = _WAVE_RAMP[i]
+        hi_val, hi_rgb = _WAVE_RAMP[i + 1]
+        band = (result >= lo_val) & (result < hi_val) & valid
+        if not np.any(band):
+            continue
+        t = (result[band] - lo_val) / (hi_val - lo_val)
+        img_data[band, 0] = (lo_rgb[0] + (hi_rgb[0] - lo_rgb[0]) * t).astype(np.uint8)
+        img_data[band, 1] = (lo_rgb[1] + (hi_rgb[1] - lo_rgb[1]) * t).astype(np.uint8)
+        img_data[band, 2] = (lo_rgb[2] + (hi_rgb[2] - lo_rgb[2]) * t).astype(np.uint8)
+        img_data[band, 3] = 180
+
+    # Values above top ramp stop
+    top_band = (result >= _WAVE_RAMP[-1][0]) & valid
+    if np.any(top_band):
+        c = _WAVE_RAMP[-1][1]
+        img_data[top_band, 0] = c[0]
+        img_data[top_band, 1] = c[1]
+        img_data[top_band, 2] = c[2]
+        img_data[top_band, 3] = 180
+
+    img = Image.fromarray(img_data, "RGBA")
+
+    # Slight gaussian blur to smooth pixel-level noise
+    img = img.filter(ImageFilter.GaussianBlur(radius=1))
+
+    buf = io.BytesIO()
+    img.save(buf, format="PNG", compress_level=1)
+    return Response(content=buf.getvalue(), media_type="image/png",
+                    headers={"Cache-Control": "public, max-age=1800"})
 
 
 @router.get("/marine/point")
