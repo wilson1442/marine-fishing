@@ -167,14 +167,6 @@ async function loadSpecies() {
         var data = await response.json();
         speciesData = data.species || [];
 
-        var speciesSelect = document.getElementById('species-select');
-        speciesData.forEach(function (sp) {
-            var option = document.createElement('option');
-            option.value = sp.species_code;
-            option.textContent = sp.common_name;
-            speciesSelect.appendChild(option);
-        });
-
         var legendItems = document.getElementById('legend-items');
         legendItems.innerHTML = '';
         speciesData.forEach(function (sp) {
@@ -210,15 +202,8 @@ async function loadBuoyStations() {
     try {
         var response = await fetch(API_ENDPOINTS.weather + '/buoys');
         var data = await response.json();
-        var buoySelect = document.getElementById('buoy-select');
         if (!data.stations) return;
         data.stations.forEach(function (station) {
-            // Populate dropdown
-            var option = document.createElement('option');
-            option.value = station.station_id;
-            option.textContent = station.station_name + ' (' + station.station_id + ')';
-            buoySelect.appendChild(option);
-
             // Add marker to map
             if (mapReady && buoysLayer && station.latitude && station.longitude) {
                 var icon = L.divIcon({
@@ -249,15 +234,9 @@ async function loadBuoyStations() {
                     '<div class="catch-popup__field"><div class="catch-popup__label">Lon</div><div class="catch-popup__val">' + station.longitude.toFixed(3) + '</div></div>' +
                     '</div></div>'
                 );
-                // Clicking a buoy selects it in the dropdown and loads its weather
+                // Clicking a buoy loads its weather
                 marker.on('click', function () {
-                    document.getElementById('buoy-select').value = station.station_id;
-                    var dateVal = document.getElementById('date-select').value;
-                    if (dateVal) {
-                        loadDateWeather();
-                    } else {
-                        loadCurrentWeather();
-                    }
+                    loadCurrentWeather();
                 });
                 buoysLayer.addLayer(marker);
             }
@@ -267,40 +246,13 @@ async function loadBuoyStations() {
     }
 }
 
-// Get selected buoy station ID
+// Get selected buoy station ID (filter removed — always returns empty)
 function getSelectedBuoy() {
-    var el = document.getElementById('buoy-select');
-    return el ? el.value : '';
+    return '';
 }
 
-// Initialize filter controls
+// Initialize filter controls (filters removed — now a no-op)
 function initFilters() {
-    var yearSelect = document.getElementById('year-select');
-    var currentYear = new Date().getFullYear();
-    for (var year = currentYear; year >= 2012; year--) {
-        var option = document.createElement('option');
-        option.value = year;
-        option.textContent = year;
-        yearSelect.appendChild(option);
-    }
-
-    var today = new Date();
-    var fiveYearsAgo = new Date(today.getFullYear() - 5, 0, 1);
-    document.getElementById('date-from').value = fiveYearsAgo.toISOString().split('T')[0];
-    document.getElementById('date-to').value = today.toISOString().split('T')[0];
-
-    document.getElementById('apply-filters').addEventListener('click', loadCatches);
-    document.getElementById('reset-filters').addEventListener('click', resetFilters);
-    document.getElementById('show-date-weather').addEventListener('click', loadDateWeather);
-
-    document.getElementById('buoy-select').addEventListener('change', function () {
-        var dateVal = document.getElementById('date-select').value;
-        if (dateVal) {
-            loadDateWeather();
-        } else {
-            loadCurrentWeather();
-        }
-    });
 }
 
 // Initialize panel toggles for mobile and desktop collapse
@@ -606,24 +558,9 @@ setInterval(function () {
     loadVesselSummary();
 }, 60000);
 
-// Get current filter values
+// Get current filter values (filters removed — returns empty)
 function getFilters() {
-    var filters = {};
-    var dateFrom = document.getElementById('date-from').value;
-    var dateTo = document.getElementById('date-to').value;
-    var year = document.getElementById('year-select').value;
-    var conditions = document.getElementById('conditions-select').value;
-    var speciesSelect = document.getElementById('species-select');
-    var selectedSpecies = Array.from(speciesSelect.selectedOptions)
-        .map(function (o) { return o.value; })
-        .filter(function (v) { return v; });
-
-    if (dateFrom) filters.date_from = dateFrom;
-    if (dateTo) filters.date_to = dateTo;
-    if (year) filters.year = year;
-    if (selectedSpecies.length > 0) filters.species = selectedSpecies.join(',');
-    if (conditions) filters.conditions = conditions;
-    return filters;
+    return {};
 }
 
 // Show/hide map loading overlay
@@ -764,19 +701,8 @@ function setText(id, text) {
     if (el) el.textContent = text;
 }
 
-// Reset all filters
+// Reset all filters (filters removed — just reload data)
 function resetFilters() {
-    document.getElementById('date-select').value = '';
-    document.getElementById('buoy-select').value = '';
-    var today = new Date();
-    var fiveYearsAgo = new Date(today.getFullYear() - 5, 0, 1);
-    document.getElementById('date-from').value = fiveYearsAgo.toISOString().split('T')[0];
-    document.getElementById('date-to').value = today.toISOString().split('T')[0];
-    document.getElementById('year-select').value = '';
-    document.getElementById('conditions-select').value = '';
-
-    Array.from(document.getElementById('species-select').options).forEach(function (o) { o.selected = false; });
-
     loadCatches();
     loadCurrentWeather();
 }
@@ -799,9 +725,10 @@ async function loadCurrentWeather() {
     }
 }
 
-// Load weather for selected date
+// Load weather for selected date (date filter removed — no-op unless called with override)
 async function loadDateWeather() {
-    var date = document.getElementById('date-select').value;
+    var el = document.getElementById('date-select');
+    var date = el ? el.value : '';
     if (!date) return;
 
     try {

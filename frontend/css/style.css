@@ -994,19 +994,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     line-height: 1.3;
 }
 
-/* ---- Map Layer Toggles Overlay (top-left) ---- */
+/* ---- Map Layer Toggles (sidebar) ---- */
 .map-layer-toggles {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    z-index: 800;
-    background: rgba(10, 21, 37, 0.92);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 0;
-    min-width: 180px;
-    backdrop-filter: blur(12px);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    margin-bottom: 16px;
 }
 .map-layer-toggles__header {
     display: flex;
@@ -1682,7 +1675,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     .species-overlay__toggle { width: auto; text-align: left; }
     .species-overlay__items { flex-direction: row; flex-wrap: wrap; gap: 6px; overflow-y: visible; flex: none; min-height: auto; }
     .tide-panel { right: 50px; }
-    .map-layer-toggles { min-width: 160px; }
 
     .topbar__toggle { display: block; }
     .topbar__stats { display: none; }
