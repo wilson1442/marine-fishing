@@ -1143,49 +1143,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     max-height: 0;
 }
 
-/* ---- Tide panel (floating, top-right of map) ---- */
-.tide-panel {
-    position: absolute;
-    top: 10px;
-    right: 202px;
-    z-index: 800;
-    width: 260px;
-    background: rgba(10, 21, 37, 0.92);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    backdrop-filter: blur(12px);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-}
-.tide-panel__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 10px;
-    border-bottom: 1px solid var(--steel);
-}
-.tide-panel__title {
-    font-family: var(--font-mono);
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    color: var(--text-bright);
-}
-.tide-panel__close {
-    background: none;
-    border: none;
-    color: var(--text-dim);
-    font-size: 16px;
-    cursor: pointer;
-    line-height: 1;
-    padding: 2px 4px;
-    border-radius: var(--radius);
-    transition: color var(--transition), background var(--transition);
-}
-.tide-panel__close:hover {
-    color: var(--cyan);
-    background: var(--steel);
-}
+/* ---- Tide panel (inline in sidebar accordion) ---- */
 .tide-panel__body {
     padding: 8px 10px;
 }
@@ -1674,8 +1632,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     .species-overlay__label { padding-bottom: 0; border-bottom: none; }
     .species-overlay__toggle { width: auto; text-align: left; }
     .species-overlay__items { flex-direction: row; flex-wrap: wrap; gap: 6px; overflow-y: visible; flex: none; min-height: auto; }
-    .tide-panel { right: 50px; }
-
     .topbar__toggle { display: block; }
     .topbar__stats { display: none; }
     .weather-bar__grid { grid-template-columns: repeat(2, 1fr); }

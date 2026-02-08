@@ -1684,15 +1684,6 @@ function initLayerGroupToggles() {
         var header = group.querySelector('.layer-group__header');
         if (!header) return;
 
-        // Tides group opens/closes the tide panel instead
-        if (group.dataset.group === 'tides') {
-            header.addEventListener('click', function (e) {
-                e.stopPropagation();
-                toggleTidePanel();
-            });
-            return;
-        }
-
         header.addEventListener('click', function (e) {
             // Don't collapse if clicking on a checkbox inside
             if (e.target.tagName === 'INPUT') return;
@@ -1703,24 +1694,7 @@ function initLayerGroupToggles() {
 
 // ---- Tide Predictions Panel ----
 
-function toggleTidePanel() {
-    var panel = document.getElementById('tide-panel');
-    if (!panel) return;
-    if (panel.style.display === 'none') {
-        panel.style.display = '';
-    } else {
-        panel.style.display = 'none';
-    }
-}
-
 function initTidePanel() {
-    var closeBtn = document.getElementById('tide-panel-close');
-    if (closeBtn) {
-        closeBtn.addEventListener('click', function () {
-            document.getElementById('tide-panel').style.display = 'none';
-        });
-    }
-
     var select = document.getElementById('tide-station-select');
     if (select) {
         select.addEventListener('change', function () {
