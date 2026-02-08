@@ -31,10 +31,8 @@ let vesselLayerState = {
 let liveRefreshInterval = null;
 
 // Weather overlay state
-let weatherGridLayer = null;
-let weatherHeatmapLayer = null;
+let weatherWmsLayer = null;
 let weatherOverlayActive = false;
-let weatherGridDebounceTimer = null;
 
 // Chlorophyll overlay state
 let chlorophyllWmsLayer = null;
@@ -818,228 +816,86 @@ function clearWeatherPanel() {
     });
 }
 
-// ---- Marine Weather Overlay ----
-
-// Canvas-based heatmap layer for smooth weather rendering
-var WeatherHeatmapLayer = L.Layer.extend({
-    initialize: function () {
-        this._points = [];
-        this._latStep = 1;
-        this._lonStep = 1;
-    },
-
-    onAdd: function (map) {
-        this._map = map;
-        this._canvas = L.DomUtil.create('canvas', 'weather-heatmap-canvas', map.getPanes().overlayPane);
-        this._canvas.style.pointerEvents = 'none';
-        map.on('moveend', this._reset, this);
-        map.on('zoomanim', this._animateZoom, this);
-        this._reset();
-    },
-
-    onRemove: function (map) {
-        L.DomUtil.remove(this._canvas);
-        map.off('moveend', this._reset, this);
-        map.off('zoomanim', this._animateZoom, this);
-    },
-
-    setData: function (points, latStep, lonStep) {
-        this._points = points || [];
-        this._latStep = latStep || 1;
-        this._lonStep = lonStep || 1;
-        if (this._map) this._reset();
-    },
-
-    clearData: function () {
-        this._points = [];
-        if (this._canvas) {
-            var ctx = this._canvas.getContext('2d');
-            ctx.clearRect(0, 0, this._canvas.width, this._canvas.height);
-        }
-    },
-
-    _animateZoom: function (e) {
-        var map = this._map;
-        var scale = map.getZoomScale(e.zoom);
-        var offset = map._latLngBoundsToNewLayerBounds(map.getBounds(), e.zoom, e.center).min;
-        L.DomUtil.setTransform(this._canvas, offset, scale);
-    },
-
-    _reset: function () {
-        var map = this._map;
-        var size = map.getSize();
-
-        // Pad canvas beyond viewport so content doesn't vanish during pans
-        var pad = 0.5;
-        var padX = Math.round(size.x * pad);
-        var padY = Math.round(size.y * pad);
-        var width = size.x + padX * 2;
-        var height = size.y + padY * 2;
-
-        var topLeft = map.containerPointToLayerPoint([-padX, -padY]);
-        L.DomUtil.setPosition(this._canvas, topLeft);
-        this._canvas.width = width;
-        this._canvas.height = height;
-
-        var ctx = this._canvas.getContext('2d');
-        ctx.clearRect(0, 0, width, height);
-
-        if (this._points.length === 0) return;
-
-        var opacity = 0.45;
-        var power = 2.0;
-
-        // Pre-compute pixel positions for each data point
-        var pts = [];
-        this._points.forEach(function (pt) {
-            if (pt.wave_height_m == null) return;
-            var cp = map.latLngToContainerPoint([pt.lat, pt.lon]);
-            pts.push({ x: cp.x + padX, y: cp.y + padY, wh: pt.wave_height_m });
-        });
-
-        if (pts.length === 0) return;
-
-        // Pre-parse wave color scale into RGB
-        var waveScale = weatherConfig.waveColorScale;
-        var scaleRgb = [];
-        for (var s = 0; s < waveScale.length; s++) {
-            var hex = waveScale[s].color;
-            scaleRgb.push({
-                max: waveScale[s].max,
-                r: parseInt(hex.slice(1, 3), 16),
-                g: parseInt(hex.slice(3, 5), 16),
-                b: parseInt(hex.slice(5, 7), 16)
-            });
-        }
-
-        function getWaveRgbInterp(heightM) {
-            if (heightM <= scaleRgb[0].max) return scaleRgb[0];
-            for (var i = 1; i < scaleRgb.length; i++) {
-                if (heightM < scaleRgb[i].max) {
-                    var lo = scaleRgb[i - 1];
-                    var hi = scaleRgb[i];
-                    var range = hi.max - lo.max;
-                    if (range <= 0 || !isFinite(range)) return hi;
-                    var t = (heightM - lo.max) / range;
-                    return {
-                        r: Math.round(lo.r + (hi.r - lo.r) * t),
-                        g: Math.round(lo.g + (hi.g - lo.g) * t),
-                        b: Math.round(lo.b + (hi.b - lo.b) * t)
-                    };
-                }
-            }
-            return scaleRgb[scaleRgb.length - 1];
-        }
-
-        // Render at reduced resolution then scale up for smooth continuous fill
-        var step = 6;
-        var lowW = Math.ceil(width / step);
-        var lowH = Math.ceil(height / step);
-
-        var offCanvas = document.createElement('canvas');
-        offCanvas.width = lowW;
-        offCanvas.height = lowH;
-        var offCtx = offCanvas.getContext('2d');
-        var imgData = offCtx.createImageData(lowW, lowH);
-        var pixels = imgData.data;
-
-        // Bounding box of data points with generous padding
-        var minPx = Infinity, maxPx = -Infinity, minPy = Infinity, maxPy = -Infinity;
-        for (var k = 0; k < pts.length; k++) {
-            if (pts[k].x < minPx) minPx = pts[k].x;
-            if (pts[k].x > maxPx) maxPx = pts[k].x;
-            if (pts[k].y < minPy) minPy = pts[k].y;
-            if (pts[k].y > maxPy) maxPy = pts[k].y;
-        }
-        var center = map.getCenter();
-        var p1 = map.latLngToContainerPoint([center.lat - this._latStep / 2, center.lng]);
-        var p2 = map.latLngToContainerPoint([center.lat + this._latStep / 2, center.lng]);
-        var pixelStep = Math.abs(p2.y - p1.y);
-        var extPad = Math.max(pixelStep * 3, 80);
-        var bboxL = Math.max(0, Math.floor((minPx - extPad) / step));
-        var bboxR = Math.min(lowW, Math.ceil((maxPx + extPad) / step));
-        var bboxT = Math.max(0, Math.floor((minPy - extPad) / step));
-        var bboxB = Math.min(lowH, Math.ceil((maxPy + extPad) / step));
-
-        // IDW interpolation — all points, no distance cutoff
-        for (var py = bboxT; py < bboxB; py++) {
-            var realY = py * step;
-            for (var px = bboxL; px < bboxR; px++) {
-                var realX = px * step;
-
-                var weightSum = 0;
-                var valSum = 0;
-
-                for (var k = 0; k < pts.length; k++) {
-                    var dx = realX - pts[k].x;
-                    var dy = realY - pts[k].y;
-                    var distSq = dx * dx + dy * dy;
-                    if (distSq < 1) distSq = 1;
-                    var w = 1 / Math.pow(distSq, power / 2);
-                    weightSum += w;
-                    valSum += w * pts[k].wh;
-                }
-
-                var interpWH = valSum / weightSum;
-                var c = getWaveRgbInterp(interpWH);
-
-                // Soft edge fade
-                var minDistSq = Infinity;
-                for (var k = 0; k < pts.length; k++) {
-                    var dx = realX - pts[k].x;
-                    var dy = realY - pts[k].y;
-                    var d = dx * dx + dy * dy;
-                    if (d < minDistSq) minDistSq = d;
-                }
-                var minDist = Math.sqrt(minDistSq);
-                var edgeFade = 1;
-                var fadeStart = extPad * 0.5;
-                if (minDist > fadeStart) {
-                    edgeFade = Math.max(0, 1 - (minDist - fadeStart) / (extPad - fadeStart));
-                }
-
-                var idx = (py * lowW + px) * 4;
-                pixels[idx] = c.r;
-                pixels[idx + 1] = c.g;
-                pixels[idx + 2] = c.b;
-                pixels[idx + 3] = Math.round(255 * opacity * edgeFade);
-            }
-        }
-
-        offCtx.putImageData(imgData, 0, 0);
-
-        // Draw scaled up with bilinear smoothing
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(offCanvas, 0, 0, lowW, lowH, 0, 0, width, height);
-    }
-});
+// ---- Marine Weather WMS Overlay ----
 
 function initWeatherOverlay() {
-    weatherGridLayer = L.layerGroup();          // text labels
-    weatherHeatmapLayer = new WeatherHeatmapLayer(); // canvas heatmap
     var toggle = document.getElementById('weather-overlay-toggle');
     if (!toggle) return;
 
     toggle.addEventListener('change', function () {
         weatherOverlayActive = this.checked;
         if (weatherOverlayActive) {
-            map.addLayer(weatherHeatmapLayer);
-            map.addLayer(weatherGridLayer);
-            loadWeatherGrid();
-            map.on('moveend', onMapMoveWeather);
+            addWeatherLayer();
         } else {
-            map.removeLayer(weatherGridLayer);
-            map.removeLayer(weatherHeatmapLayer);
-            weatherGridLayer.clearLayers();
-            weatherHeatmapLayer.clearData();
-            map.off('moveend', onMapMoveWeather);
-            setText('weather-grid-count', '');
+            removeWeatherLayer();
         }
     });
 
     // Always register click handler for weather bar updates (works regardless of overlay toggle)
     map.on('click', onMapClickWeather);
+}
+
+function addWeatherLayer() {
+    if (weatherWmsLayer) map.removeLayer(weatherWmsLayer);
+
+    weatherWmsLayer = L.tileLayer.wms(waveHeightWmsConfig.wmsUrl, {
+        layers: waveHeightWmsConfig.wmsLayer,
+        bounds: L.latLngBounds(waveHeightWmsConfig.bounds),
+        version: '1.1.1',
+        format: waveHeightWmsConfig.wmsOptions.format,
+        transparent: waveHeightWmsConfig.wmsOptions.transparent,
+        opacity: waveHeightWmsConfig.wmsOptions.opacity,
+        crs: L.CRS.EPSG4326,
+        colorBarMinimum: waveHeightWmsConfig.wmsOptions.colorBarMin,
+        colorBarMaximum: waveHeightWmsConfig.wmsOptions.colorBarMax,
+    });
+
+    weatherWmsLayer.on('tileerror', function (e) {
+        console.error('Weather tile error:', e.tile.src);
+        setText('weather-grid-count', 'ERR');
+    });
+    weatherWmsLayer.on('tileload', function () {
+        setText('weather-grid-count', 'ON');
+    });
+
+    weatherWmsLayer.addTo(map);
+    showWeatherLegend();
+    setText('weather-grid-count', 'ON');
+}
+
+function removeWeatherLayer() {
+    if (weatherWmsLayer) {
+        map.removeLayer(weatherWmsLayer);
+        weatherWmsLayer = null;
+    }
+    hideWeatherLegend();
+    setText('weather-grid-count', '');
+}
+
+function showWeatherLegend() {
+    hideWeatherLegend();
+    var wrap = document.querySelector('.map-wrap');
+    if (!wrap) return;
+    var legend = document.createElement('div');
+    legend.className = 'weather-legend';
+    legend.innerHTML =
+        '<div class="weather-legend__title">Waves (m)</div>' +
+        '<div class="weather-legend__bar">' +
+        waveHeightWmsConfig.colorScale.map(function (s) {
+            return '<div class="weather-legend__stop" style="background:' + s.color + '" title="' + s.label + '"></div>';
+        }).join('') +
+        '</div>' +
+        '<div class="weather-legend__labels">' +
+        waveHeightWmsConfig.colorScale.map(function (s) {
+            return '<span>' + s.label + '</span>';
+        }).join('') +
+        '</div>';
+    wrap.appendChild(legend);
+}
+
+function hideWeatherLegend() {
+    var existing = document.querySelector('.weather-legend');
+    if (existing) existing.remove();
 }
 
 function getWaveColor(heightM) {
@@ -1051,79 +907,6 @@ function getWaveColor(heightM) {
     return scale[scale.length - 1].color;
 }
 
-function directionArrow(deg) {
-    if (deg == null) return '';
-    return '\u2191'; // ↑ rotated via CSS transform
-}
-
-async function loadWeatherGrid() {
-    if (!weatherOverlayActive) return;
-    var zoom = map.getZoom();
-    if (zoom < weatherConfig.minZoom) {
-        weatherGridLayer.clearLayers();
-        weatherHeatmapLayer.clearData();
-        setText('weather-grid-count', '');
-        return;
-    }
-
-    var bounds = map.getBounds();
-    var params = new URLSearchParams({
-        north: bounds.getNorth().toFixed(2),
-        south: bounds.getSouth().toFixed(2),
-        east: bounds.getEast().toFixed(2),
-        west: bounds.getWest().toFixed(2),
-        zoom: zoom,
-    });
-
-    try {
-        var response = await fetch(API_ENDPOINTS.marineWeatherGrid + '?' + params);
-        var data = await response.json();
-        renderWeatherGrid(data.points || [], data.lat_step || 1, data.lon_step || 1);
-    } catch (error) {
-        console.error('Error loading weather grid:', error);
-    }
-}
-
-function renderWeatherGrid(points, latStep, lonStep) {
-    // Update canvas heatmap
-    weatherHeatmapLayer.setData(points, latStep, lonStep);
-
-    // Update text labels
-    weatherGridLayer.clearLayers();
-
-    points.forEach(function (pt) {
-        var color = getWaveColor(pt.wave_height_m);
-
-        var waveText = pt.wave_height_m != null ? pt.wave_height_m.toFixed(1) + 'm' : '--';
-        var arrowRotation = pt.wave_direction != null ? pt.wave_direction : 0;
-        var swellText = pt.swell_height_m != null ? pt.swell_height_m.toFixed(1) + 'm sw' : '';
-
-        var html = '<div class="wx-grid-marker__inner">' +
-            '<span class="wx-grid-marker__wave" style="color:' + color + '">' + waveText + '</span>' +
-            '<span class="wx-grid-marker__arrow" style="transform:rotate(' + arrowRotation + 'deg)">\u2191</span>' +
-            (swellText ? '<span class="wx-grid-marker__temp">' + swellText + '</span>' : '') +
-            '</div>';
-
-        var icon = L.divIcon({
-            className: 'wx-grid-marker',
-            html: html,
-            iconSize: [54, 40],
-            iconAnchor: [27, 20],
-        });
-
-        var label = L.marker([pt.lat, pt.lon], { icon: icon, interactive: false });
-        weatherGridLayer.addLayer(label);
-    });
-
-    setText('weather-grid-count', points.length > 0 ? points.length.toString() : '');
-}
-
-function onMapMoveWeather() {
-    if (weatherGridDebounceTimer) clearTimeout(weatherGridDebounceTimer);
-    weatherGridDebounceTimer = setTimeout(function () {
-        loadWeatherGrid();
-    }, weatherConfig.gridDebounceMs);
-}
 
 function onMapClickWeather(e) {
     var lat = e.latlng.lat.toFixed(2);

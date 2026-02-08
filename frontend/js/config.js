@@ -94,15 +94,36 @@ const coastalCities = [
 ];
 
 const weatherConfig = {
-    // Wave height color scale: calm -> light -> moderate -> rough
+    // Wave height color scale (used by click-popup coloring)
     waveColorScale: [
         { max: 0.5, color: '#3dffa2' },   // green - calm
         { max: 1.0, color: '#4cc9f0' },   // cyan - light
         { max: 2.0, color: '#ffa94d' },   // amber - moderate
         { max: Infinity, color: '#ff6b6b' } // red - rough 3m+
     ],
-    gridDebounceMs: 800,
-    minZoom: 4,
+};
+
+const waveHeightWmsConfig = {
+    wmsUrl: 'https://coastwatch.pfeg.noaa.gov/erddap/wms/NWW3_Global_Best/request',
+    wmsLayer: 'NWW3_Global_Best:Thgt',
+    bounds: [[37.0, -76.5], [45.0, -65.0]],  // Maine to Delaware, ~1000 fathoms
+    wmsOptions: {
+        version: '1.1.0',
+        format: 'image/png',
+        transparent: true,
+        opacity: 0.6,
+        colorBarMin: 0,
+        colorBarMax: 6,
+    },
+    colorScale: [
+        { max: 0.5,  color: '#b000d0', label: '<0.5m' },
+        { max: 1.0,  color: '#0055d4', label: '1m' },
+        { max: 2.0,  color: '#00d0c0', label: '2m' },
+        { max: 3.0,  color: '#00b000', label: '3m' },
+        { max: 4.0,  color: '#d8b800', label: '4m' },
+        { max: 5.0,  color: '#d02000', label: '5m' },
+        { max: Infinity, color: '#a00000', label: '>5m' },
+    ],
 };
 
 const sstWmsConfig = {
