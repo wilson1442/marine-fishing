@@ -1716,10 +1716,19 @@ function addChlorophyllLayer() {
         format: chlorophyllConfig.wmsOptions.format,
         transparent: chlorophyllConfig.wmsOptions.transparent,
         opacity: chlorophyllConfig.wmsOptions.opacity,
-        crs: L.CRS.EPSG4326,
+        uppercase: true,
         time: timeStr,
         colorBarMinimum: chlorophyllConfig.wmsOptions.colorBarMin,
         colorBarMaximum: chlorophyllConfig.wmsOptions.colorBarMax,
+    });
+
+    chlorophyllWmsLayer.on('tileerror', function (e) {
+        console.error('Chlorophyll tile error:', e.tile, e.error);
+        setText('chlorophyll-status', 'ERR');
+    });
+
+    chlorophyllWmsLayer.on('tileload', function () {
+        setText('chlorophyll-status', 'ON');
     });
 
     chlorophyllWmsLayer.addTo(map);

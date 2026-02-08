@@ -147,7 +147,7 @@ const chlorophyllConfig = {
     wmsUrl: 'https://coastwatch.pfeg.noaa.gov/erddap/wms/erdMH1chla1day/request',
     wmsLayer: 'erdMH1chla1day:chlorophyll',
     wmsOptions: {
-        version: '1.3.0',
+        version: '1.1.0',
         format: 'image/png',
         transparent: true,
         opacity: 0.6,
