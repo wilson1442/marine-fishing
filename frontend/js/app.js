@@ -1705,25 +1705,22 @@ function addChlorophyllLayer() {
         map.removeLayer(chlorophyllWmsLayer);
     }
 
-    // Use date 2 days ago to account for satellite processing lag
-    var d = new Date();
-    d.setDate(d.getDate() - 2);
-    var timeStr = d.toISOString().split('T')[0] + 'T12:00:00Z';
-
+    // No time parameter — ERDDAP defaults to the latest available image
+    // crs: EPSG4326 ensures Leaflet sends lat/lon BBOX (ERDDAP requirement)
+    // version 1.1.1 uses lon,lat BBOX order matching EPSG:4326 axis convention
     chlorophyllWmsLayer = L.tileLayer.wms(chlorophyllConfig.wmsUrl, {
         layers: chlorophyllConfig.wmsLayer,
-        version: chlorophyllConfig.wmsOptions.version,
+        version: '1.1.1',
         format: chlorophyllConfig.wmsOptions.format,
         transparent: chlorophyllConfig.wmsOptions.transparent,
         opacity: chlorophyllConfig.wmsOptions.opacity,
-        uppercase: true,
-        time: timeStr,
+        crs: L.CRS.EPSG4326,
         colorBarMinimum: chlorophyllConfig.wmsOptions.colorBarMin,
         colorBarMaximum: chlorophyllConfig.wmsOptions.colorBarMax,
     });
 
     chlorophyllWmsLayer.on('tileerror', function (e) {
-        console.error('Chlorophyll tile error:', e.tile, e.error);
+        console.error('Chlorophyll tile error:', e.tile.src);
         setText('chlorophyll-status', 'ERR');
     });
 
