@@ -103,18 +103,8 @@ const weatherConfig = {
     ],
 };
 
-const waveHeightWmsConfig = {
-    wmsUrl: 'https://coastwatch.pfeg.noaa.gov/erddap/wms/NWW3_Global_Best/request',
-    wmsLayer: 'NWW3_Global_Best:Thgt',
-    bounds: [[37.0, -76.5], [45.0, -65.0]],  // Maine to Delaware, ~1000 fathoms
-    wmsOptions: {
-        version: '1.1.0',
-        format: 'image/png',
-        transparent: true,
-        opacity: 0.6,
-        colorBarMin: 0,
-        colorBarMax: 6,
-    },
+const waveHeightGridConfig = {
+    opacity: 0.55,
     colorScale: [
         { max: 0.5,  color: '#b000d0', label: '<0.5m' },
         { max: 1.0,  color: '#0055d4', label: '1m' },
