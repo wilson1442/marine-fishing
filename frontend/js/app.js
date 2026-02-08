@@ -1397,6 +1397,7 @@ function addSSTLayer() {
 
     sstWmsLayer = L.tileLayer.wms(sstWmsConfig.wmsUrl, {
         layers: sstWmsConfig.wmsLayer,
+        bounds: L.latLngBounds(sstWmsConfig.bounds),
         version: '1.1.1',
         format: sstWmsConfig.wmsOptions.format,
         transparent: sstWmsConfig.wmsOptions.transparent,
@@ -1480,6 +1481,7 @@ function addChlorophyllLayer() {
     // version 1.1.1 uses lon,lat BBOX order matching EPSG:4326 axis convention
     chlorophyllWmsLayer = L.tileLayer.wms(chlorophyllConfig.wmsUrl, {
         layers: chlorophyllConfig.wmsLayer,
+        bounds: L.latLngBounds(chlorophyllConfig.bounds),
         version: '1.1.1',
         format: chlorophyllConfig.wmsOptions.format,
         transparent: chlorophyllConfig.wmsOptions.transparent,

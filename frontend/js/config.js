@@ -108,6 +108,7 @@ const weatherConfig = {
 const sstWmsConfig = {
     wmsUrl: 'https://coastwatch.pfeg.noaa.gov/erddap/wms/jplMURSST41/request',
     wmsLayer: 'jplMURSST41:analysed_sst',
+    bounds: [[37.0, -76.5], [45.0, -65.0]],  // Maine to Delaware, ~1000 fathoms
     wmsOptions: {
         version: '1.1.0',
         format: 'image/png',
@@ -130,6 +131,7 @@ const sstWmsConfig = {
 const chlorophyllConfig = {
     wmsUrl: 'https://coastwatch.pfeg.noaa.gov/erddap/wms/erdMH1chla1day/request',
     wmsLayer: 'erdMH1chla1day:chlorophyll',
+    bounds: [[37.0, -76.5], [45.0, -65.0]],  // Maine to Delaware, ~1000 fathoms
     wmsOptions: {
         version: '1.1.0',
         format: 'image/png',
