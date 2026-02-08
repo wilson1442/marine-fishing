@@ -71,6 +71,7 @@ const API_ENDPOINTS = {
     vesselsSummary: `${API_BASE}/vessels/summary`,
     vesselsSearch: `${API_BASE}/vessels/search`,
     marineWeatherGrid: `${API_BASE}/weather/marine/grid`,
+    marineWeatherGridData: `${API_BASE}/weather/marine/grid-data`,
     marineWeatherPoint: `${API_BASE}/weather/marine/point`,
     tideStations: `${API_BASE}/tide/stations`,
     tidePredictions: `${API_BASE}/tide/predictions`,

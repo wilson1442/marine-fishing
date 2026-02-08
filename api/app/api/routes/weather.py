@@ -292,6 +292,46 @@ async def get_marine_weather_grid(
     return {"points": points, "count": len(points), "lat_step": lat_step, "lon_step": lon_step}
 
 
+@router.get("/marine/grid-data")
+def get_marine_weather_grid_data(
+    north: float = Query(..., description="North bound latitude"),
+    south: float = Query(..., description="South bound latitude"),
+    east: float = Query(..., description="East bound longitude"),
+    west: float = Query(..., description="West bound longitude"),
+    db: Session = Depends(get_db),
+    _auth: dict = Depends(require_api_access)
+):
+    """Serve harvested marine weather grid from the database."""
+    rows = db.execute(text("""
+        SELECT lat, lon, wave_height_m, wave_direction, wave_period_s,
+               swell_height_m, current_velocity_ms, current_direction,
+               sst_c, sst_f
+        FROM marine_weather_grid
+        WHERE lat BETWEEN :south AND :north
+          AND lon BETWEEN :west AND :east
+          AND fetched_at = (SELECT MAX(fetched_at) FROM marine_weather_grid)
+        ORDER BY lat, lon
+    """), {"south": south, "north": north, "west": west, "east": east}).fetchall()
+
+    points = []
+    for r in rows:
+        points.append({
+            "lat": float(r.lat),
+            "lon": float(r.lon),
+            "wave_height_m": float(r.wave_height_m) if r.wave_height_m is not None else None,
+            "wave_direction": int(r.wave_direction) if r.wave_direction is not None else None,
+            "wave_period_s": float(r.wave_period_s) if r.wave_period_s is not None else None,
+            "swell_height_m": float(r.swell_height_m) if r.swell_height_m is not None else None,
+            "current_velocity_ms": float(r.current_velocity_ms) if r.current_velocity_ms is not None else None,
+            "current_direction": int(r.current_direction) if r.current_direction is not None else None,
+            "sst_c": float(r.sst_c) if r.sst_c is not None else None,
+            "sst_f": float(r.sst_f) if r.sst_f is not None else None,
+        })
+
+    # Grid step matches harvester GRID_STEP (1.0 degree)
+    return {"points": points, "count": len(points), "lat_step": 1.0, "lon_step": 1.0}
+
+
 @router.get("/marine/point")
 async def get_marine_weather_point(
     lat: float = Query(..., description="Latitude"),

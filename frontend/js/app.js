@@ -860,18 +860,16 @@ function fetchWeatherGrid() {
     if (!weatherOverlayActive || !weatherGridLayer) return;
 
     var bounds = map.getBounds();
-    var zoom = map.getZoom();
     var params = new URLSearchParams({
         north: bounds.getNorth().toFixed(2),
         south: bounds.getSouth().toFixed(2),
         east: bounds.getEast().toFixed(2),
         west: bounds.getWest().toFixed(2),
-        zoom: zoom,
     });
 
     setText('weather-grid-count', '...');
 
-    fetch(API_ENDPOINTS.marineWeatherGrid + '?' + params, { credentials: 'same-origin' })
+    fetch(API_ENDPOINTS.marineWeatherGridData + '?' + params, { credentials: 'same-origin' })
         .then(function (r) {
             if (!r.ok) throw new Error('HTTP ' + r.status);
             return r.json();
@@ -885,8 +883,8 @@ function fetchWeatherGrid() {
                 return;
             }
 
-            var latStep = data.lat_step || 0.5;
-            var lonStep = data.lon_step || 0.5;
+            var latStep = data.lat_step || 1.0;
+            var lonStep = data.lon_step || 1.0;
             var halfLat = latStep / 2;
             var halfLon = lonStep / 2;
             var scale = waveHeightGridConfig.colorScale;
