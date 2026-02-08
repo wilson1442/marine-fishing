@@ -142,3 +142,25 @@ const weatherConfig = {
     gridDebounceMs: 800,
     minZoom: 4,
 };
+
+const chlorophyllConfig = {
+    wmsUrl: 'https://coastwatch.pfeg.noaa.gov/erddap/wms/erdMH1chla1day/request',
+    wmsLayer: 'erdMH1chla1day:chlorophyll',
+    wmsOptions: {
+        version: '1.3.0',
+        format: 'image/png',
+        transparent: true,
+        opacity: 0.6,
+        colorBarMin: 0.01,
+        colorBarMax: 30,
+    },
+    colorScale: [
+        { max: 0.03, color: '#440154', label: '<0.03' },
+        { max: 0.1,  color: '#3b528b', label: '0.1' },
+        { max: 0.3,  color: '#21918c', label: '0.3' },
+        { max: 1.0,  color: '#5ec962', label: '1.0' },
+        { max: 3.0,  color: '#fde725', label: '3.0' },
+        { max: 10.0, color: '#f89540', label: '10' },
+        { max: Infinity, color: '#cc4778', label: '>10' },
+    ],
+};

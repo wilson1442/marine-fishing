@@ -36,6 +36,10 @@ let weatherHeatmapLayer = null;
 let weatherOverlayActive = false;
 let weatherGridDebounceTimer = null;
 
+// Chlorophyll overlay state
+let chlorophyllWmsLayer = null;
+let chlorophyllOverlayActive = false;
+
 // Initialize the application
 document.addEventListener('DOMContentLoaded', async function () {
     // Auth guard: verify user is logged in before loading map
@@ -70,6 +74,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     initVesselLayerToggles();
     initWeatherOverlay();
     initSSTOverlay();
+    initChlorophyllOverlay();
     initSpeciesToggleAll();
     initLayerGroupToggles();
     initTidePanel();
@@ -1677,6 +1682,86 @@ function onMapMoveSST() {
     sstGridDebounceTimer = setTimeout(function () {
         loadSSTGrid();
     }, weatherConfig.gridDebounceMs);
+}
+
+// ---- Chlorophyll-a WMS Overlay ----
+
+function initChlorophyllOverlay() {
+    var toggle = document.getElementById('chlorophyll-overlay-toggle');
+    if (!toggle) return;
+
+    toggle.addEventListener('change', function () {
+        chlorophyllOverlayActive = this.checked;
+        if (chlorophyllOverlayActive) {
+            addChlorophyllLayer();
+        } else {
+            removeChlorophyllLayer();
+        }
+    });
+}
+
+function addChlorophyllLayer() {
+    if (chlorophyllWmsLayer) {
+        map.removeLayer(chlorophyllWmsLayer);
+    }
+
+    // Use date 2 days ago to account for satellite processing lag
+    var d = new Date();
+    d.setDate(d.getDate() - 2);
+    var timeStr = d.toISOString().split('T')[0] + 'T12:00:00Z';
+
+    chlorophyllWmsLayer = L.tileLayer.wms(chlorophyllConfig.wmsUrl, {
+        layers: chlorophyllConfig.wmsLayer,
+        version: chlorophyllConfig.wmsOptions.version,
+        format: chlorophyllConfig.wmsOptions.format,
+        transparent: chlorophyllConfig.wmsOptions.transparent,
+        opacity: chlorophyllConfig.wmsOptions.opacity,
+        crs: L.CRS.EPSG4326,
+        time: timeStr,
+        colorBarMinimum: chlorophyllConfig.wmsOptions.colorBarMin,
+        colorBarMaximum: chlorophyllConfig.wmsOptions.colorBarMax,
+    });
+
+    chlorophyllWmsLayer.addTo(map);
+    showChlorophyllLegend();
+    setText('chlorophyll-status', 'ON');
+}
+
+function removeChlorophyllLayer() {
+    if (chlorophyllWmsLayer) {
+        map.removeLayer(chlorophyllWmsLayer);
+        chlorophyllWmsLayer = null;
+    }
+    hideChlorophyllLegend();
+    setText('chlorophyll-status', '');
+}
+
+function showChlorophyllLegend() {
+    hideChlorophyllLegend();
+    var wrap = document.querySelector('.map-wrap');
+    if (!wrap) return;
+
+    var legend = document.createElement('div');
+    legend.className = 'chlorophyll-legend';
+    legend.innerHTML =
+        '<div class="chlorophyll-legend__title">Chl-a (mg/m\u00B3)</div>' +
+        '<div class="chlorophyll-legend__bar">' +
+        chlorophyllConfig.colorScale.map(function (s) {
+            return '<div class="chlorophyll-legend__stop" style="background:' + s.color + '" title="' + s.label + '"></div>';
+        }).join('') +
+        '</div>' +
+        '<div class="chlorophyll-legend__labels">' +
+        chlorophyllConfig.colorScale.map(function (s) {
+            return '<span>' + s.label + '</span>';
+        }).join('') +
+        '</div>';
+
+    wrap.appendChild(legend);
+}
+
+function hideChlorophyllLegend() {
+    var existing = document.querySelector('.chlorophyll-legend');
+    if (existing) existing.remove();
 }
 
 // ---- Collapsible Layer Groups ----

@@ -1638,3 +1638,44 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     .topbar__stats { display: none; }
     .weather-bar__grid { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ---- Chlorophyll-a Legend ---- */
+.chlorophyll-legend {
+    position: absolute;
+    bottom: 12px;
+    right: 200px;
+    z-index: 2;
+    background: rgba(10, 21, 37, 0.92);
+    border: 1px solid var(--steel);
+    border-radius: var(--radius);
+    padding: 8px 10px;
+    backdrop-filter: blur(8px);
+    pointer-events: auto;
+}
+.chlorophyll-legend__title {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    text-align: center;
+}
+.chlorophyll-legend__bar {
+    display: flex;
+    height: 10px;
+    border-radius: 2px;
+    overflow: hidden;
+}
+.chlorophyll-legend__stop {
+    flex: 1;
+}
+.chlorophyll-legend__labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 3px;
+    font-family: var(--font-mono);
+    font-size: 8px;
+    color: var(--text-dim);
+}

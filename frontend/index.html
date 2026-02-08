@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="/css/vendor/MarkerCluster.css" />
     <link rel="stylesheet" href="/css/vendor/MarkerCluster.Default.css" />
 
-    <link rel="stylesheet" href="/css/style.css?v=29" />
+    <link rel="stylesheet" href="/css/style.css?v=30" />
 </head>
 <body>
     <div class="scanline-overlay"></div>
@@ -90,6 +90,12 @@
                                 <span class="map-layer-toggle__swatch" style="background:#f46d43"></span>
                                 <span class="map-layer-toggle__name">SST Heatmap</span>
                                 <span class="map-layer-toggle__count" id="sst-grid-count"></span>
+                            </label>
+                            <label class="map-layer-toggle">
+                                <input type="checkbox" id="chlorophyll-overlay-toggle" />
+                                <span class="map-layer-toggle__swatch" style="background:#21918c"></span>
+                                <span class="map-layer-toggle__name">Chlorophyll-a</span>
+                                <span class="map-layer-toggle__count" id="chlorophyll-status"></span>
                             </label>
                         </div>
                     </div>
@@ -308,7 +314,7 @@
 
     <script src="/js/vendor/leaflet.js"></script>
     <script src="/js/vendor/leaflet.markercluster.js"></script>
-    <script src="/js/config.js?v=26"></script>
-    <script src="/js/app.js?v=29"></script>
+    <script src="/js/config.js?v=27"></script>
+    <script src="/js/app.js?v=30"></script>
 </body>
 </html>
