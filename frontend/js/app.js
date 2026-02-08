@@ -1375,313 +1375,83 @@ function initSpeciesToggleAll() {
     });
 }
 
-// ---- SST Contour Overlay (NOAA filled-contour style) ----
-
-// Canvas layer that renders solid filled rectangles for each grid cell
-var SSTContourLayer = L.Layer.extend({
-    initialize: function () {
-        this._points = [];
-        this._latStep = 1;
-        this._lonStep = 1;
-    },
-
-    onAdd: function (map) {
-        this._map = map;
-        this._canvas = L.DomUtil.create('canvas', 'sst-contour-canvas', map.getPanes().overlayPane);
-        this._canvas.style.pointerEvents = 'none';
-        map.on('moveend', this._reset, this);
-        map.on('zoomanim', this._animateZoom, this);
-        this._reset();
-    },
-
-    onRemove: function (map) {
-        L.DomUtil.remove(this._canvas);
-        map.off('moveend', this._reset, this);
-        map.off('zoomanim', this._animateZoom, this);
-    },
-
-    setData: function (points, latStep, lonStep) {
-        this._points = points || [];
-        this._latStep = latStep || 1;
-        this._lonStep = lonStep || 1;
-        if (this._map) this._reset();
-    },
-
-    clearData: function () {
-        this._points = [];
-        if (this._canvas) {
-            var ctx = this._canvas.getContext('2d');
-            ctx.clearRect(0, 0, this._canvas.width, this._canvas.height);
-        }
-    },
-
-    _animateZoom: function (e) {
-        var map = this._map;
-        var scale = map.getZoomScale(e.zoom);
-        var offset = map._latLngBoundsToNewLayerBounds(map.getBounds(), e.zoom, e.center).min;
-        L.DomUtil.setTransform(this._canvas, offset, scale);
-    },
-
-    _hexToRgb: function (hex) {
-        var r = parseInt(hex.slice(1, 3), 16);
-        var g = parseInt(hex.slice(3, 5), 16);
-        var b = parseInt(hex.slice(5, 7), 16);
-        return r + ',' + g + ',' + b;
-    },
-
-    _reset: function () {
-        var map = this._map;
-        var size = map.getSize();
-
-        var pad = 0.5;
-        var padX = Math.round(size.x * pad);
-        var padY = Math.round(size.y * pad);
-        var width = size.x + padX * 2;
-        var height = size.y + padY * 2;
-
-        var topLeft = map.containerPointToLayerPoint([-padX, -padY]);
-        L.DomUtil.setPosition(this._canvas, topLeft);
-        this._canvas.width = width;
-        this._canvas.height = height;
-
-        var ctx = this._canvas.getContext('2d');
-        ctx.clearRect(0, 0, width, height);
-
-        if (this._points.length === 0) return;
-
-        var self = this;
-        var opacity = 0.55;
-
-        // Pre-compute pixel positions for each data point
-        var pts = [];
-        this._points.forEach(function (pt) {
-            if (pt.sst_f == null) return;
-            var cp = map.latLngToContainerPoint([pt.lat, pt.lon]);
-            pts.push({ x: cp.x + padX, y: cp.y + padY, sst: pt.sst_f });
-        });
-
-        if (pts.length === 0) return;
-
-        // Render at reduced resolution then scale up for smooth continuous fill
-        var step = 6; // render every 6th pixel
-        var lowW = Math.ceil(width / step);
-        var lowH = Math.ceil(height / step);
-
-        // Use offscreen canvas at low res, then draw scaled up
-        var offCanvas = document.createElement('canvas');
-        offCanvas.width = lowW;
-        offCanvas.height = lowH;
-        var offCtx = offCanvas.getContext('2d');
-        var imgData = offCtx.createImageData(lowW, lowH);
-        var pixels = imgData.data;
-
-        // IDW power parameter — lower = smoother blend across sparse points
-        var power = 2.0;
-
-        // Pre-parse SST color scale into RGB arrays for fast lookup
-        var sstScale = weatherConfig.sstColorScale;
-        var scaleRgb = [];
-        for (var s = 0; s < sstScale.length; s++) {
-            var hex = sstScale[s].color;
-            scaleRgb.push({
-                max: sstScale[s].max,
-                r: parseInt(hex.slice(1, 3), 16),
-                g: parseInt(hex.slice(3, 5), 16),
-                b: parseInt(hex.slice(5, 7), 16)
-            });
-        }
-
-        // Interpolate color between two adjacent scale entries for smooth gradients
-        function getSSTRgbInterp(tempF) {
-            if (tempF <= scaleRgb[0].max) return scaleRgb[0];
-            for (var i = 1; i < scaleRgb.length; i++) {
-                if (tempF < scaleRgb[i].max) {
-                    var lo = scaleRgb[i - 1];
-                    var hi = scaleRgb[i];
-                    var range = hi.max - lo.max;
-                    if (range <= 0 || !isFinite(range)) return hi;
-                    var t = (tempF - lo.max) / range;
-                    return {
-                        r: Math.round(lo.r + (hi.r - lo.r) * t),
-                        g: Math.round(lo.g + (hi.g - lo.g) * t),
-                        b: Math.round(lo.b + (hi.b - lo.b) * t)
-                    };
-                }
-            }
-            return scaleRgb[scaleRgb.length - 1];
-        }
-
-        // Compute bounding box of data points to limit fill area
-        var minPx = Infinity, maxPx = -Infinity, minPy = Infinity, maxPy = -Infinity;
-        for (var k = 0; k < pts.length; k++) {
-            if (pts[k].x < minPx) minPx = pts[k].x;
-            if (pts[k].x > maxPx) maxPx = pts[k].x;
-            if (pts[k].y < minPy) minPy = pts[k].y;
-            if (pts[k].y > maxPy) maxPy = pts[k].y;
-        }
-        // Generous padding around data extent
-        var center = map.getCenter();
-        var p1 = map.latLngToContainerPoint([center.lat - this._latStep / 2, center.lng]);
-        var p2 = map.latLngToContainerPoint([center.lat + this._latStep / 2, center.lng]);
-        var pixelStep = Math.abs(p2.y - p1.y);
-        var extPad = Math.max(pixelStep * 3, 80);
-        var bboxL = Math.max(0, Math.floor((minPx - extPad) / step));
-        var bboxR = Math.min(lowW, Math.ceil((maxPx + extPad) / step));
-        var bboxT = Math.max(0, Math.floor((minPy - extPad) / step));
-        var bboxB = Math.min(lowH, Math.ceil((maxPy + extPad) / step));
-
-        // No distance cutoff — every pixel uses ALL data points for smooth interpolation
-        for (var py = bboxT; py < bboxB; py++) {
-            var realY = py * step;
-            for (var px = bboxL; px < bboxR; px++) {
-                var realX = px * step;
-
-                var weightSum = 0;
-                var valSum = 0;
-
-                for (var k = 0; k < pts.length; k++) {
-                    var dx = realX - pts[k].x;
-                    var dy = realY - pts[k].y;
-                    var distSq = dx * dx + dy * dy;
-                    if (distSq < 1) distSq = 1;
-                    var w = 1 / Math.pow(distSq, power / 2);
-                    weightSum += w;
-                    valSum += w * pts[k].sst;
-                }
-
-                var interpSST = valSum / weightSum;
-                var c = getSSTRgbInterp(interpSST);
-
-                // Soft edge fade based on distance to nearest data point
-                var minDistSq = Infinity;
-                for (var k = 0; k < pts.length; k++) {
-                    var dx = realX - pts[k].x;
-                    var dy = realY - pts[k].y;
-                    var d = dx * dx + dy * dy;
-                    if (d < minDistSq) minDistSq = d;
-                }
-                var minDist = Math.sqrt(minDistSq);
-                var edgeFade = 1;
-                var fadeStart = extPad * 0.5;
-                if (minDist > fadeStart) {
-                    edgeFade = Math.max(0, 1 - (minDist - fadeStart) / (extPad - fadeStart));
-                }
-
-                var idx = (py * lowW + px) * 4;
-                pixels[idx] = c.r;
-                pixels[idx + 1] = c.g;
-                pixels[idx + 2] = c.b;
-                pixels[idx + 3] = Math.round(255 * opacity * edgeFade);
-            }
-        }
-
-        offCtx.putImageData(imgData, 0, 0);
-
-        // Draw scaled up with bilinear interpolation (smoothing)
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(offCanvas, 0, 0, lowW, lowH, 0, 0, width, height);
-
-        // Draw temperature labels on top
-        ctx.globalAlpha = 1.0;
-        ctx.font = '10px "JetBrains Mono", monospace';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-
-        var labelInterval = this._points.length > 120 ? 5 : this._points.length > 60 ? 3 : 2;
-        this._points.forEach(function (pt, idx) {
-            if (pt.sst_f == null) return;
-            if (idx % labelInterval !== 0) return;
-
-            var cp = map.latLngToContainerPoint([pt.lat, pt.lon]);
-            var tx = cp.x + padX;
-            var ty = cp.y + padY;
-            var tempF = Math.round(pt.sst_f);
-            var label = tempF + '\u00B0F';
-
-            ctx.strokeStyle = 'rgba(0,0,0,0.7)';
-            ctx.lineWidth = 2.5;
-            ctx.strokeText(label, tx, ty);
-            ctx.fillStyle = '#fff';
-            ctx.fillText(label, tx, ty);
-        });
-    }
-});
-
-var sstContourLayer = null;
-var sstLabelLayer = null;
+// ---- SST WMS Overlay ----
+var sstWmsLayer = null;
 var sstOverlayActive = false;
-var sstGridDebounceTimer = null;
 
 function initSSTOverlay() {
-    sstContourLayer = new SSTContourLayer();
     var toggle = document.getElementById('sst-overlay-toggle');
     if (!toggle) return;
-
     toggle.addEventListener('change', function () {
         sstOverlayActive = this.checked;
         if (sstOverlayActive) {
-            map.addLayer(sstContourLayer);
-            loadSSTGrid();
-            map.on('moveend', onMapMoveSST);
+            addSSTLayer();
         } else {
-            map.removeLayer(sstContourLayer);
-            sstContourLayer.clearData();
-            map.off('moveend', onMapMoveSST);
-            setText('sst-grid-count', '');
+            removeSSTLayer();
         }
     });
 }
 
-function getSSTColor(tempF) {
-    if (tempF == null) return '#6b7da0';
-    var scale = weatherConfig.sstColorScale;
-    for (var i = 0; i < scale.length; i++) {
-        if (tempF < scale[i].max) return scale[i].color;
-    }
-    return scale[scale.length - 1].color;
-}
+function addSSTLayer() {
+    if (sstWmsLayer) map.removeLayer(sstWmsLayer);
 
-async function loadSSTGrid() {
-    if (!sstOverlayActive) return;
-    var zoom = map.getZoom();
-    if (zoom < weatherConfig.minZoom) {
-        sstContourLayer.clearData();
-        setText('sst-grid-count', '');
-        return;
-    }
-
-    var bounds = map.getBounds();
-    var params = new URLSearchParams({
-        north: bounds.getNorth().toFixed(2),
-        south: bounds.getSouth().toFixed(2),
-        east: bounds.getEast().toFixed(2),
-        west: bounds.getWest().toFixed(2),
-        zoom: zoom,
-        density: 'high',
+    sstWmsLayer = L.tileLayer.wms(sstWmsConfig.wmsUrl, {
+        layers: sstWmsConfig.wmsLayer,
+        version: '1.1.1',
+        format: sstWmsConfig.wmsOptions.format,
+        transparent: sstWmsConfig.wmsOptions.transparent,
+        opacity: sstWmsConfig.wmsOptions.opacity,
+        crs: L.CRS.EPSG4326,
+        colorBarMinimum: sstWmsConfig.wmsOptions.colorBarMin,
+        colorBarMaximum: sstWmsConfig.wmsOptions.colorBarMax,
     });
 
-    try {
-        var response = await fetch(API_ENDPOINTS.marineWeatherGrid + '?' + params);
-        var data = await response.json();
-        var sstPoints = [];
-        (data.points || []).forEach(function (pt) {
-            if (pt.sst_f != null) {
-                sstPoints.push(pt);
-            }
-        });
-        sstContourLayer.setData(sstPoints, data.lat_step || 1, data.lon_step || 1);
-        setText('sst-grid-count', sstPoints.length > 0 ? sstPoints.length.toString() : '');
-    } catch (error) {
-        console.error('Error loading SST grid:', error);
-    }
+    sstWmsLayer.on('tileerror', function (e) {
+        console.error('SST tile error:', e.tile.src);
+        setText('sst-grid-count', 'ERR');
+    });
+    sstWmsLayer.on('tileload', function () {
+        setText('sst-grid-count', 'ON');
+    });
+
+    sstWmsLayer.addTo(map);
+    showSSTLegend();
+    setText('sst-grid-count', 'ON');
 }
 
-function onMapMoveSST() {
-    if (sstGridDebounceTimer) clearTimeout(sstGridDebounceTimer);
-    sstGridDebounceTimer = setTimeout(function () {
-        loadSSTGrid();
-    }, weatherConfig.gridDebounceMs);
+function removeSSTLayer() {
+    if (sstWmsLayer) {
+        map.removeLayer(sstWmsLayer);
+        sstWmsLayer = null;
+    }
+    hideSSTLegend();
+    setText('sst-grid-count', '');
+}
+
+function showSSTLegend() {
+    hideSSTLegend();
+    var wrap = document.querySelector('.map-wrap');
+    if (!wrap) return;
+    var legend = document.createElement('div');
+    legend.className = 'sst-legend';
+    legend.innerHTML =
+        '<div class="sst-legend__title">SST (\u00B0F)</div>' +
+        '<div class="sst-legend__bar">' +
+        sstWmsConfig.colorScale.map(function (s) {
+            return '<div class="sst-legend__stop" style="background:' + s.color + '" title="' + s.label + '"></div>';
+        }).join('') +
+        '</div>' +
+        '<div class="sst-legend__labels">' +
+        sstWmsConfig.colorScale.map(function (s) {
+            return '<span>' + s.label + '</span>';
+        }).join('') +
+        '</div>';
+    wrap.appendChild(legend);
+}
+
+function hideSSTLegend() {
+    var existing = document.querySelector('.sst-legend');
+    if (existing) existing.remove();
 }
 
 // ---- Chlorophyll-a WMS Overlay ----
