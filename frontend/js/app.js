@@ -871,8 +871,11 @@ function fetchWeatherGrid() {
 
     setText('weather-grid-count', '...');
 
-    fetch(API_ENDPOINTS.marineWeatherGrid + '?' + params)
-        .then(function (r) { return r.json(); })
+    fetch(API_ENDPOINTS.marineWeatherGrid + '?' + params, { credentials: 'same-origin' })
+        .then(function (r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+        })
         .then(function (data) {
             if (!weatherOverlayActive || !weatherGridLayer) return;
             weatherGridLayer.clearLayers();
