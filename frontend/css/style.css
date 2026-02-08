@@ -1231,6 +1231,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     border: 1px solid var(--steel);
     border-radius: var(--radius);
     padding: 8px 10px;
+    min-width: 220px;
     backdrop-filter: blur(8px);
     pointer-events: auto;
 }
@@ -1258,7 +1259,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     justify-content: space-between;
     margin-top: 3px;
     font-family: var(--font-mono);
-    font-size: 8px;
+    font-size: 10px;
     color: var(--text-dim);
 }
 

@@ -952,16 +952,18 @@ function onMapClickWeather(e) {
             }
             var c = data.current || {};
             var waveColor = getWaveColor(c.wave_height_m);
+            var waveFt = c.wave_height_ft != null ? c.wave_height_ft : (c.wave_height_m != null ? (c.wave_height_m * 3.281).toFixed(1) : null);
+            var swellFt = c.swell_height_m != null ? (c.swell_height_m * 3.281).toFixed(1) : null;
 
             var html = '<div class="catch-popup">' +
                 '<div class="wx-popup__title">Marine Weather</div>' +
                 '<div style="font-family:var(--font-mono);font-size:9px;color:var(--text-dim);margin-bottom:6px">' +
                     parseFloat(lat).toFixed(2) + '\u00B0, ' + parseFloat(lon).toFixed(2) + '\u00B0</div>' +
                 '<div class="catch-popup__grid">' +
-                field('Waves', c.wave_height_ft != null ? '<span style="color:' + waveColor + '">' + c.wave_height_ft + ' ft</span> (' + (c.wave_height_m != null ? c.wave_height_m.toFixed(1) : '--') + 'm)' : 'N/A') +
+                field('Waves', waveFt != null ? '<span style="color:' + waveColor + '">' + waveFt + ' ft</span>' : 'N/A') +
                 field('Direction', c.wave_direction != null ? c.wave_direction + '\u00B0' : 'N/A') +
                 field('Period', c.wave_period_s != null ? c.wave_period_s + 's' : 'N/A') +
-                field('Swell', c.swell_height_m != null ? c.swell_height_m.toFixed(1) + 'm' : 'N/A') +
+                field('Swell', swellFt != null ? swellFt + ' ft' : 'N/A') +
                 field('Current', c.current_velocity_ms != null ? c.current_velocity_ms + ' m/s' : 'N/A') +
                 field('Cur. Dir', c.current_direction != null ? c.current_direction + '\u00B0' : 'N/A') +
                 '</div>';
@@ -972,7 +974,7 @@ function onMapClickWeather(e) {
                     '<div class="wx-popup__forecast">';
                 data.hourly.forEach(function (h) {
                     var t = h.time ? h.time.split('T')[1] || h.time : '';
-                    var wh = h.wave_height_m != null ? h.wave_height_m.toFixed(1) + 'm' : '--';
+                    var wh = h.wave_height_m != null ? (h.wave_height_m * 3.281).toFixed(1) + 'ft' : '--';
                     var wd = h.wave_direction != null ? h.wave_direction + '\u00B0' : '';
                     html += '<div class="wx-popup__hour">' +
                         '<span class="wx-popup__hour-time">' + t + '</span>' +

@@ -128,6 +128,14 @@ if settings.serve_frontend and os.path.exists(settings.frontend_dir):
             return FileResponse(test_path)
         return {"message": "Test landing page not found."}
 
+    # WMS diagnostic test page (temporary)
+    @app.get("/wms-test")
+    async def serve_wms_test():
+        test_path = os.path.join(settings.frontend_dir, "wms-test.html")
+        if os.path.exists(test_path):
+            return FileResponse(test_path)
+        return {"message": "WMS test page not found."}
+
 
 if __name__ == "__main__":
     import uvicorn

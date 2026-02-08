@@ -46,22 +46,30 @@ A full-stack geospatial data aggregation and visualization system for marine fis
 ### Marine Weather
 - Live observations from 13 NOAA NDBC buoy stations
 - Weather bar displaying: air temp, water temp, wind, waves, pressure, moon phase, fishing score, visibility
-- Canvas-based heatmap weather overlay on map (wave height color scale)
-- Click-to-query marine weather at any ocean point via Open-Meteo API
+- Click-to-query marine weather at any ocean point via Open-Meteo API (current + 24h hourly forecast)
 - Historical weather lookup by date and station
 
 ### Marine Weather Grid Overlay
-- Fetches wave/swell/current/SST data from Open-Meteo Marine API for visible map bounds
-- Smooth canvas heatmap rendering with radial gradients (land-filtered)
-- Text labels showing wave height, direction arrows, and swell data
-- Debounced loading on map pan/zoom
+- Server-rendered PNG tile overlay of wave height data (displayed in feet)
+- Harvests wave/swell/current/SST from Open-Meteo Marine API on a 1° grid (Maine to Florida, out to Gulf Stream)
+- Data stored in `marine_weather_grid` database table, refreshed every 2 hours
+- Backend tile renderer uses IDW interpolation + Gaussian blur for smooth gradients (Pillow + numpy)
+- Land masking prevents rendering over non-ocean areas
+- 13-stop color ramp from calm purple (<2 ft) through green (6 ft) to red (>16 ft)
+- Toggled via "Weather Grid" checkbox in the Ocean & Weather layer panel
 
-### Sea Surface Temperature (SST) Heatmap
-- Dedicated SST toggle in the Live Layers panel
-- 9-step color gradient from deep blue (cold, <55°F) through green (~72°F) to red (hot, >82°F)
-- Visualizes temperature breaks and warm/cold water boundaries for identifying fishing structure
-- Uses the same Open-Meteo Marine API grid with `sea_surface_temperature` parameter
-- SST data also returned in point-query weather popups and weather bar
+### Sea Surface Temperature (SST) Overlay
+- ERDDAP WMS tile overlay from NOAA CoastWatch (`jplMURSST41` dataset)
+- Covers Maine to Delaware, coastline to ~1000 fathoms offshore
+- 7-stop color scale from 32°F (purple) through 68°F (green) to 86°F+ (red)
+- Toggled via "SST Overlay" checkbox in the Ocean & Weather layer panel
+
+### Chlorophyll-a Overlay
+- ERDDAP WMS tile overlay from NOAA CoastWatch (`erdMH1chla1day` dataset)
+- Same geographic bounds as SST (Maine to Delaware)
+- Logarithmic color scale from 0.03 to 10+ mg/m³ (Viridis-derived palette)
+- Useful for identifying productive water and bait concentrations
+- Toggled via "Chlorophyll-a" checkbox in the Ocean & Weather layer panel
 
 ### Fishing Conditions Scoring
 - Algorithmic scoring (0-100) based on water temp, wind speed, wave height, and moon illumination
@@ -160,17 +168,31 @@ A full-stack geospatial data aggregation and visualization system for marine fis
 | **Stations** | 13 buoy stations covering Mid-Atlantic to offshore (see [Buoy Stations](#buoy-stations)) |
 | **Data Captured** | Air temp, water temp, wind speed/gust/direction, pressure & tendency, wave height/period/direction, swell, visibility, tide, moon phase, fishing score |
 
-### 5. Open-Meteo Marine API (Real-Time Grid Weather)
+### 5. Open-Meteo Marine API (Grid Weather + Point Queries)
 
 | Detail | Value |
 |--------|-------|
+| **Harvester** | `harvesters/marine_weather_harvester.py` |
 | **Endpoint** | `https://marine-api.open-meteo.com/v1/marine` |
-| **Usage** | Fetched on-demand for map weather overlay and point queries |
-| **Data** | Wave height/direction/period, swell height, ocean current velocity/direction, sea surface temperature (SST in °C and °F) |
-| **Caching** | Redis with 1800s TTL |
-| **Integration** | Weather grid overlay on map, click-to-query popups |
+| **Grid** | 1° spacing, 25°N–45°N, 82°W–65°W (~270 ocean points) |
+| **Schedule** | Every 2 hours (harvester), on-demand for point queries |
+| **Data** | Wave height/direction/period, swell height, ocean current velocity/direction, SST (°C and °F) |
+| **Storage** | `marine_weather_grid` table (auto-purges data >6 hours old) |
+| **Tile Rendering** | Backend renders 256×256 PNG tiles via IDW interpolation (Pillow + numpy) |
+| **Caching** | Redis with 1800s TTL for point queries; tile Cache-Control 30 min |
+| **Integration** | Weather grid tile overlay on map, click-to-query popups with 24h forecast |
 
-### 6. Open-Meteo Weather API (Atmospheric)
+### 6. NOAA CoastWatch ERDDAP (SST + Chlorophyll WMS)
+
+| Detail | Value |
+|--------|-------|
+| **SST Dataset** | `jplMURSST41` via WMS at `coastwatch.pfeg.noaa.gov` |
+| **Chlorophyll Dataset** | `erdMH1chla1day` via WMS at `coastwatch.pfeg.noaa.gov` |
+| **Usage** | Leaflet `L.tileLayer.wms()` overlays — tiles rendered server-side by ERDDAP |
+| **Bounds** | 37°N–45°N, 76.5°W–65°W (Maine to Delaware, ~1000 fathoms offshore) |
+| **Integration** | Toggleable map overlays with color-scale legends |
+
+### 7. Open-Meteo Weather API (Atmospheric)
 
 | Detail | Value |
 |--------|-------|
@@ -204,7 +226,9 @@ A full-stack geospatial data aggregation and visualization system for marine fis
 | GET | `/historical/{date}` | Weather for a specific date. Filters: `station_id`, `lat`/`lon` |
 | GET | `/buoys` | List all buoy stations with metadata. Filter: `active_only` |
 | GET | `/buoys/{station_id}` | Recent observations for a buoy (limit: 1-168 hours) |
-| GET | `/marine/grid` | Marine weather grid for map bounds (includes SST). Params: `north`, `south`, `east`, `west`, `zoom` |
+| GET | `/marine/grid` | Marine weather grid from Open-Meteo (live). Params: `north`, `south`, `east`, `west`, `zoom` |
+| GET | `/marine/grid-data` | Harvested marine weather grid from database. Params: `north`, `south`, `east`, `west` |
+| GET | `/marine/tiles/{z}/{x}/{y}.png` | Wave height PNG tile (IDW interpolated, land-masked). Served to Leaflet `L.tileLayer()` |
 | GET | `/marine/point` | Detailed marine weather + 24h forecast for a single lat/lon |
 
 ### Vessels (`/api/v1/vessels`)
@@ -339,6 +363,12 @@ A full-stack geospatial data aggregation and visualization system for marine fis
 - `id`, `mmsi` (FK), `start_time`, `end_time`, `location` (PostGIS Point)
 - `avg_speed_knots`, `duration_hours`
 
+**marine_weather_grid** — Harvested Open-Meteo marine weather grid points
+- `id`, `lat`, `lon`, `wave_height_m`, `wave_direction`, `wave_period_s`
+- `swell_height_m`, `current_velocity_ms`, `current_direction`
+- `sst_c`, `sst_f`, `fetched_at`
+- Unique constraint on (lat, lon, fetched_at); auto-purged after 6 hours
+
 **data_sync_log** — Harvester sync history
 - `id`, `source`, `sync_type` (full/incremental/backfill)
 - `started_at`, `completed_at`, `date_range_start`, `date_range_end`
@@ -377,6 +407,8 @@ A full-stack geospatial data aggregation and visualization system for marine fis
 | Config | Pydantic Settings 2.1 | Environment variable management |
 | HTTP Client | httpx 0.26 | Async HTTP requests for harvesters |
 | WebSocket Client | websocket-client | AIS Stream persistent connection |
+| Tile Rendering | Pillow (PIL) | PNG tile generation for weather overlay |
+| Numerical | numpy | IDW interpolation for weather tile rendering |
 | Geospatial | Shapely 2.0 | Geometry operations |
 | GeoJSON | geojson 3.1 | GeoJSON serialization |
 | Scheduler | APScheduler 3.10 | Background job scheduling |
@@ -440,7 +472,8 @@ marine-fishing/
 │   ├── base.py                     # Abstract base harvester class
 │   ├── noaa_harvester.py           # NOAA commercial + MRIP landings harvester
 │   ├── ais_harvester.py            # AIS Stream WebSocket vessel tracking
-│   └── weather_harvester.py        # NDBC buoy weather observations
+│   ├── weather_harvester.py        # NDBC buoy weather observations
+│   └── marine_weather_harvester.py # Open-Meteo marine grid (wave/swell/SST)
 ├── scripts/
 │   ├── run_ais_harvester.sh        # AIS harvester process manager (start/stop/restart)
 │   ├── ais_watchdog.sh             # AIS process health monitor (10-min cron)
@@ -542,6 +575,14 @@ python harvesters/weather_harvester.py
 ```
 
 Fetches latest observations from all 13 NDBC buoy stations.
+
+### Marine Weather Grid (Open-Meteo)
+
+```bash
+python harvesters/marine_weather_harvester.py
+```
+
+Fetches wave height, swell, ocean currents, and SST from Open-Meteo Marine API on a 1° grid covering the US East Coast (25°N–45°N, 82°W–65°W). Stores results in `marine_weather_grid` table. Auto-purges data older than 6 hours. Scheduled to run every 2 hours.
 
 ---
 

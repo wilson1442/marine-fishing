@@ -336,16 +336,20 @@ def get_marine_weather_grid_data(
 
 # ---------- Wave Height Tile Renderer ----------
 
-# Smooth color ramp for wave height in feet.
-# Each entry is (feet_threshold, (r, g, b)).
-# _wave_color_smooth() interpolates between adjacent stops for a gradient.
+# Dense color ramp for wave height in feet — more stops = smoother gradient.
 _WAVE_RAMP = [
     (0.0,  (176, 0, 208)),    # #b000d0  — flat calm
+    (1.0,  (88, 42, 210)),    # blend
     (2.0,  (0, 85, 212)),     # #0055d4
+    (3.0,  (0, 146, 202)),    # blend
     (4.0,  (0, 208, 192)),    # #00d0c0
+    (5.0,  (0, 192, 96)),     # blend
     (6.0,  (0, 176, 0)),      # #00b000
+    (8.0,  (108, 180, 0)),    # blend
     (10.0, (216, 184, 0)),    # #d8b800
+    (11.5, (212, 108, 0)),    # blend
     (13.0, (208, 32, 0)),     # #d02000
+    (14.5, (184, 16, 0)),     # blend
     (16.0, (160, 0, 0)),      # #a00000  — heavy seas
 ]
 
@@ -453,10 +457,11 @@ def get_marine_tile(z: int, x: int, y: int, db: Session = Depends(get_db),
 
     # IDW interpolation: for each pixel, compute weighted average of nearby points
     # Use power=2 for smooth falloff; max_dist limits land bleed
-    max_dist = GRID_STEP * 1.45  # just over 1 cell — suppresses land bleed
+    max_dist = GRID_STEP * 0.75  # tight radius — suppresses land bleed
     result = np.full((TILE_SIZE, TILE_SIZE), np.nan)
     w_sum = np.zeros((TILE_SIZE, TILE_SIZE))
     v_sum = np.zeros((TILE_SIZE, TILE_SIZE))
+    pt_count = np.zeros((TILE_SIZE, TILE_SIZE), dtype=np.int32)
 
     for k in range(len(pts_val)):
         dlat = grid_lat - pts_lat[k]
@@ -470,8 +475,10 @@ def get_marine_tile(z: int, x: int, y: int, db: Session = Depends(get_db),
         w[~mask] = 0.0
         w_sum += w
         v_sum += w * pts_val[k]
+        pt_count += mask.astype(np.int32)
 
-    valid = w_sum > 0
+    # Require at least 2 contributing data points to avoid lone-point land bleed
+    valid = (w_sum > 0) & (pt_count >= 2)
     result[valid] = v_sum[valid] / w_sum[valid]
 
     # Build RGBA image from interpolated values
@@ -500,8 +507,8 @@ def get_marine_tile(z: int, x: int, y: int, db: Session = Depends(get_db),
 
     img = Image.fromarray(img_data, "RGBA")
 
-    # Slight gaussian blur to smooth pixel-level noise
-    img = img.filter(ImageFilter.GaussianBlur(radius=1))
+    # Gaussian blur to smooth pixel-level noise and soften color transitions
+    img = img.filter(ImageFilter.GaussianBlur(radius=3))
 
     buf = io.BytesIO()
     img.save(buf, format="PNG", compress_level=1)
