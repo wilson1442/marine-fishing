@@ -1139,11 +1139,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     overflow: hidden;
     transition: max-height 0.25s ease;
 }
+.layer-group[data-group="tides"] .layer-group__body {
+    max-height: 500px;
+    overflow-y: auto;
+}
 .layer-group.collapsed .layer-group__body {
     max-height: 0;
 }
-
-/* ---- Tide panel (inline in sidebar accordion) ---- */
 .tide-panel__body {
     padding: 8px 10px;
 }
