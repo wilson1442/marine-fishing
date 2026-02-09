@@ -27,6 +27,10 @@ let vesselLayerState = {
     effort_heatmap: false,
 };
 
+// Fishing-only filter for live vessels
+let fishingOnlyFilter = false;
+let liveVesselData = null; // cache last fetched live vessel GeoJSON
+
 // Auto-refresh interval for live vessels
 let liveRefreshInterval = null;
 
@@ -299,10 +303,23 @@ function initVesselLayerToggles() {
                 removeVesselLayer(layerKey);
                 if (layerKey === 'live_vessels') {
                     stopLiveRefresh();
+                    liveVesselData = null;
                 }
             }
         });
     });
+
+    // Fishing-only slider
+    var fishingToggle = document.getElementById('fishing-only-toggle');
+    if (fishingToggle) {
+        fishingToggle.addEventListener('change', function () {
+            fishingOnlyFilter = this.checked;
+            // Re-render live vessels with current filter
+            if (vesselLayerState.live_vessels && liveVesselData) {
+                renderLiveVessels(liveVesselData);
+            }
+        });
+    }
 }
 
 // Start auto-refresh for live vessel positions
@@ -344,6 +361,13 @@ async function loadVesselLayer(layerKey) {
             return;
         }
 
+        // Cache live vessel data for fishing-only filter re-renders
+        if (layerKey === 'live_vessels') {
+            liveVesselData = data;
+            renderLiveVessels(data);
+            return;
+        }
+
         removeVesselLayer(layerKey);
         vesselLayers[layerKey] = L.layerGroup();
 
@@ -369,25 +393,6 @@ async function loadVesselLayer(layerKey) {
                 });
                 rect.bindPopup(createVesselPopup(layerKey, props));
                 markers.push(rect);
-            } else if (layerKey === 'live_vessels') {
-                // Vessel-shaped marker with heading/course indicator
-                var heading = props.heading != null ? props.heading : (props.course != null ? props.course : 0);
-                var vesselIcon = L.divIcon({
-                    className: 'vessel-icon',
-                    html: '<div class="vessel-icon__wrap" style="transform:rotate(' + heading + 'deg)">' +
-                        '<svg viewBox="0 0 24 40" width="20" height="32">' +
-                        '<path d="M12 2 L4 14 L4 34 Q4 38 12 38 Q20 38 20 34 L20 14 Z" fill="' + color + '" stroke="#fff" stroke-width="1.5" opacity="0.9"/>' +
-                        '<path d="M12 2 L8 10 L16 10 Z" fill="' + color + '" stroke="#fff" stroke-width="1" opacity="1"/>' +
-                        '</svg>' +
-                        '<div class="vessel-icon__heading"></div>' +
-                        '</div>',
-                    iconSize: [20, 32],
-                    iconAnchor: [10, 16],
-                    popupAnchor: [0, -16]
-                });
-                var marker = L.marker([coords[1], coords[0]], { icon: vesselIcon });
-                marker.bindPopup(createVesselPopup(layerKey, props));
-                markers.push(marker);
             } else {
                 // Circle markers for fishing_activity, loitering events
                 var radius = 6;
@@ -415,6 +420,44 @@ async function loadVesselLayer(layerKey) {
     } catch (error) {
         console.error('Error loading vessel layer ' + layerKey + ':', error);
     }
+}
+
+// Render live vessels, applying fishing-only filter
+function renderLiveVessels(data) {
+    removeVesselLayer('live_vessels');
+    vesselLayers['live_vessels'] = L.layerGroup();
+
+    var features = data.features || [];
+    var filtered = fishingOnlyFilter
+        ? features.filter(function (f) { return f.properties.vessel_type === 'fishing'; })
+        : features;
+
+    filtered.forEach(function (feature) {
+        var coords = feature.geometry.coordinates;
+        var props = feature.properties;
+        var color = props.color || mapConfig.vesselLayerColors['live_vessels'] || '#ffffff';
+
+        var heading = props.heading != null ? props.heading : (props.course != null ? props.course : 0);
+        var vesselIcon = L.divIcon({
+            className: 'vessel-icon',
+            html: '<div class="vessel-icon__wrap" style="transform:rotate(' + heading + 'deg)">' +
+                '<svg viewBox="0 0 24 40" width="20" height="32">' +
+                '<path d="M12 2 L4 14 L4 34 Q4 38 12 38 Q20 38 20 34 L20 14 Z" fill="' + color + '" stroke="#fff" stroke-width="1.5" opacity="0.9"/>' +
+                '<path d="M12 2 L8 10 L16 10 Z" fill="' + color + '" stroke="#fff" stroke-width="1" opacity="1"/>' +
+                '</svg>' +
+                '<div class="vessel-icon__heading"></div>' +
+                '</div>',
+            iconSize: [20, 32],
+            iconAnchor: [10, 16],
+            popupAnchor: [0, -16]
+        });
+        var marker = L.marker([coords[1], coords[0]], { icon: vesselIcon });
+        marker.bindPopup(createVesselPopup('live_vessels', props));
+        vesselLayers['live_vessels'].addLayer(marker);
+    });
+
+    map.addLayer(vesselLayers['live_vessels']);
+    updateVesselLayerCount('live_vessels', filtered.length);
 }
 
 // Remove a vessel layer from the map

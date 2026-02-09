@@ -810,6 +810,193 @@ body {
     color: var(--text-dim);
 }
 
+/* ===== ACTIVITY LOG ===== */
+.activity {
+    padding: 80px 48px;
+    background: linear-gradient(180deg, rgba(10, 21, 37, 0.9) 0%, rgba(46, 204, 113, 0.02) 50%, rgba(10, 21, 37, 0.9) 100%);
+    border-top: 1px solid var(--border);
+}
+
+.activity__inner {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.activity__header {
+    text-align: center;
+    margin-bottom: 36px;
+}
+
+.activity__label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--radar-green);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.activity__label::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    background: var(--radar-green);
+    border-radius: 50%;
+    animation: pulse 2s ease-in-out infinite;
+    box-shadow: 0 0 10px var(--radar-green);
+}
+
+.activity__title {
+    font-family: 'Oswald', sans-serif;
+    font-size: clamp(28px, 4vw, 40px);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--text-bright);
+}
+
+.activity__card {
+    position: relative;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: rgba(10, 21, 37, 0.7);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.03),
+        0 30px 100px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+}
+
+.activity__table-wrap {
+    max-height: 440px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(58, 143, 217, 0.3) transparent;
+}
+
+.activity__table-wrap::-webkit-scrollbar {
+    width: 6px;
+}
+.activity__table-wrap::-webkit-scrollbar-track {
+    background: transparent;
+}
+.activity__table-wrap::-webkit-scrollbar-thumb {
+    background: rgba(58, 143, 217, 0.3);
+    border-radius: 3px;
+}
+
+.activity__table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.activity__table thead {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+.activity__table th {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    background: rgba(10, 21, 37, 0.95);
+    padding: 14px 20px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+
+.activity__table td {
+    font-size: 13px;
+    color: var(--text-main);
+    padding: 12px 20px;
+    border-bottom: 1px solid rgba(58, 143, 217, 0.06);
+    white-space: nowrap;
+}
+
+.activity__table tbody tr {
+    transition: background 0.2s;
+}
+
+.activity__table tbody tr:hover {
+    background: rgba(58, 143, 217, 0.05);
+}
+
+.activity__species {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 500;
+    color: var(--text-bright);
+}
+
+.activity__species-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.activity__weight {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--accent);
+}
+
+.activity__location {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.activity__time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+}
+
+.activity__empty {
+    padding: 48px 20px;
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+}
+
+.activity__loading {
+    padding: 48px 20px;
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@media (max-width: 768px) {
+    .activity { padding: 48px 24px; }
+    .activity__table th,
+    .activity__table td { padding: 10px 12px; }
+    .activity__table td { font-size: 12px; }
+    .activity__location { font-size: 10px; }
+}
+
+@media (max-width: 480px) {
+    .activity { padding: 36px 16px; }
+    .activity__table th:nth-child(4),
+    .activity__table td:nth-child(4) { display: none; }
+}
+
 /* ===== FEATURES ===== */
 .features {
     padding: 100px 48px;
@@ -1051,21 +1238,22 @@ body {
     color: var(--text-dim);
 }
 
-.footer__back {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    font-weight: 500;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    color: var(--radar-green);
-    text-decoration: none;
+.footer__links {
     display: flex;
-    align-items: center;
-    gap: 6px;
-    transition: opacity 0.3s;
+    gap: 24px;
 }
 
-.footer__back:hover { opacity: 0.7; }
+.footer__link {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    text-decoration: none;
+    transition: color 0.3s;
+}
+
+.footer__link:hover { color: var(--primary); }
 
 .footer__social {
     display: flex;
@@ -1316,6 +1504,33 @@ body {
         </div>
     </div>
 
+    <!-- Activity Log -->
+    <section class="activity">
+        <div class="activity__inner">
+            <div class="activity__header">
+                <div class="activity__label">Live Feed</div>
+                <h2 class="activity__title">Recent Catches</h2>
+            </div>
+            <div class="activity__card">
+                <div class="activity__table-wrap">
+                    <table class="activity__table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Species</th>
+                                <th>Weight</th>
+                                <th>Location</th>
+                            </tr>
+                        </thead>
+                        <tbody id="activity-body">
+                            <tr><td colspan="4" class="activity__loading">Loading recent catches...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Features -->
     <section class="features">
         <div class="features__header">
@@ -1400,6 +1615,10 @@ body {
     <!-- Footer -->
     <footer class="footer">
         <span class="footer__text">Angler Suite &copy; 2026 &mdash; Marine Fishing Intelligence Platform</span>
+        <div class="footer__links">
+            <a href="/privacy" class="footer__link">Privacy Policy</a>
+            <a href="/contact" class="footer__link">Contact Us</a>
+        </div>
         <div class="footer__social">
             <a href="#" class="footer__social-link" target="_blank" rel="noopener noreferrer" aria-label="Facebook">
                 <svg viewBox="0 0 24 24"><path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z"/></svg>
@@ -1487,6 +1706,60 @@ function countUp(el, target, duration) {
         btn.disabled = false;
         btn.style.opacity = '';
     });
+})();
+
+// Load recent catches activity log
+(async function() {
+    var tbody = document.getElementById('activity-body');
+    try {
+        var r = await fetch('/api/v1/catches/recent?limit=20', { credentials: 'same-origin' });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        var d = await r.json();
+        var catches = d.catches || [];
+        if (catches.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="activity__empty">No recent catches reported</td></tr>';
+            return;
+        }
+        tbody.innerHTML = '';
+        catches.forEach(function(c) {
+            var tr = document.createElement('tr');
+
+            // Time cell
+            var timeStr = '';
+            if (c.catch_date) {
+                var parts = c.catch_date.split('-');
+                var mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                timeStr = mon[parseInt(parts[1], 10) - 1] + ' ' + parseInt(parts[2], 10);
+                if (c.catch_time) timeStr += ', ' + c.catch_time;
+            }
+
+            // Location cell
+            var locStr = '';
+            if (c.latitude != null && c.longitude != null) {
+                var lat = c.latitude, lon = c.longitude;
+                var latDir = lat >= 0 ? 'N' : 'S';
+                var lonDir = lon >= 0 ? 'E' : 'W';
+                locStr = Math.abs(lat).toFixed(2) + '\u00b0' + latDir + ', ' + Math.abs(lon).toFixed(2) + '\u00b0' + lonDir;
+            }
+
+            // Weight cell
+            var weightStr = c.weight_lbs ? c.weight_lbs.toLocaleString(undefined, { maximumFractionDigits: 1 }) + ' lbs' : '\u2014';
+
+            tr.innerHTML =
+                '<td class="activity__time">' + timeStr + '</td>' +
+                '<td><span class="activity__species">' +
+                    '<span class="activity__species-dot" style="background:' + c.color_hex + ';box-shadow:0 0 6px ' + c.color_hex + '"></span>' +
+                    c.species_name +
+                '</span></td>' +
+                '<td class="activity__weight">' + weightStr + '</td>' +
+                '<td class="activity__location">' + locStr + '</td>';
+
+            tbody.appendChild(tr);
+        });
+    } catch (e) {
+        console.error('Activity log error:', e);
+        tbody.innerHTML = '<tr><td colspan="4" class="activity__empty">Unable to load recent catches</td></tr>';
+    }
 })();
 
 // Load species

@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy - Angler Suite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@300;400;500&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+    --primary: #3a8fd9;
+    --primary-glow: rgba(58, 143, 217, 0.35);
+    --accent: #f58220;
+    --bg-deep: #0a1525;
+    --bg-card: rgba(58, 143, 217, 0.04);
+    --text-bright: #ffffff;
+    --text-main: #b8c5d6;
+    --text-muted: #7a8ca0;
+    --text-dim: #4a5a70;
+    --border: rgba(58, 143, 217, 0.12);
+    --border-hover: rgba(58, 143, 217, 0.3);
+}
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { height: 100%; scroll-behavior: smooth; }
+body {
+    min-height: 100%;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    background: var(--bg-deep);
+    color: var(--text-main);
+    -webkit-font-smoothing: antialiased;
+}
+.bg-gradient {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background:
+        radial-gradient(ellipse 120% 60% at 50% 0%, rgba(58, 143, 217, 0.12) 0%, transparent 50%),
+        radial-gradient(ellipse 100% 100% at 50% 100%, rgba(10, 21, 37, 1) 0%, transparent 50%);
+}
+.page { position: relative; z-index: 10; min-height: 100vh; display: flex; flex-direction: column; }
+
+/* Nav */
+.nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 48px; position: sticky; top: 0; z-index: 100;
+    background: linear-gradient(180deg, rgba(10, 21, 37, 0.98) 0%, rgba(10, 21, 37, 0.9) 50%, transparent 100%);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+}
+.nav__brand { display: flex; align-items: center; gap: 16px; text-decoration: none; }
+.nav__logo { width: 48px; height: 48px; border-radius: 8px; object-fit: contain; }
+.nav__title { display: flex; flex-direction: column; }
+.nav__title-main {
+    font-family: 'Oswald', sans-serif; font-size: 20px; font-weight: 600;
+    letter-spacing: 1px; text-transform: uppercase;
+    background: linear-gradient(180deg, #ffffff 0%, #a0b0c0 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.nav__title-main span { color: var(--accent); -webkit-text-fill-color: var(--accent); }
+.nav__title-sub {
+    font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 400;
+    letter-spacing: 2px; text-transform: uppercase; color: var(--primary);
+}
+.nav__back {
+    font-family: 'Oswald', sans-serif; font-size: 12px; font-weight: 500;
+    letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-main);
+    text-decoration: none; padding: 12px 24px; border: 1px solid var(--border-hover);
+    border-radius: 6px; transition: all 0.3s;
+}
+.nav__back:hover { color: var(--accent); border-color: var(--accent); background: rgba(245, 130, 32, 0.05); }
+
+/* Content */
+.content { flex: 1; padding: 60px 48px 80px; max-width: 860px; margin: 0 auto; width: 100%; }
+.content__label {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 500;
+    letter-spacing: 3px; text-transform: uppercase; color: var(--accent); margin-bottom: 16px;
+}
+.content__title {
+    font-family: 'Oswald', sans-serif; font-size: clamp(32px, 5vw, 48px); font-weight: 600;
+    text-transform: uppercase; letter-spacing: 2px; color: var(--text-bright); margin-bottom: 8px;
+}
+.content__updated {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-dim);
+    letter-spacing: 0.5px; margin-bottom: 48px;
+}
+.content__card {
+    border-radius: 12px; border: 1px solid var(--border);
+    background: rgba(10, 21, 37, 0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.03), 0 30px 100px rgba(0, 0, 0, 0.5);
+    padding: 48px 44px;
+}
+.content__card h2 {
+    font-family: 'Oswald', sans-serif; font-size: 20px; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 1px; color: var(--text-bright);
+    margin: 36px 0 12px; padding-top: 24px; border-top: 1px solid var(--border);
+}
+.content__card h2:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+.content__card p {
+    font-size: 15px; font-weight: 300; line-height: 1.8; color: var(--text-muted); margin-bottom: 16px;
+}
+.content__card ul {
+    list-style: none; margin: 0 0 16px 0; padding: 0;
+}
+.content__card li {
+    font-size: 14px; font-weight: 300; line-height: 1.8; color: var(--text-muted);
+    padding-left: 20px; position: relative; margin-bottom: 4px;
+}
+.content__card li::before {
+    content: ''; position: absolute; left: 0; top: 10px;
+    width: 6px; height: 6px; border-radius: 50%; background: var(--primary);
+}
+.content__card a { color: var(--primary); text-decoration: none; transition: color 0.2s; }
+.content__card a:hover { color: var(--accent); }
+.content__card strong { color: var(--text-main); font-weight: 500; }
+
+/* Footer */
+.footer {
+    padding: 24px 48px; border-top: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+    background: rgba(10, 21, 37, 0.5); flex-wrap: wrap; gap: 12px;
+}
+.footer__text {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 400;
+    letter-spacing: 1px; color: var(--text-dim);
+}
+.footer__links { display: flex; gap: 24px; }
+.footer__link {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 400;
+    letter-spacing: 1px; color: var(--text-dim); text-decoration: none; transition: color 0.3s;
+}
+.footer__link:hover { color: var(--primary); }
+
+@media (max-width: 768px) {
+    .nav { padding: 12px 24px; }
+    .content { padding: 40px 24px 60px; }
+    .content__card { padding: 32px 24px; }
+    .footer { padding: 20px 24px; flex-direction: column; gap: 12px; }
+}
+@media (max-width: 480px) {
+    .nav__back { padding: 8px 12px; font-size: 10px; }
+    .content__card { padding: 24px 16px; }
+}
+</style>
+</head>
+<body>
+
+<div class="bg-gradient"></div>
+
+<div class="page">
+    <nav class="nav">
+        <a href="/" class="nav__brand">
+            <img src="/images/logo.jpg" alt="Angler Suite" class="nav__logo">
+            <div class="nav__title">
+                <span class="nav__title-main">Angler <span>Suite</span></span>
+                <span class="nav__title-sub">Marine Fishing Intelligence</span>
+            </div>
+        </a>
+        <a href="/" class="nav__back">&larr; Back</a>
+    </nav>
+
+    <div class="content">
+        <div class="content__label">Legal</div>
+        <h1 class="content__title">Privacy Policy</h1>
+        <p class="content__updated">Last updated: February 9, 2026</p>
+
+        <div class="content__card">
+            <h2>Introduction</h2>
+            <p>Angler Suite ("we," "our," or "us") operates the Angler Suite marine fishing intelligence platform. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you visit our website and use our services. Please read this policy carefully. By accessing or using our platform, you agree to the terms of this Privacy Policy.</p>
+
+            <h2>Information We Collect</h2>
+            <p>We may collect the following types of information:</p>
+            <p><strong>Personal Information You Provide</strong></p>
+            <ul>
+                <li>Name, email address, and region when you submit our access request form</li>
+                <li>Account credentials (name, email, password) when you create an account</li>
+                <li>Messages or comments you submit through our contact form</li>
+                <li>Catch reports and fishing data you voluntarily submit</li>
+            </ul>
+            <p><strong>Information Collected Automatically</strong></p>
+            <ul>
+                <li>Browser type, operating system, and device information</li>
+                <li>IP address and approximate geographic location</li>
+                <li>Pages viewed, features used, and time spent on the platform</li>
+                <li>Cookies and similar tracking technologies for session management</li>
+            </ul>
+
+            <h2>How We Use Your Information</h2>
+            <p>We use the information we collect for the following purposes:</p>
+            <ul>
+                <li>To provide, operate, and maintain our platform and services</li>
+                <li>To process your access requests and manage your account</li>
+                <li>To display catch data, weather information, and vessel tracking on our maps</li>
+                <li>To respond to your inquiries and provide customer support</li>
+                <li>To send you updates, newsletters, or promotional materials (with your consent)</li>
+                <li>To improve our platform, features, and user experience</li>
+                <li>To detect and prevent fraud, abuse, or security incidents</li>
+                <li>To comply with legal obligations and enforce our terms</li>
+            </ul>
+
+            <h2>Data Sources</h2>
+            <p>Our platform aggregates publicly available data from the following sources:</p>
+            <ul>
+                <li>NOAA Fisheries (catch and species data)</li>
+                <li>NOAA NDBC (weather buoy observations)</li>
+                <li>NOAA CO-OPS (tide predictions and water levels)</li>
+                <li>NOAA MRIP (marine recreational information program)</li>
+                <li>AIS vessel tracking data (publicly broadcast ship positions)</li>
+                <li>ERDDAP satellite data (sea surface temperature, chlorophyll-a)</li>
+            </ul>
+            <p>This publicly sourced data does not contain personally identifiable information.</p>
+
+            <h2>Cookies and Tracking</h2>
+            <p>We use cookies to manage user sessions and authentication. These are essential cookies required for the platform to function. We do not use third-party advertising or analytics cookies. You can configure your browser to refuse cookies, but some features of the platform may not function properly without them.</p>
+
+            <h2>Data Sharing and Disclosure</h2>
+            <p>We do not sell, trade, or rent your personal information to third parties. We may share your information in the following limited circumstances:</p>
+            <ul>
+                <li><strong>Service providers:</strong> Trusted third parties who assist in operating our platform (e.g., hosting, email delivery), bound by confidentiality agreements</li>
+                <li><strong>Legal requirements:</strong> When required by law, regulation, legal process, or governmental request</li>
+                <li><strong>Safety:</strong> To protect the rights, property, or safety of Angler Suite, our users, or others</li>
+                <li><strong>Business transfers:</strong> In connection with a merger, acquisition, or sale of assets, with notice to affected users</li>
+            </ul>
+
+            <h2>Data Security</h2>
+            <p>We implement reasonable technical and organizational measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction. These measures include encrypted data transmission (HTTPS), secure password hashing, and access controls. However, no method of transmission over the Internet or electronic storage is 100% secure, and we cannot guarantee absolute security.</p>
+
+            <h2>Data Retention</h2>
+            <p>We retain your personal information for as long as your account is active or as needed to provide you services. We may also retain and use your information to comply with legal obligations, resolve disputes, and enforce our agreements. You may request deletion of your account and associated personal data at any time by contacting us.</p>
+
+            <h2>Your Rights</h2>
+            <p>Depending on your jurisdiction, you may have the following rights regarding your personal information:</p>
+            <ul>
+                <li>Access and obtain a copy of your personal data</li>
+                <li>Correct inaccurate or incomplete personal data</li>
+                <li>Request deletion of your personal data</li>
+                <li>Withdraw consent for data processing</li>
+                <li>Object to or restrict certain processing activities</li>
+                <li>Data portability (receive your data in a structured, machine-readable format)</li>
+            </ul>
+            <p>To exercise any of these rights, please contact us at <a href="mailto:info@anglersuite.com">info@anglersuite.com</a>.</p>
+
+            <h2>Children's Privacy</h2>
+            <p>Our platform is not intended for children under the age of 13. We do not knowingly collect personal information from children under 13. If we become aware that we have collected personal information from a child under 13, we will take steps to delete that information promptly.</p>
+
+            <h2>Third-Party Links</h2>
+            <p>Our platform may contain links to third-party websites or services that are not operated by us. We have no control over and assume no responsibility for the content, privacy policies, or practices of any third-party sites or services. We encourage you to review the privacy policies of any third-party sites you visit.</p>
+
+            <h2>Changes to This Policy</h2>
+            <p>We may update this Privacy Policy from time to time. We will notify you of any material changes by posting the new policy on this page and updating the "Last updated" date above. Your continued use of the platform after any changes constitutes acceptance of the updated policy.</p>
+
+            <h2>Contact Us</h2>
+            <p>If you have any questions about this Privacy Policy or our data practices, please contact us:</p>
+            <ul>
+                <li>Email: <a href="mailto:info@anglersuite.com">info@anglersuite.com</a></li>
+                <li>Contact page: <a href="/contact">/contact</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <span class="footer__text">Angler Suite &copy; 2026 &mdash; Marine Fishing Intelligence Platform</span>
+        <div class="footer__links">
+            <a href="/privacy" class="footer__link">Privacy Policy</a>
+            <a href="/contact" class="footer__link">Contact Us</a>
+        </div>
+    </footer>
+</div>
+
+</body>
+</html>

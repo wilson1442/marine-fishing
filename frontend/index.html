@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="/css/vendor/MarkerCluster.css" />
     <link rel="stylesheet" href="/css/vendor/MarkerCluster.Default.css" />
 
-    <link rel="stylesheet" href="/css/style.css?v=33" />
+    <link rel="stylesheet" href="/css/style.css?v=34" />
 </head>
 <body>
     <div class="scanline-overlay"></div>
@@ -45,6 +45,13 @@
                                 <span class="map-layer-toggle__name">Live Vessels</span>
                                 <span class="map-layer-toggle__count" id="gfw-count-live_vessels"></span>
                             </label>
+                            <div class="fishing-only-toggle" id="fishing-only-row">
+                                <label class="switch" for="fishing-only-toggle">
+                                    <input type="checkbox" id="fishing-only-toggle" />
+                                    <span class="switch__slider"></span>
+                                </label>
+                                <span class="fishing-only-toggle__label">Fishing Only</span>
+                            </div>
                             <label class="map-layer-toggle">
                                 <input type="checkbox" class="gfw-layer-toggle" data-layer="fishing_activity" />
                                 <span class="map-layer-toggle__swatch" style="background:#ff6b35"></span>
@@ -315,6 +322,6 @@
     <script src="/js/vendor/leaflet.js"></script>
     <script src="/js/vendor/leaflet.markercluster.js"></script>
     <script src="/js/config.js?v=36"></script>
-    <script src="/js/app.js?v=42"></script>
+    <script src="/js/app.js?v=43"></script>
 </body>
 </html>

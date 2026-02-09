@@ -128,6 +128,22 @@ if settings.serve_frontend and os.path.exists(settings.frontend_dir):
             return FileResponse(test_path)
         return {"message": "Test landing page not found."}
 
+    # Privacy policy
+    @app.get("/privacy")
+    async def serve_privacy():
+        privacy_path = os.path.join(settings.frontend_dir, "privacy.html")
+        if os.path.exists(privacy_path):
+            return FileResponse(privacy_path)
+        return {"message": "Privacy policy not found."}
+
+    # Contact page
+    @app.get("/contact")
+    async def serve_contact():
+        contact_path = os.path.join(settings.frontend_dir, "contact.html")
+        if os.path.exists(contact_path):
+            return FileResponse(contact_path)
+        return {"message": "Contact page not found."}
+
     # WMS diagnostic test page (temporary)
     @app.get("/wms-test")
     async def serve_wms_test():
@@ -135,6 +151,16 @@ if settings.serve_frontend and os.path.exists(settings.frontend_dir):
         if os.path.exists(test_path):
             return FileResponse(test_path)
         return {"message": "WMS test page not found."}
+
+    # Map UI design variants
+    @app.get("/map{variant}")
+    async def serve_map_variant(variant: int):
+        if variant < 1 or variant > 5:
+            return {"message": "Map variant not found."}
+        variant_path = os.path.join(settings.frontend_dir, f"map{variant}", "index.html")
+        if os.path.exists(variant_path):
+            return FileResponse(variant_path)
+        return {"message": f"Map variant {variant} not found."}
 
 
 if __name__ == "__main__":

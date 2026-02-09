@@ -228,3 +228,73 @@ def get_catch_stats(db: Session = Depends(get_db), _auth: dict = Depends(require
         })
 
     return {"stats": stats}
+
+
+@router.get("/recent")
+def get_recent_catches(
+    limit: int = Query(20, ge=1, le=50, description="Max records"),
+    db: Session = Depends(get_db),
+    _auth: dict = Depends(require_api_access)
+):
+    """
+    Get the most recent catches for the activity feed.
+    Returns catches from the last 48 hours, falling back to the
+    most recent catches if none exist in that window.
+    """
+    # Try last 48 hours first
+    query = """
+        SELECT
+            c.catch_date,
+            c.catch_time,
+            s.common_name as species_name,
+            s.species_code,
+            s.color_hex,
+            c.latitude,
+            c.longitude,
+            c.weight_lbs,
+            c.source
+        FROM catches c
+        LEFT JOIN species s ON c.species_id = s.id
+        WHERE c.catch_date >= CURRENT_DATE - INTERVAL '48 hours'
+        ORDER BY c.catch_date DESC, c.catch_time DESC NULLS LAST
+        LIMIT :limit
+    """
+    result = db.execute(text(query), {"limit": limit})
+    rows = result.fetchall()
+
+    # Fall back to most recent catches if none in last 48h
+    if not rows:
+        fallback_query = """
+            SELECT
+                c.catch_date,
+                c.catch_time,
+                s.common_name as species_name,
+                s.species_code,
+                s.color_hex,
+                c.latitude,
+                c.longitude,
+                c.weight_lbs,
+                c.source
+            FROM catches c
+            LEFT JOIN species s ON c.species_id = s.id
+            ORDER BY c.catch_date DESC, c.catch_time DESC NULLS LAST
+            LIMIT :limit
+        """
+        result = db.execute(text(fallback_query), {"limit": limit})
+        rows = result.fetchall()
+
+    catches = []
+    for row in rows:
+        catches.append({
+            "catch_date": row.catch_date.isoformat() if row.catch_date else None,
+            "catch_time": row.catch_time.strftime("%H:%M") if row.catch_time else None,
+            "species_name": row.species_name or "Unknown",
+            "species_code": row.species_code,
+            "color_hex": row.color_hex or "#808080",
+            "latitude": float(row.latitude) if row.latitude else None,
+            "longitude": float(row.longitude) if row.longitude else None,
+            "weight_lbs": float(row.weight_lbs) if row.weight_lbs else None,
+            "source": row.source
+        })
+
+    return {"catches": catches, "total": len(catches)}
