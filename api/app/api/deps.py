@@ -7,6 +7,7 @@ import time
 import secrets
 from datetime import datetime
 
+import jwt as pyjwt
 from fastapi import Request, HTTPException, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -89,12 +90,25 @@ def validate_api_key(db: Session, key: str) -> dict | None:
     }
 
 
+def _verify_jwt_access_token(token: str) -> dict | None:
+    """Verify a JWT access token. Returns payload or None."""
+    settings = get_settings()
+    try:
+        payload = pyjwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+        if payload.get("type") != "access":
+            return None
+        return payload
+    except (pyjwt.ExpiredSignatureError, pyjwt.InvalidTokenError):
+        return None
+
+
 def require_api_access(request: Request, db: Session = Depends(get_db)) -> dict:
     """
     FastAPI dependency: Allow access if any of:
     1. Valid X-API-Key header provided
-    2. Valid user_token session cookie (logged-in user)
-    3. Same-origin request (frontend) via Sec-Fetch-Site header
+    2. Valid Authorization: Bearer <jwt> header
+    3. Valid user_token session cookie (logged-in user)
+    4. Same-origin request (frontend) via Sec-Fetch-Site header
     """
     # Check 1: API Key header
     api_key = request.headers.get("X-API-Key")
@@ -104,7 +118,27 @@ def require_api_access(request: Request, db: Session = Depends(get_db)) -> dict:
             return key_info
         raise HTTPException(status_code=401, detail="Invalid or expired API key")
 
-    # Check 2: Session cookie (logged-in user)
+    # Check 2: JWT Bearer token
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        jwt_token = auth_header[7:]
+        payload = _verify_jwt_access_token(jwt_token)
+        if payload:
+            user_id = int(payload["sub"])
+            row = db.execute(
+                text("SELECT id, email, status, expires_at FROM registered_users WHERE id = :id"),
+                {"id": user_id}
+            ).fetchone()
+            if row and row.status == "approved":
+                if not row.expires_at or row.expires_at >= datetime.utcnow():
+                    return {
+                        "user_id": row.id,
+                        "username": row.email,
+                        "auth_type": "jwt_bearer"
+                    }
+        raise HTTPException(status_code=401, detail="Invalid or expired Bearer token")
+
+    # Check 3: Session cookie (logged-in user)
     token = request.cookies.get("user_token")
     if token:
         payload = _verify_token(token)
@@ -122,7 +156,7 @@ def require_api_access(request: Request, db: Session = Depends(get_db)) -> dict:
                         "auth_type": "session"
                     }
 
-    # Check 3: Same-origin request (frontend)
+    # Check 4: Same-origin request (frontend)
     sec_fetch_site = request.headers.get("Sec-Fetch-Site")
     if sec_fetch_site == "same-origin":
         return {"auth_type": "same_origin"}
@@ -130,7 +164,7 @@ def require_api_access(request: Request, db: Session = Depends(get_db)) -> dict:
     # No valid authentication
     raise HTTPException(
         status_code=401,
-        detail="Authentication required. Provide X-API-Key header, login, or access from the frontend."
+        detail="Authentication required. Provide X-API-Key header, Bearer token, login, or access from the frontend."
     )
 
 

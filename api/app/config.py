@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     admin_secret_key: str = secrets.token_hex(32)
     admin_token_expiry_hours: int = 24
 
+    # JWT auth (mobile app)
+    jwt_secret_key: str = secrets.token_hex(32)
+    jwt_access_token_expire_minutes: int = 15
+    jwt_refresh_token_expire_days: int = 30
+    jwt_algorithm: str = "HS256"
+
     # Zoho CRM
     zoho_client_id: str = ""
     zoho_client_secret: str = ""
