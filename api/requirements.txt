@@ -27,3 +27,8 @@ apscheduler==3.10.4
 
 # Retry logic
 tenacity==8.2.3
+
+# Tile rendering
+numpy>=1.26.0
+Pillow>=10.0.0
+scipy>=1.12.0

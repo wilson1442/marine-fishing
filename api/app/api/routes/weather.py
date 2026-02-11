@@ -402,7 +402,7 @@ def _get_empty_tile():
 def get_marine_tile(z: int, x: int, y: int, db: Session = Depends(get_db),
                     _auth: dict = Depends(require_api_access)):
     """Render a 256x256 PNG tile of wave height with smooth gradient and land masking."""
-    from PIL import Image, ImageFilter
+    from PIL import Image
     import io
     import numpy as np
 
@@ -412,8 +412,8 @@ def get_marine_tile(z: int, x: int, y: int, db: Session = Depends(get_db),
 
     west, south, east, north = _tile_bounds(z, x, y)
 
-    # Fetch grid points with margin for interpolation at tile edges
-    margin = GRID_STEP * 2
+    # Fetch grid points with margin for interpolation and alpha edge fade
+    margin = GRID_STEP * 5
     rows = db.execute(text("""
         SELECT lat, lon, wave_height_m
         FROM marine_weather_grid
@@ -455,31 +455,66 @@ def get_marine_tile(z: int, x: int, y: int, db: Session = Depends(get_db),
     lons = west + (east - west) * px / TILE_SIZE      # shape (256,)
     grid_lat, grid_lon = np.meshgrid(lats, lons, indexing='ij')  # (256,256)
 
-    # IDW interpolation: for each pixel, compute weighted average of nearby points
-    # Use power=2 for smooth falloff; max_dist limits land bleed
-    max_dist = GRID_STEP * 0.75  # tight radius — suppresses land bleed
-    result = np.full((TILE_SIZE, TILE_SIZE), np.nan)
-    w_sum = np.zeros((TILE_SIZE, TILE_SIZE))
-    v_sum = np.zeros((TILE_SIZE, TILE_SIZE))
-    pt_count = np.zeros((TILE_SIZE, TILE_SIZE), dtype=np.int32)
+    # RBF interpolation — smooth everywhere, no convex-hull gaps
+    from scipy.interpolate import RBFInterpolator
+    from scipy.spatial import cKDTree, Delaunay
 
-    for k in range(len(pts_val)):
-        dlat = grid_lat - pts_lat[k]
-        dlon = grid_lon - pts_lon[k]
-        dist = np.sqrt(dlat * dlat + dlon * dlon)
-        dist = np.maximum(dist, 0.001)  # avoid division by zero
-        mask = dist < max_dist
-        if not np.any(mask):
-            continue
-        w = 1.0 / (dist * dist)
-        w[~mask] = 0.0
-        w_sum += w
-        v_sum += w * pts_val[k]
-        pt_count += mask.astype(np.int32)
+    points = np.column_stack([pts_lat, pts_lon])
+    grid_points = np.column_stack([grid_lat.ravel(), grid_lon.ravel()])
 
-    # Require at least 2 contributing data points to avoid lone-point land bleed
-    valid = (w_sum > 0) & (pt_count >= 2)
-    result[valid] = v_sum[valid] / w_sum[valid]
+    if len(pts_val) >= 4:
+        rbf = RBFInterpolator(points, pts_val, kernel='thin_plate_spline', smoothing=0.1)
+        result = rbf(grid_points)
+    else:
+        from scipy.interpolate import griddata as scipy_griddata
+        result = scipy_griddata(points, pts_val, grid_points, method='nearest')
+
+    result = result.reshape(TILE_SIZE, TILE_SIZE)
+
+    # Alpha: full opacity inside the main ocean cluster's convex hull,
+    # smooth fade outside.  Data contains points on both the Atlantic AND
+    # Great Lakes — cluster first so the hull isn't stretched across the US.
+    from scipy.sparse import csr_matrix
+    from scipy.sparse.csgraph import connected_components as cc
+    from collections import Counter
+
+    BASE_ALPHA = 180
+    FADE_DIST = GRID_STEP * 3.0
+
+    tree = cKDTree(points)
+
+    # Cluster ocean data into connected basins (neighbors within 1.5 grid steps)
+    pairs = tree.query_pairs(r=GRID_STEP * 1.5)
+    n_pts = len(pts_val)
+    if pairs:
+        rows, cols = zip(*pairs)
+        data = np.ones(len(rows))
+        adj = csr_matrix((data, (rows, cols)), shape=(n_pts, n_pts))
+        adj = adj + adj.T
+    else:
+        adj = csr_matrix((n_pts, n_pts))
+    n_comp, labels = cc(adj, directed=False)
+
+    # Use the largest cluster for hull + distance fade
+    largest = Counter(labels).most_common(1)[0][0]
+    main_pts = points[labels == largest]
+
+    main_tree = cKDTree(main_pts)
+    main_dist, _ = main_tree.query(grid_points)
+    main_dist = main_dist.reshape(TILE_SIZE, TILE_SIZE)
+
+    try:
+        hull = Delaunay(main_pts)
+        inside = (hull.find_simplex(grid_points) >= 0).reshape(TILE_SIZE, TILE_SIZE)
+        fade = np.clip((1.0 - main_dist / FADE_DIST) * BASE_ALPHA, 0, BASE_ALPHA)
+        alpha_map = np.where(inside, BASE_ALPHA, fade).astype(np.uint8)
+    except Exception:
+        alpha_map = np.clip((1.0 - main_dist / FADE_DIST) * BASE_ALPHA, 0, BASE_ALPHA).astype(np.uint8)
+
+    result[alpha_map == 0] = np.nan
+
+    # Clamp (RBF can extrapolate beyond data range)
+    result = np.clip(result, 0, None)
 
     # Build RGBA image from interpolated values
     img_data = np.zeros((TILE_SIZE, TILE_SIZE, 4), dtype=np.uint8)
@@ -487,28 +522,25 @@ def get_marine_tile(z: int, x: int, y: int, db: Session = Depends(get_db),
     for i in range(len(_WAVE_RAMP) - 1):
         lo_val, lo_rgb = _WAVE_RAMP[i]
         hi_val, hi_rgb = _WAVE_RAMP[i + 1]
-        band = (result >= lo_val) & (result < hi_val) & valid
+        band = (result >= lo_val) & (result < hi_val) & ~np.isnan(result)
         if not np.any(band):
             continue
         t = (result[band] - lo_val) / (hi_val - lo_val)
         img_data[band, 0] = (lo_rgb[0] + (hi_rgb[0] - lo_rgb[0]) * t).astype(np.uint8)
         img_data[band, 1] = (lo_rgb[1] + (hi_rgb[1] - lo_rgb[1]) * t).astype(np.uint8)
         img_data[band, 2] = (lo_rgb[2] + (hi_rgb[2] - lo_rgb[2]) * t).astype(np.uint8)
-        img_data[band, 3] = 180
+        img_data[band, 3] = alpha_map[band]
 
     # Values above top ramp stop
-    top_band = (result >= _WAVE_RAMP[-1][0]) & valid
+    top_band = (result >= _WAVE_RAMP[-1][0]) & ~np.isnan(result)
     if np.any(top_band):
         c = _WAVE_RAMP[-1][1]
         img_data[top_band, 0] = c[0]
         img_data[top_band, 1] = c[1]
         img_data[top_band, 2] = c[2]
-        img_data[top_band, 3] = 180
+        img_data[top_band, 3] = alpha_map[top_band]
 
     img = Image.fromarray(img_data, "RGBA")
-
-    # Gaussian blur to smooth pixel-level noise and soften color transitions
-    img = img.filter(ImageFilter.GaussianBlur(radius=3))
 
     buf = io.BytesIO()
     img.save(buf, format="PNG", compress_level=1)
