@@ -558,14 +558,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     gap: 8px;
     padding: 5px 10px;
     cursor: pointer;
-    transition: background var(--transition), opacity var(--transition);
+    transition: background var(--transition);
     user-select: none;
 }
 .legend-item:hover {
     background: var(--steel);
-}
-.legend-item--hidden {
-    opacity: 0.45;
 }
 .legend-item--hidden .legend-swatch {
     box-shadow: none;
