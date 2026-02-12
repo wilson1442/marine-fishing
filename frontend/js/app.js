@@ -58,28 +58,30 @@ document.addEventListener('DOMContentLoaded', async function () {
         return;
     }
 
-    // Load Google Maps API key and dynamically inject script if configured
+    // Create a Google Map Tiles API session for satellite imagery
     try {
         var keyResp = await fetch('/api/v1/settings/google-maps-key');
         var keyData = await keyResp.json();
         if (keyData.google_maps_api_key) {
-            await new Promise(function (resolve, reject) {
-                var script = document.createElement('script');
-                script.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(keyData.google_maps_api_key);
-                script.async = true;
-                script.onload = function () {
-                    window._googleMapsReady = true;
-                    resolve();
-                };
-                script.onerror = function () {
-                    console.warn('Google Maps API failed to load, falling back to Esri tiles');
-                    resolve();
-                };
-                document.head.appendChild(script);
-            });
+            var apiKey = keyData.google_maps_api_key;
+            var sessionResp = await fetch(
+                'https://tile.googleapis.com/v1/createSession?key=' + encodeURIComponent(apiKey),
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mapType: 'satellite', language: 'en-US', region: 'US' })
+                }
+            );
+            if (sessionResp.ok) {
+                var sessionData = await sessionResp.json();
+                window._googleTileSession = sessionData.session;
+                window._googleTileKey = apiKey;
+            } else {
+                console.warn('Google Map Tiles session creation failed:', sessionResp.status);
+            }
         }
     } catch (e) {
-        console.warn('Could not fetch Google Maps key, using fallback tiles:', e);
+        console.warn('Could not set up Google Maps tiles, using fallback:', e);
     }
 
     // Safety timeout: hide loading overlay after 15s no matter what
@@ -141,12 +143,14 @@ function initMap() {
         zoomControl: true
     });
 
-    // Add base layer — Google Maps satellite if available, else Esri Ocean fallback
-    if (window._googleMapsReady && typeof L.gridLayer.googleMutant === 'function') {
-        L.gridLayer.googleMutant({
-            type: 'satellite',
-            maxZoom: 22,
-        }).addTo(map);
+    // Add base layer — Google satellite tiles if session available, else Esri Ocean fallback
+    if (window._googleTileSession && window._googleTileKey) {
+        L.tileLayer(
+            'https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}?session=' +
+            encodeURIComponent(window._googleTileSession) +
+            '&key=' + encodeURIComponent(window._googleTileKey),
+            { maxZoom: 22, attribution: 'Map data &copy; Google' }
+        ).addTo(map);
     } else {
         L.tileLayer(mapConfig.baseLayers.ocean.url, {
             attribution: mapConfig.baseLayers.ocean.attribution,

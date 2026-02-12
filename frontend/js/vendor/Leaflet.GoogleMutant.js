@@ -532,6 +532,11 @@ this.L.GridLayer.GoogleMutant = (function (leaflet) {
 				styles: this.options.styles || [],
 				backgroundColor: "transparent",
 			};
+			// Force raster rendering so tiles are <img> elements
+			// that the MutationObserver can find and clone into Leaflet.
+			if (google.maps.RenderingType) {
+				options.renderingType = google.maps.RenderingType.RASTER;
+			}
 			if (this.options.mapId != null) {
 				options.mapId = this.options.mapId;
 			}
