@@ -527,104 +527,56 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     min-height: 1.3em;
 }
 
-/* ---- Species overlay (right sidebar on map) ---- */
-.species-overlay {
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: 192px;
-    z-index: 2;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    padding: 10px 12px;
-    background: linear-gradient(270deg, rgba(10,21,37,0.95) 60%, rgba(10,21,37,0) 100%);
-    pointer-events: none;
-    overflow-y: auto;
-}
-
-.species-overlay__label {
+/* ---- Species filter (left panel layer group) ---- */
+.species-toggle-all {
     font-family: var(--font-mono);
-    font-size: 9px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    color: var(--text-dim);
-    flex-shrink: 0;
-    pointer-events: auto;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--border);
-}
-
-.species-overlay__toggle {
-    font-family: var(--font-mono);
-    font-size: 9px;
+    font-size: 8px;
     font-weight: 600;
     letter-spacing: 0.5px;
     text-transform: uppercase;
-    padding: 4px 10px;
-    background: rgba(10,21,37,0.85);
+    padding: 2px 8px;
+    background: var(--steel);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 3px;
     color: var(--text-dim);
     cursor: pointer;
-    pointer-events: auto;
-    flex-shrink: 0;
+    margin-left: auto;
     transition: all var(--transition);
-    backdrop-filter: blur(8px);
-    width: 100%;
-    text-align: center;
 }
-.species-overlay__toggle:hover {
+.species-toggle-all:hover {
     border-color: var(--accent);
     color: var(--accent);
-    box-shadow: 0 0 12px var(--accent-glow);
 }
 
-.species-overlay__items {
+.species-list {
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    pointer-events: auto;
-    overflow-y: auto;
-    flex: 1;
-    min-height: 0;
 }
 
 .legend-item {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 4px 10px 4px 8px;
-    border-radius: 12px;
+    gap: 8px;
+    padding: 5px 10px;
     cursor: pointer;
-    background: rgba(10,21,37,0.85);
-    border: 1px solid var(--border);
-    backdrop-filter: blur(8px);
-    transition: border-color var(--transition), box-shadow var(--transition), opacity var(--transition);
+    transition: background var(--transition), opacity var(--transition);
     user-select: none;
 }
 .legend-item:hover {
-    border-color: var(--border-hover);
-    box-shadow: 0 0 10px var(--cyan-glow);
+    background: var(--steel);
 }
 .legend-item--hidden {
-    opacity: 0.35;
+    opacity: 0.45;
 }
 .legend-item--hidden .legend-swatch {
     box-shadow: none;
-}
-.legend-item--active:hover {
-    border-color: var(--cyan-dim);
-    box-shadow: 0 0 10px rgba(76,201,240,0.15);
 }
 
 .legend-checkbox {
     appearance: none;
     -webkit-appearance: none;
-    width: 12px;
-    height: 12px;
+    width: 14px;
+    height: 14px;
     border: 2px solid var(--rivet);
     border-radius: 3px;
     background: var(--abyss);
@@ -641,8 +593,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .legend-checkbox:checked::after {
     content: '';
     position: absolute;
-    left: 1.5px; top: -0.5px;
-    width: 4px; height: 7px;
+    left: 2px; top: 0;
+    width: 5px; height: 8px;
     border: solid var(--abyss);
     border-width: 0 2px 2px 0;
     transform: rotate(45deg);
@@ -656,38 +608,20 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 .legend-name {
-    font-size: 11px;
-    font-weight: 400;
+    font-family: var(--font-mono);
+    font-size: 10px;
     color: var(--text);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    flex: 1;
 }
 
 .legend-code {
     font-family: var(--font-mono);
     font-size: 9px;
     color: var(--text-dim);
-    margin-left: 2px;
-    display: none;
-}
-
-.species-overlay::-webkit-scrollbar,
-.species-overlay__items::-webkit-scrollbar {
-    width: 4px;
-}
-.species-overlay::-webkit-scrollbar-track,
-.species-overlay__items::-webkit-scrollbar-track {
-    background: transparent;
-}
-.species-overlay::-webkit-scrollbar-thumb,
-.species-overlay__items::-webkit-scrollbar-thumb {
-    background: var(--border);
-    border-radius: 2px;
-}
-.species-overlay::-webkit-scrollbar-thumb:hover,
-.species-overlay__items::-webkit-scrollbar-thumb:hover {
-    background: var(--border-hover);
+    margin-left: auto;
 }
 
 /* ---- Leaflet popup ---- */
@@ -1191,7 +1125,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     overflow: hidden;
     transition: max-height 0.25s ease;
 }
-.layer-group[data-group="tides"] .layer-group__body {
+.layer-group[data-group="tides"] .layer-group__body,
+.layer-group[data-group="species"] .layer-group__body {
     max-height: 500px;
     overflow-y: auto;
 }
@@ -1676,22 +1611,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     }
     .panel--filters.open { transform: translateX(0); }
 
-    .species-overlay {
-        top: auto;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        width: auto;
-        flex-direction: row;
-        align-items: center;
-        gap: 8px;
-        padding: 6px 10px;
-        background: linear-gradient(180deg, rgba(10,21,37,0) 0%, rgba(10,21,37,0.85) 40%, rgba(10,21,37,0.95) 100%);
-        overflow-y: visible;
-    }
-    .species-overlay__label { padding-bottom: 0; border-bottom: none; }
-    .species-overlay__toggle { width: auto; text-align: left; }
-    .species-overlay__items { flex-direction: row; flex-wrap: wrap; gap: 6px; overflow-y: visible; flex: none; min-height: auto; }
     .topbar__toggle { display: block; }
     .topbar__stats { display: none; }
     .weather-bar__grid { grid-template-columns: repeat(2, 1fr); }

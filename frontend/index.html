@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="/css/vendor/MarkerCluster.css" />
     <link rel="stylesheet" href="/css/vendor/MarkerCluster.Default.css" />
 
-    <link rel="stylesheet" href="/css/style.css?v=34" />
+    <link rel="stylesheet" href="/css/style.css?v=35" />
 </head>
 <body>
     <div class="scanline-overlay"></div>
@@ -137,6 +137,18 @@
                             </label>
                         </div>
                     </div>
+                    <!-- SP — Species Filter -->
+                    <div class="layer-group collapsed" data-group="species">
+                        <div class="layer-group__header">
+                            <span class="map-layer-toggles__badge" style="background:#4cc9f0">SP</span>
+                            <span class="map-layer-toggles__title">Species Filter</span>
+                            <button class="species-toggle-all" id="toggle-all-species">Show All</button>
+                            <span class="layer-group__chevron">&#9662;</span>
+                        </div>
+                        <div class="layer-group__body">
+                            <div class="species-list" id="legend-items"></div>
+                        </div>
+                    </div>
                 </div>
 
             </div>
@@ -202,12 +214,6 @@
                 <div class="map-loading" id="map-loading">
                     <div class="map-loading__spinner"></div>
                     <span>Loading catches&hellip;</span>
-                </div>
-                <!-- Species legend overlay at bottom of map -->
-                <div class="species-overlay" id="species-overlay">
-                    <span class="species-overlay__label">Species</span>
-                    <button class="species-overlay__toggle" id="toggle-all-species">Show All</button>
-                    <div class="species-overlay__items" id="legend-items"></div>
                 </div>
             </div>
 
