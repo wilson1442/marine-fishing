@@ -1,0 +1,9 @@
+[Unit]
+Description=Marine Fishing - NOAA MRIP Recreational Harvester (Daily 4:05 AM)
+
+[Timer]
+OnCalendar=*-*-* 04:05:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

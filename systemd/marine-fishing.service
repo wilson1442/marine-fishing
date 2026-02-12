@@ -1,0 +1,17 @@
+[Unit]
+Description=Marine Fishing Platform API
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/marine-fishing/api
+Environment="PATH=/opt/marine-fishing/api/venv/bin"
+EnvironmentFile=/opt/marine-fishing/api/.env
+ExecStart=/opt/marine-fishing/api/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

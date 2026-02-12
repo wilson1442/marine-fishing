@@ -1,0 +1,9 @@
+[Unit]
+Description=Marine Fishing - GFW Harvester (Daily 2:05 AM)
+
+[Timer]
+OnCalendar=*-*-* 02:05:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
