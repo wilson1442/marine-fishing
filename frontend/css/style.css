@@ -455,76 +455,75 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ---- Weather bar ---- */
-.weather-bar {
-    background: linear-gradient(180deg, rgba(58, 143, 217, 0.03) 0%, var(--abyss) 100%);
-    border-top: 1px solid var(--border);
-    padding: 14px 20px;
+/* ---- Stat strip (conditions bar) ---- */
+.stat-strip {
+    display: flex;
+    gap: 1px;
+    background: rgba(0, 0, 0, 0.5);
     flex-shrink: 0;
+    position: relative;
 }
 
-.weather-bar__header {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    margin-bottom: 10px;
-}
-
-.weather-bar__title {
-    font-family: var(--font-mono);
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    color: var(--text-bright);
-}
-
-.weather-bar__station {
-    font-family: var(--font-mono);
-    font-size: 10px;
-    color: var(--text-dim);
-}
-
-.weather-bar__grid {
-    display: grid;
-    grid-template-columns: repeat(8, 1fr);
-    gap: 8px;
-}
-
-.wx-cell {
-    background: rgba(58, 143, 217, 0.04);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 12px 10px;
+.stat-card {
+    flex: 1;
+    padding: 14px 8px;
     text-align: center;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+    background: var(--hull);
+    transition: background var(--transition);
 }
-.wx-cell:hover {
-    border-color: var(--border-hover);
-    background: rgba(58, 143, 217, 0.08);
-    box-shadow: 0 0 12px var(--cyan-glow);
+.stat-card:hover {
+    background: rgba(18, 32, 53, 0.9);
 }
 
-.wx-cell__icon { color: var(--cyan-dim); line-height: 1; }
-
-.wx-cell__label {
+.stat-card__value {
     font-family: var(--font-mono);
-    font-size: 8px;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-bright);
+    line-height: 1;
+}
+.stat-card__value--water { color: var(--cyan); }
+.stat-card__value--moon  { color: var(--accent); }
+.stat-card__value--score { color: var(--phosphor); }
+
+.stat-card__label {
+    font-family: var(--font-mono);
+    font-size: 9px;
     text-transform: uppercase;
     letter-spacing: 1px;
     color: var(--text-dim);
+    margin-top: 4px;
+    font-weight: 500;
 }
 
-.wx-cell__value {
+.stat-card__sparkline {
+    display: flex;
+    align-items: flex-end;
+    gap: 1px;
+    height: 16px;
+    justify-content: center;
+    margin-top: 6px;
+}
+
+.spark-bar {
+    width: 3px;
+    border-radius: 1px;
+    background: var(--cyan-dim);
+    opacity: 0.5;
+}
+.spark-bar:last-child {
+    background: var(--accent);
+    opacity: 1;
+}
+
+.stat-strip__station {
+    position: absolute;
+    top: 4px;
+    right: 8px;
     font-family: var(--font-mono);
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--text-bright);
-    min-height: 1.3em;
+    font-size: 9px;
+    color: var(--text-dim);
+    pointer-events: none;
 }
 
 /* ---- Species filter (left panel layer group) ---- */
@@ -1592,7 +1591,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 /* ---- Responsive ---- */
 @media (max-width: 1100px) {
-    .weather-bar__grid { grid-template-columns: repeat(4, 1fr); }
+    .stat-card__value { font-size: 17px; }
+    .stat-card { padding: 10px 4px; }
+    .stat-card__sparkline { display: none; }
 }
 
 @media (max-width: 900px) {
@@ -1613,7 +1614,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
     .topbar__toggle { display: block; }
     .topbar__stats { display: none; }
-    .weather-bar__grid { grid-template-columns: repeat(2, 1fr); }
+    .stat-strip { display: none; }
 }
 
 /* ---- Chlorophyll-a Legend ---- */

@@ -842,7 +842,7 @@ function updateWeatherPanel(data) {
         setText('moon-phase', '\u2014');
     }
 
-    setText('fishing-score', data.fishing_score != null ? data.fishing_score + '/10' : '\u2014');
+    setText('fishing-score', data.fishing_score != null ? (parseFloat(data.fishing_score) / 10).toFixed(1) + ' / 10' : '\u2014');
     setWx('visibility', data.visibility_nm, ' nm');
 }
 

@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="/css/vendor/MarkerCluster.css" />
     <link rel="stylesheet" href="/css/vendor/MarkerCluster.Default.css" />
 
-    <link rel="stylesheet" href="/css/style.css?v=35" />
+    <link rel="stylesheet" href="/css/style.css?v=36" />
 </head>
 <body>
     <div class="scanline-overlay"></div>
@@ -217,70 +217,49 @@
                 </div>
             </div>
 
-            <section class="weather-bar" id="weather-bar">
-                <div class="weather-bar__header">
-                    <h3 class="weather-bar__title">Marine Conditions</h3>
-                    <span class="weather-bar__station" id="weather-station">Select a date or viewing latest</span>
+            <div class="stat-strip" id="weather-bar">
+                <div class="stat-card">
+                    <div class="stat-card__value" id="air-temp">&mdash;</div>
+                    <div class="stat-card__label">Air Temp</div>
+                    <div class="stat-card__sparkline"><div class="spark-bar" style="height:6px"></div><div class="spark-bar" style="height:9px"></div><div class="spark-bar" style="height:11px"></div><div class="spark-bar" style="height:10px"></div><div class="spark-bar" style="height:13px"></div><div class="spark-bar" style="height:15px"></div></div>
                 </div>
-                <div class="weather-bar__grid">
-                    <div class="wx-cell">
-                        <span class="wx-cell__icon">
-                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 9a4 4 0 100 8 4 4 0 000-8z"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>
-                        </span>
-                        <span class="wx-cell__label">Air Temp</span>
-                        <span class="wx-cell__value" id="air-temp">&mdash;</span>
-                    </div>
-                    <div class="wx-cell">
-                        <span class="wx-cell__icon">
-                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2v6l3 3M3 17c1.5-2 3-3 5-3s3.5 1 5 3 3 3 5 3 3.5-1 5-3"/></svg>
-                        </span>
-                        <span class="wx-cell__label">Water Temp</span>
-                        <span class="wx-cell__value" id="water-temp">&mdash;</span>
-                    </div>
-                    <div class="wx-cell">
-                        <span class="wx-cell__icon">
-                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.59 4.59A2 2 0 1111 8H2m10.59 11.41A2 2 0 1014 16H2m15.73-8.27A2.5 2.5 0 1119.5 12H2"/></svg>
-                        </span>
-                        <span class="wx-cell__label">Wind</span>
-                        <span class="wx-cell__value" id="wind-speed">&mdash;</span>
-                    </div>
-                    <div class="wx-cell">
-                        <span class="wx-cell__icon">
-                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 12c2-3 4-4 6-4s4 1 6 4 4 4 6 4 4-1 6-4"/><path d="M2 6c2-3 4-4 6-4s4 1 6 4 4 4 6 4 4-1 6-4"/><path d="M2 18c2-3 4-4 6-4s4 1 6 4 4 4 6 4 4-1 6-4"/></svg>
-                        </span>
-                        <span class="wx-cell__label">Waves</span>
-                        <span class="wx-cell__value" id="wave-height">&mdash;</span>
-                    </div>
-                    <div class="wx-cell">
-                        <span class="wx-cell__icon">
-                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z"/><path d="M12 6v6l4 2"/></svg>
-                        </span>
-                        <span class="wx-cell__label">Pressure</span>
-                        <span class="wx-cell__value" id="pressure">&mdash;</span>
-                    </div>
-                    <div class="wx-cell">
-                        <span class="wx-cell__icon">
-                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3a9 9 0 110 18c-4.97 0-9-4.03-9-9h9V3z"/></svg>
-                        </span>
-                        <span class="wx-cell__label">Moon</span>
-                        <span class="wx-cell__value" id="moon-phase">&mdash;</span>
-                    </div>
-                    <div class="wx-cell">
-                        <span class="wx-cell__icon">
-                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 18h20M5 14v4M9 12v6M13 10v8M17 8v10M21 6v12"/></svg>
-                        </span>
-                        <span class="wx-cell__label">Fishing Score</span>
-                        <span class="wx-cell__value" id="fishing-score">&mdash;</span>
-                    </div>
-                    <div class="wx-cell">
-                        <span class="wx-cell__icon">
-                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
-                        </span>
-                        <span class="wx-cell__label">Visibility</span>
-                        <span class="wx-cell__value" id="visibility">&mdash;</span>
-                    </div>
+                <div class="stat-card">
+                    <div class="stat-card__value stat-card__value--water" id="water-temp">&mdash;</div>
+                    <div class="stat-card__label">Water</div>
+                    <div class="stat-card__sparkline"><div class="spark-bar" style="height:9px"></div><div class="spark-bar" style="height:8px"></div><div class="spark-bar" style="height:10px"></div><div class="spark-bar" style="height:11px"></div><div class="spark-bar" style="height:10px"></div><div class="spark-bar" style="height:12px"></div></div>
                 </div>
-            </section>
+                <div class="stat-card">
+                    <div class="stat-card__value" id="wind-speed">&mdash;</div>
+                    <div class="stat-card__label">Wind</div>
+                    <div class="stat-card__sparkline"><div class="spark-bar" style="height:5px"></div><div class="spark-bar" style="height:8px"></div><div class="spark-bar" style="height:6px"></div><div class="spark-bar" style="height:9px"></div><div class="spark-bar" style="height:7px"></div><div class="spark-bar" style="height:4px"></div></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card__value" id="wave-height">&mdash;</div>
+                    <div class="stat-card__label">Waves</div>
+                    <div class="stat-card__sparkline"><div class="spark-bar" style="height:7px"></div><div class="spark-bar" style="height:11px"></div><div class="spark-bar" style="height:9px"></div><div class="spark-bar" style="height:6px"></div><div class="spark-bar" style="height:8px"></div><div class="spark-bar" style="height:5px"></div></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card__value" id="pressure">&mdash;</div>
+                    <div class="stat-card__label">Pressure</div>
+                    <div class="stat-card__sparkline"><div class="spark-bar" style="height:13px"></div><div class="spark-bar" style="height:13px"></div><div class="spark-bar" style="height:14px"></div><div class="spark-bar" style="height:13px"></div><div class="spark-bar" style="height:13px"></div><div class="spark-bar" style="height:14px"></div></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card__value stat-card__value--moon" id="moon-phase">&mdash;</div>
+                    <div class="stat-card__label">Moon</div>
+                    <div class="stat-card__sparkline"><div class="spark-bar" style="height:9px"></div><div class="spark-bar" style="height:10px"></div><div class="spark-bar" style="height:11px"></div><div class="spark-bar" style="height:12px"></div><div class="spark-bar" style="height:12px"></div><div class="spark-bar" style="height:11px"></div></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card__value stat-card__value--score" id="fishing-score">&mdash;</div>
+                    <div class="stat-card__label">Fishing Score</div>
+                    <div class="stat-card__sparkline"><div class="spark-bar" style="height:8px"></div><div class="spark-bar" style="height:10px"></div><div class="spark-bar" style="height:12px"></div><div class="spark-bar" style="height:11px"></div><div class="spark-bar" style="height:14px"></div><div class="spark-bar" style="height:13px"></div></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card__value" id="visibility">&mdash;</div>
+                    <div class="stat-card__label">Visibility</div>
+                    <div class="stat-card__sparkline"><div class="spark-bar" style="height:12px"></div><div class="spark-bar" style="height:11px"></div><div class="spark-bar" style="height:13px"></div><div class="spark-bar" style="height:14px"></div><div class="spark-bar" style="height:13px"></div><div class="spark-bar" style="height:14px"></div></div>
+                </div>
+                <span class="stat-strip__station" id="weather-station">Select a date or viewing latest</span>
+            </div>
         </main>
 
     </div>
@@ -328,6 +307,6 @@
     <script src="/js/vendor/leaflet.js"></script>
     <script src="/js/vendor/leaflet.markercluster.js"></script>
     <script src="/js/config.js?v=36"></script>
-    <script src="/js/app.js?v=43"></script>
+    <script src="/js/app.js?v=45"></script>
 </body>
 </html>
