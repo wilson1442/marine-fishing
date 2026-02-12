@@ -633,6 +633,36 @@ def delete_backup(filename: str, current_user: dict = Depends(get_current_admin)
     return {"filename": filename, "message": "Backup deleted"}
 
 
+# ---------- Site Settings ----------
+
+SITE_SETTINGS_FILE = "/opt/marine-fishing/api/site_settings.json"
+
+def _read_site_settings() -> dict:
+    if os.path.exists(SITE_SETTINGS_FILE):
+        with open(SITE_SETTINGS_FILE, "r") as f:
+            return json.load(f)
+    return {}
+
+def _write_site_settings(data: dict):
+    with open(SITE_SETTINGS_FILE, "w") as f:
+        json.dump(data, f)
+
+
+@router.get("/settings")
+def get_site_settings(current_user: dict = Depends(get_current_admin)):
+    """Get all site settings (admin only)."""
+    return _read_site_settings()
+
+
+@router.put("/settings")
+def update_site_settings(body: dict, current_user: dict = Depends(get_current_admin)):
+    """Update site settings (admin only)."""
+    data = _read_site_settings()
+    data.update(body)
+    _write_site_settings(data)
+    return data
+
+
 # ---------- Scheduled Backup ----------
 
 def _read_schedule_file() -> dict:

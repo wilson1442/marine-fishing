@@ -5,7 +5,7 @@ const mapConfig = {
     center: [39.5, -72.0],
     zoom: 6,
     minZoom: 3,
-    maxZoom: 15,
+    maxZoom: 20,
 
     // Base layers
     baseLayers: {

@@ -58,6 +58,30 @@ document.addEventListener('DOMContentLoaded', async function () {
         return;
     }
 
+    // Load Google Maps API key and dynamically inject script if configured
+    try {
+        var keyResp = await fetch('/api/v1/settings/google-maps-key');
+        var keyData = await keyResp.json();
+        if (keyData.google_maps_api_key) {
+            await new Promise(function (resolve, reject) {
+                var script = document.createElement('script');
+                script.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(keyData.google_maps_api_key);
+                script.async = true;
+                script.onload = function () {
+                    window._googleMapsReady = true;
+                    resolve();
+                };
+                script.onerror = function () {
+                    console.warn('Google Maps API failed to load, falling back to Esri tiles');
+                    resolve();
+                };
+                document.head.appendChild(script);
+            });
+        }
+    } catch (e) {
+        console.warn('Could not fetch Google Maps key, using fallback tiles:', e);
+    }
+
     // Safety timeout: hide loading overlay after 15s no matter what
     var loadingTimeout = setTimeout(function () {
         setMapLoading(false);
@@ -117,11 +141,18 @@ function initMap() {
         zoomControl: true
     });
 
-    // Add ocean basemap
-    L.tileLayer(mapConfig.baseLayers.ocean.url, {
-        attribution: mapConfig.baseLayers.ocean.attribution,
-        maxZoom: mapConfig.baseLayers.ocean.maxZoom
-    }).addTo(map);
+    // Add base layer — Google Maps satellite if available, else Esri Ocean fallback
+    if (window._googleMapsReady && typeof L.gridLayer.googleMutant === 'function') {
+        L.gridLayer.googleMutant({
+            type: 'satellite',
+            maxZoom: 22,
+        }).addTo(map);
+    } else {
+        L.tileLayer(mapConfig.baseLayers.ocean.url, {
+            attribution: mapConfig.baseLayers.ocean.attribution,
+            maxZoom: mapConfig.baseLayers.ocean.maxZoom
+        }).addTo(map);
+    }
 
     // Add scale bar
     L.control.scale({ imperial: true, metric: true, position: 'bottomright', maxWidth: 150 }).addTo(map);

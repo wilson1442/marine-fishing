@@ -8,6 +8,7 @@ import os
 
 from app.config import get_settings
 from app.api.routes import catches, species, weather, admin, explorer, vessels, tide, leads, auth
+from app.api.routes import settings as settings_routes
 from app.scheduler import init_scheduler, shutdown_scheduler
 
 settings = get_settings()
@@ -58,6 +59,7 @@ app.include_router(vessels.router, prefix="/api/v1/vessels", tags=["vessels"])
 app.include_router(tide.router, prefix="/api/v1/tide", tags=["tide"])
 app.include_router(leads.router, prefix="/api/v1/leads", tags=["leads"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
+app.include_router(settings_routes.router, prefix="/api/v1", tags=["settings"])
 
 
 # Health check endpoint

@@ -525,6 +525,7 @@ textarea.field__input{resize:vertical;min-height:60px}
         <button class="tab-btn" data-tab="backups" onclick="switchTab('backups')">Backups</button>
         <button class="tab-btn" data-tab="users" onclick="switchTab('users')">Users <span class="tab-badge" id="tab-users-badge" style="display:none">0</span></button>
         <button class="tab-btn" data-tab="apikeys" onclick="switchTab('apikeys')">API Keys</button>
+        <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">Settings</button>
     </div>
 
     <!-- TAB: Overview -->
@@ -826,6 +827,34 @@ textarea.field__input{resize:vertical;min-height:60px}
     </section>
 
     </div><!-- /tab-apikeys -->
+
+    <!-- TAB: Settings -->
+    <div class="tab-panel" id="tab-settings">
+
+    <section class="section">
+        <div class="section__head">
+            <h2 class="section__title">Site Settings</h2>
+        </div>
+
+        <div class="form-grid" style="max-width:600px">
+            <div class="field field--full">
+                <label class="field__label">Google Maps API Key</label>
+                <div style="display:flex;gap:8px;align-items:center">
+                    <input type="password" class="field__input" id="settings-gmaps-key" placeholder="Enter your Google Maps API key" style="flex:1;font-family:var(--font-mono);font-size:12px">
+                    <button class="btn btn--ghost" onclick="toggleGmapsKeyVisibility()" id="settings-gmaps-toggle" style="min-width:60px">Show</button>
+                </div>
+                <div style="margin-top:6px;font-size:11px;color:var(--text-dim)">
+                    <span id="settings-gmaps-status" style="margin-right:8px"></span>
+                    Enable the <strong>Maps JavaScript API</strong> in your <a href="https://console.cloud.google.com/apis/library/maps-backend.googleapis.com" target="_blank" rel="noopener" style="color:var(--cyan)">Google Cloud Console</a>.
+                </div>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn--primary" onclick="saveSiteSettings()">Save Settings</button>
+            </div>
+        </div>
+    </section>
+
+    </div><!-- /tab-settings -->
 
     <!-- API Key Modal -->
     <div class="log-modal-overlay" id="apikey-modal-overlay" onclick="closeApiKeyModal(event)">
@@ -1209,6 +1238,8 @@ async function loadAll() {
     if (results[6].status === 'fulfilled') _registrationsCache = results[6].value.registrations || [];
     populateAllUsers();
     if (results[7].status === 'fulfilled') populateApiKeys(results[7].value);
+
+    loadSiteSettings();
 }
 
 // ===== Populate Functions =====
@@ -1994,6 +2025,60 @@ function copyApiKey() {
 function closeApiKeyModal(event) {
     if (event && event.target !== event.currentTarget) return;
     document.getElementById('apikey-modal-overlay').classList.remove('visible');
+}
+
+// ===== Site Settings =====
+
+async function loadSiteSettings() {
+    try {
+        var resp = await authFetch(API + '/settings');
+        if (!resp.ok) return;
+        var data = await resp.json();
+        var input = document.getElementById('settings-gmaps-key');
+        var status = document.getElementById('settings-gmaps-status');
+        if (input && data.google_maps_api_key) {
+            input.value = data.google_maps_api_key;
+            if (status) { status.textContent = 'Key configured'; status.style.color = 'var(--green, #4ade80)'; }
+        } else {
+            if (status) { status.textContent = 'No key configured'; status.style.color = 'var(--text-dim)'; }
+        }
+    } catch (e) {
+        console.error('Failed to load site settings:', e);
+    }
+}
+
+async function saveSiteSettings() {
+    var input = document.getElementById('settings-gmaps-key');
+    var key = input ? input.value.trim() : '';
+    try {
+        var resp = await authFetch(API + '/settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ google_maps_api_key: key })
+        });
+        if (!resp.ok) throw new Error('Save failed');
+        showToast(key ? 'Google Maps API key saved' : 'Google Maps API key removed', 'success');
+        var status = document.getElementById('settings-gmaps-status');
+        if (status) {
+            if (key) { status.textContent = 'Key configured'; status.style.color = 'var(--green, #4ade80)'; }
+            else { status.textContent = 'No key configured'; status.style.color = 'var(--text-dim)'; }
+        }
+    } catch (e) {
+        showToast('Failed to save settings', 'error');
+    }
+}
+
+function toggleGmapsKeyVisibility() {
+    var input = document.getElementById('settings-gmaps-key');
+    var btn = document.getElementById('settings-gmaps-toggle');
+    if (!input || !btn) return;
+    if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = 'Hide';
+    } else {
+        input.type = 'password';
+        btn.textContent = 'Show';
+    }
 }
 
 // ===== Init =====
