@@ -1,21 +1,36 @@
-from fastapi import APIRouter, Depends
+import hashlib
+import json
+
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from typing import List
 
-from app.api.deps import get_db, require_api_access
+from app.api.deps import get_db, require_api_access, check_etag
 from app.models.species import Species
 from app.schemas.species import SpeciesResponse, SpeciesListResponse
 
 router = APIRouter()
 
 
-@router.get("", response_model=SpeciesListResponse)
-def get_species(db: Session = Depends(get_db), _auth: dict = Depends(require_api_access)):
+@router.get("")
+def get_species(request: Request, db: Session = Depends(get_db), _auth: dict = Depends(require_api_access)):
     """Get all species with their colors for the legend"""
     species = db.query(Species).order_by(Species.common_name).all()
-    return SpeciesListResponse(
+    data = SpeciesListResponse(
         species=[SpeciesResponse.model_validate(s) for s in species],
         total=len(species)
+    ).model_dump()
+
+    cached = check_etag(request, data)
+    if cached:
+        return cached
+
+    raw = json.dumps(data, sort_keys=True, default=str)
+    etag = '"' + hashlib.md5(raw.encode()).hexdigest() + '"'
+    return JSONResponse(
+        content=data,
+        headers={"ETag": etag, "Cache-Control": "public, max-age=300"},
     )
 
 

@@ -1,12 +1,15 @@
-from fastapi import APIRouter, Depends, Query, HTTPException
-from fastapi.responses import Response
+import hashlib
+import json as json_stdlib
+
+from fastapi import APIRouter, Depends, Query, HTTPException, Request
+from fastapi.responses import Response, JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import Optional
 from datetime import date
 import math
 
-from app.api.deps import get_db, require_api_access
+from app.api.deps import get_db, require_api_access, check_etag
 
 router = APIRouter()
 
@@ -108,6 +111,7 @@ def get_historical_weather(
 
 @router.get("/buoys")
 def get_buoy_stations(
+    request: Request,
     active_only: bool = Query(True),
     db: Session = Depends(get_db),
     _auth: dict = Depends(require_api_access)
@@ -137,7 +141,18 @@ def get_buoy_stations(
             "is_active": row.is_active
         })
 
-    return {"stations": stations, "total": len(stations)}
+    data = {"stations": stations, "total": len(stations)}
+
+    cached = check_etag(request, data)
+    if cached:
+        return cached
+
+    raw = json_stdlib.dumps(data, sort_keys=True, default=str)
+    etag = '"' + hashlib.md5(raw.encode()).hexdigest() + '"'
+    return JSONResponse(
+        content=data,
+        headers={"ETag": etag, "Cache-Control": "public, max-age=300"},
+    )
 
 
 @router.get("/buoys/{station_id}")

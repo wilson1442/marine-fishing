@@ -3,19 +3,24 @@ Tide API Routes
 NOAA CO-OPS tide predictions and water levels
 """
 
-from fastapi import APIRouter, Depends, Query, HTTPException
+import hashlib
+import json
+
+from fastapi import APIRouter, Depends, Query, HTTPException, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import Optional
 from datetime import datetime, timezone, timedelta
 
-from app.api.deps import get_db, require_api_access
+from app.api.deps import get_db, require_api_access, check_etag
 
 router = APIRouter()
 
 
 @router.get("/stations")
 def get_tide_stations(
+    request: Request,
     active_only: bool = Query(True),
     state: Optional[str] = Query(None, description="Filter by state code (e.g., NY, NJ)"),
     station_type: Optional[str] = Query(None, description="Filter by type: inlet, harbor, bay"),
@@ -65,7 +70,18 @@ def get_tide_stations(
             "is_active": row.is_active,
         })
 
-    return {"stations": stations, "total": len(stations)}
+    data = {"stations": stations, "total": len(stations)}
+
+    cached = check_etag(request, data)
+    if cached:
+        return cached
+
+    raw = json.dumps(data, sort_keys=True, default=str)
+    etag = '"' + hashlib.md5(raw.encode()).hexdigest() + '"'
+    return JSONResponse(
+        content=data,
+        headers={"ETag": etag, "Cache-Control": "public, max-age=300"},
+    )
 
 
 @router.get("/predictions")

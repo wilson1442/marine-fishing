@@ -9,6 +9,7 @@ from datetime import datetime
 
 import jwt as pyjwt
 from fastapi import Request, HTTPException, Depends
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
@@ -210,14 +211,29 @@ def _verify_token(token: str) -> dict | None:
 
 
 def get_current_admin(request: Request, db: Session = Depends(get_db)):
-    """FastAPI dependency: read user_token cookie, verify token, confirm user has admin role."""
-    token = request.cookies.get("user_token")
-    payload = _verify_token(token)
-    if payload is None:
+    """FastAPI dependency: verify admin role via JWT Bearer token or session cookie."""
+    user_id = None
+
+    # Try JWT Bearer token first (mobile apps)
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        jwt_payload = _verify_jwt_access_token(auth_header[7:])
+        if jwt_payload:
+            user_id = int(jwt_payload["sub"])
+
+    # Fall back to session cookie (web frontend)
+    if user_id is None:
+        token = request.cookies.get("user_token")
+        cookie_payload = _verify_token(token)
+        if cookie_payload:
+            user_id = cookie_payload["user_id"]
+
+    if user_id is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
+
     row = db.execute(
         text("SELECT id, email, first_name, last_name, role, status, expires_at FROM registered_users WHERE id = :id"),
-        {"id": payload["user_id"]},
+        {"id": user_id},
     ).fetchone()
     if not row or row.status != "approved" or row.role != "admin":
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -229,3 +245,23 @@ def get_current_admin(request: Request, db: Session = Depends(get_db)):
         "display_name": row.first_name + " " + row.last_name,
         "role": row.role,
     }
+
+
+# ---------- ETag helpers ----------
+
+def check_etag(request: Request, data: dict, max_age: int = 300) -> Response | None:
+    """
+    Compute an ETag for *data* and return a 304 Response if the client's
+    If-None-Match header matches.  Returns None when the caller should
+    send the full payload (caller must set ETag/Cache-Control itself).
+    """
+    raw = json.dumps(data, sort_keys=True, default=str)
+    etag = '"' + hashlib.md5(raw.encode()).hexdigest() + '"'
+
+    if_none_match = request.headers.get("If-None-Match")
+    if if_none_match and if_none_match == etag:
+        return Response(
+            status_code=304,
+            headers={"ETag": etag, "Cache-Control": f"public, max-age={max_age}"},
+        )
+    return None

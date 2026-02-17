@@ -21,6 +21,7 @@ def get_catches_geojson(
     conditions: Optional[str] = Query(None, description="Condition names (comma-separated)"),
     bbox: Optional[str] = Query(None, description="Bounding box: SW_lng,SW_lat,NE_lng,NE_lat"),
     source: Optional[str] = Query(None, description="Data sources (comma-separated)"),
+    format: Optional[str] = Query(None, description="'compact' for minimal mobile payload"),
     limit: int = Query(500, ge=1, le=5000, description="Max records"),
     offset: int = Query(0, ge=0, description="Pagination offset"),
     db: Session = Depends(get_db),
@@ -113,12 +114,22 @@ def get_catches_geojson(
     rows = result.fetchall()
 
     # Build GeoJSON features
+    compact = format == "compact"
     features = []
     for row in rows:
-        feature = {
-            "type": "Feature",
-            "geometry": row.geojson if row.geojson else {"type": "Point", "coordinates": [float(row.longitude or 0), float(row.latitude or 0)]},
-            "properties": {
+        geom = row.geojson if row.geojson else {"type": "Point", "coordinates": [float(row.longitude or 0), float(row.latitude or 0)]}
+
+        if compact:
+            props = {
+                "id": row.id,
+                "sc": row.species_code,
+                "c": row.color_hex or "#808080",
+                "d": row.catch_date.isoformat() if row.catch_date else None,
+                "w": float(row.weight_lbs) if row.weight_lbs else None,
+                "q": row.quantity or 1,
+            }
+        else:
+            props = {
                 "id": row.id,
                 "catch_date": row.catch_date.isoformat() if row.catch_date else None,
                 "species_name": row.species_name,
@@ -131,10 +142,10 @@ def get_catches_geojson(
                 "fishing_method": row.fishing_method,
                 "conditions": row.conditions_name,
                 "source": row.source,
-                "source_id": row.source_id
+                "source_id": row.source_id,
             }
-        }
-        features.append(feature)
+
+        features.append({"type": "Feature", "geometry": geom, "properties": props})
 
     # Get metadata (counts)
     count_query = """
@@ -298,3 +309,85 @@ def get_recent_catches(
         })
 
     return {"catches": catches, "total": len(catches)}
+
+
+@router.get("/dashboard")
+def get_dashboard(
+    lat: Optional[float] = Query(None, description="Latitude for nearest weather"),
+    lon: Optional[float] = Query(None, description="Longitude for nearest weather"),
+    db: Session = Depends(get_db),
+    _auth: dict = Depends(require_api_access),
+):
+    """
+    Mobile dashboard summary — single request replaces 3-4 separate API calls.
+    Returns catches (7d), active species, top 5 species (30d), live vessels, and nearest weather.
+    """
+    # Catches in last 7 days
+    catches_7d = db.execute(text(
+        "SELECT COUNT(*) FROM catches WHERE catch_date >= CURRENT_DATE - INTERVAL '7 days'"
+    )).scalar() or 0
+
+    # Active species (seen in last 30 days)
+    active_species = db.execute(text(
+        "SELECT COUNT(DISTINCT species_id) FROM catches WHERE catch_date >= CURRENT_DATE - INTERVAL '30 days'"
+    )).scalar() or 0
+
+    # Top 5 species by catch count in last 30 days
+    top_species_rows = db.execute(text("""
+        SELECT s.common_name, s.species_code, s.color_hex, COUNT(*) as cnt
+        FROM catches c
+        JOIN species s ON c.species_id = s.id
+        WHERE c.catch_date >= CURRENT_DATE - INTERVAL '30 days'
+        GROUP BY s.id, s.common_name, s.species_code, s.color_hex
+        ORDER BY cnt DESC
+        LIMIT 5
+    """)).fetchall()
+
+    top_species = [
+        {
+            "species_name": r.common_name,
+            "species_code": r.species_code,
+            "color_hex": r.color_hex,
+            "count": r.cnt,
+        }
+        for r in top_species_rows
+    ]
+
+    # Live vessel count (last 6 hours)
+    try:
+        live_vessels = db.execute(text(
+            "SELECT COUNT(DISTINCT mmsi) FROM vessel_positions WHERE received_at > NOW() - INTERVAL '6 hours'"
+        )).scalar() or 0
+    except Exception:
+        live_vessels = 0
+
+    # Nearest weather (if lat/lon provided)
+    nearest_weather = None
+    if lat is not None and lon is not None:
+        try:
+            wx_row = db.execute(text("""
+                SELECT wo.*, bs.station_name
+                FROM weather_observations wo
+                JOIN buoy_stations bs ON wo.buoy_id = bs.station_id
+                ORDER BY bs.location <-> ST_SetSRID(ST_MakePoint(:lon, :lat), 4326),
+                         wo.recorded_at DESC
+                LIMIT 1
+            """), {"lat": lat, "lon": lon}).fetchone()
+            if wx_row:
+                nearest_weather = {
+                    "station_name": wx_row.station_name,
+                    "water_temp_f": float(wx_row.water_temp_f) if wx_row.water_temp_f else None,
+                    "wind_speed_kts": float(wx_row.wind_speed_kts) if wx_row.wind_speed_kts else None,
+                    "wave_height_ft": float(wx_row.wave_height_ft) if wx_row.wave_height_ft else None,
+                    "fishing_score": wx_row.fishing_score,
+                }
+        except Exception:
+            pass
+
+    return {
+        "catches_7d": catches_7d,
+        "active_species": active_species,
+        "top_species": top_species,
+        "live_vessels": live_vessels,
+        "nearest_weather": nearest_weather,
+    }

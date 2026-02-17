@@ -7,8 +7,9 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 
 from app.config import get_settings
-from app.api.routes import catches, species, weather, admin, explorer, vessels, tide, leads, auth
+from app.api.routes import catches, species, weather, admin, explorer, vessels, tide, leads, auth, preferences, notifications
 from app.api.routes import settings as settings_routes
+from app.middleware.rate_limit import RateLimitMiddleware
 from app.scheduler import init_scheduler, shutdown_scheduler
 
 settings = get_settings()
@@ -40,6 +41,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Rate limiting middleware (120 req/min per client, skips same-origin + tiles)
+app.add_middleware(RateLimitMiddleware)
+
 # Clear legacy admin_token cookie if present
 @app.middleware("http")
 async def clear_legacy_admin_token(request: Request, call_next):
@@ -59,6 +63,8 @@ app.include_router(vessels.router, prefix="/api/v1/vessels", tags=["vessels"])
 app.include_router(tide.router, prefix="/api/v1/tide", tags=["tide"])
 app.include_router(leads.router, prefix="/api/v1/leads", tags=["leads"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
+app.include_router(preferences.router, prefix="/api/v1/preferences", tags=["preferences"])
+app.include_router(notifications.router, prefix="/api/v1/notifications", tags=["notifications"])
 app.include_router(settings_routes.router, prefix="/api/v1", tags=["settings"])
 
 
