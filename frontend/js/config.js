@@ -77,6 +77,30 @@ const API_ENDPOINTS = {
     tideStations: `${API_BASE}/tide/stations`,
     tidePredictions: `${API_BASE}/tide/predictions`,
     tideCurrent: `${API_BASE}/tide/current`,
+    // Pelagic Intelligence endpoints
+    predictionsCells: `${API_BASE}/predictions/cells`,
+    predictionsTopSpots: `${API_BASE}/predictions/top-spots`,
+    predictionsPoint: `${API_BASE}/predictions/point`,
+    biteWindows: `${API_BASE}/bite-windows`,
+    inletsBiteIndex: `${API_BASE}/inlets/bite-index`,
+    fleetPressure: `${API_BASE}/fleet/pressure`,
+    fleetSummary: `${API_BASE}/fleet/summary`,
+    pelagicRegions: `${API_BASE}/regions`,
+    pelagicTiles: `${API_BASE}/tiles/pelagic`,
+};
+
+// Pelagic Intelligence configuration
+const pelagicConfig = {
+    tileUrlTemplate: `${API_BASE}/tiles/pelagic/{species}/{z}/{x}/{y}.png`,
+    defaultSpecies: 'YFT',
+    colorScale: [
+        { max: 20,  color: '#1e46c8', label: '<20%' },
+        { max: 40,  color: '#1ec8dc', label: '40%' },
+        { max: 55,  color: '#32c850', label: '55%' },
+        { max: 70,  color: '#f0dc28', label: '70%' },
+        { max: 85,  color: '#f0961e', label: '85%' },
+        { max: Infinity, color: '#dc1e1e', label: '>85%' },
+    ],
 };
 
 // Coastal city landmarks for reference on the map

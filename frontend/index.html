@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="/css/vendor/MarkerCluster.css" />
     <link rel="stylesheet" href="/css/vendor/MarkerCluster.Default.css" />
 
-    <link rel="stylesheet" href="/css/style.css?v=37" />
+    <link rel="stylesheet" href="/css/style.css?v=38" />
 </head>
 <body>
     <div class="scanline-overlay"></div>
@@ -103,6 +103,43 @@
                                 <span class="map-layer-toggle__swatch" style="background:#21918c"></span>
                                 <span class="map-layer-toggle__name">Chlorophyll-a</span>
                                 <span class="map-layer-toggle__count" id="chlorophyll-status"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <!-- PI — Pelagic Intelligence -->
+                    <div class="layer-group" data-group="pelagic">
+                        <div class="layer-group__header">
+                            <span class="map-layer-toggles__badge" style="background:#dc1e1e">PI</span>
+                            <span class="map-layer-toggles__title">Pelagic Intelligence</span>
+                            <span class="layer-group__chevron">&#9662;</span>
+                        </div>
+                        <div class="layer-group__body">
+                            <label class="map-layer-toggle">
+                                <input type="checkbox" id="pelagic-heatmap-toggle" />
+                                <span class="map-layer-toggle__swatch" style="background:#dc1e1e"></span>
+                                <span class="map-layer-toggle__name">Species Heatmap</span>
+                                <span class="map-layer-toggle__count" id="pelagic-status"></span>
+                            </label>
+                            <div class="pelagic-species-selector" style="padding:4px 0 4px 28px">
+                                <select id="pelagic-species-select" class="tide-panel__select" style="width:100%">
+                                    <option value="YFT">Yellowfin Tuna</option>
+                                    <option value="BFT">Bluefin Tuna</option>
+                                    <option value="BET">Bigeye Tuna</option>
+                                    <option value="ALB">Albacore Tuna</option>
+                                    <option value="DOL">Mahi Mahi</option>
+                                    <option value="WAH">Wahoo</option>
+                                    <option value="WHM">White Marlin</option>
+                                    <option value="BUM">Blue Marlin</option>
+                                    <option value="SWO">Swordfish</option>
+                                    <option value="SAI">Sailfish</option>
+                                    <option value="SKJ">Skipjack Tuna</option>
+                                </select>
+                            </div>
+                            <label class="map-layer-toggle">
+                                <input type="checkbox" id="fleet-pressure-toggle" />
+                                <span class="map-layer-toggle__swatch" style="background:#ff9f1c"></span>
+                                <span class="map-layer-toggle__name">Fleet Pressure</span>
+                                <span class="map-layer-toggle__count" id="fleet-pressure-status"></span>
                             </label>
                         </div>
                     </div>
@@ -306,7 +343,7 @@
 
     <script src="/js/vendor/leaflet.js"></script>
     <script src="/js/vendor/leaflet.markercluster.js"></script>
-    <script src="/js/config.js?v=37"></script>
-    <script src="/js/app.js?v=48"></script>
+    <script src="/js/config.js?v=38"></script>
+    <script src="/js/app.js?v=49"></script>
 </body>
 </html>

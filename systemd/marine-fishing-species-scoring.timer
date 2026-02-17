@@ -1,0 +1,9 @@
+[Unit]
+Description=Marine Fishing - Species Scoring (Every 30min, offset 10min)
+
+[Timer]
+OnCalendar=*-*-* *:10,40:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

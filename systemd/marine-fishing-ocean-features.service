@@ -1,0 +1,12 @@
+[Unit]
+Description=Marine Fishing - Ocean Features Harvester
+After=network.target postgresql.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/marine-fishing
+Environment="PATH=/opt/marine-fishing/api/venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONPATH=/opt/marine-fishing"
+EnvironmentFile=/opt/marine-fishing/api/.env
+ExecStart=/opt/marine-fishing/api/venv/bin/python -m harvesters.ocean_features_harvester
+TimeoutStartSec=600

@@ -42,6 +42,13 @@ let weatherOverlayActive = false;
 let chlorophyllWmsLayer = null;
 let chlorophyllOverlayActive = false;
 
+// Pelagic Intelligence overlay state
+let pelagicTileLayer = null;
+let pelagicOverlayActive = false;
+let pelagicSelectedSpecies = 'YFT';
+let fleetPressureLayer = null;
+let fleetPressureActive = false;
+
 // Initialize the application
 document.addEventListener('DOMContentLoaded', async function () {
     // Auth guard: verify user is logged in before loading map
@@ -108,6 +115,8 @@ document.addEventListener('DOMContentLoaded', async function () {
     initTidePanel();
     initCityLandmarksToggle();
     loadCityLandmarks();
+    initPelagicOverlay();
+    initFleetPressureOverlay();
 
     // Run data fetches in parallel, don't let one block another
     await Promise.allSettled([
@@ -1533,6 +1542,166 @@ function toggleCityLandmarks(visible) {
             map.removeLayer(cityLandmarksLayer);
         }
     }
+}
+
+// ---- Pelagic Intelligence Overlay ----
+
+function initPelagicOverlay() {
+    var toggle = document.getElementById('pelagic-heatmap-toggle');
+    if (!toggle) return;
+
+    toggle.addEventListener('change', function () {
+        pelagicOverlayActive = this.checked;
+        if (pelagicOverlayActive) {
+            addPelagicLayer();
+        } else {
+            removePelagicLayer();
+        }
+    });
+
+    var select = document.getElementById('pelagic-species-select');
+    if (select) {
+        select.addEventListener('change', function () {
+            pelagicSelectedSpecies = this.value;
+            if (pelagicOverlayActive) {
+                addPelagicLayer();
+            }
+        });
+    }
+}
+
+function addPelagicLayer() {
+    if (pelagicTileLayer) map.removeLayer(pelagicTileLayer);
+
+    var url = pelagicConfig.tileUrlTemplate
+        .replace('{species}', pelagicSelectedSpecies);
+
+    pelagicTileLayer = L.tileLayer(url, {
+        transparent: true,
+        opacity: 0.6,
+    });
+
+    pelagicTileLayer.on('tileerror', function (e) {
+        console.error('Pelagic tile error:', e.tile ? e.tile.src : e);
+        setText('pelagic-status', 'ERR');
+    });
+    pelagicTileLayer.on('tileload', function () {
+        setText('pelagic-status', 'ON');
+    });
+
+    pelagicTileLayer.addTo(map);
+    showPelagicLegend();
+    setText('pelagic-status', 'ON');
+}
+
+function removePelagicLayer() {
+    if (pelagicTileLayer) {
+        map.removeLayer(pelagicTileLayer);
+        pelagicTileLayer = null;
+    }
+    hidePelagicLegend();
+    setText('pelagic-status', '');
+}
+
+function showPelagicLegend() {
+    hidePelagicLegend();
+    var wrap = document.querySelector('.map-wrap');
+    if (!wrap) return;
+    var legend = document.createElement('div');
+    legend.className = 'pelagic-legend';
+    legend.innerHTML =
+        '<div class="pelagic-legend__title">Catch Prob (' + pelagicSelectedSpecies + ')</div>' +
+        '<div class="pelagic-legend__bar">' +
+        pelagicConfig.colorScale.map(function (s) {
+            return '<div class="pelagic-legend__stop" style="background:' + s.color + '" title="' + s.label + '"></div>';
+        }).join('') +
+        '</div>' +
+        '<div class="pelagic-legend__labels">' +
+        pelagicConfig.colorScale.map(function (s) {
+            return '<span>' + s.label + '</span>';
+        }).join('') +
+        '</div>';
+    wrap.appendChild(legend);
+}
+
+function hidePelagicLegend() {
+    var existing = document.querySelector('.pelagic-legend');
+    if (existing) existing.remove();
+}
+
+// ---- Fleet Pressure Overlay ----
+
+function initFleetPressureOverlay() {
+    var toggle = document.getElementById('fleet-pressure-toggle');
+    if (!toggle) return;
+
+    toggle.addEventListener('change', function () {
+        fleetPressureActive = this.checked;
+        if (fleetPressureActive) {
+            loadFleetPressure();
+        } else {
+            removeFleetPressure();
+        }
+    });
+}
+
+async function loadFleetPressure() {
+    removeFleetPressure();
+    fleetPressureLayer = L.layerGroup();
+
+    var bounds = map.getBounds();
+    var url = API_ENDPOINTS.fleetPressure +
+        '?min_lat=' + bounds.getSouth().toFixed(2) +
+        '&max_lat=' + bounds.getNorth().toFixed(2) +
+        '&min_lon=' + bounds.getWest().toFixed(2) +
+        '&max_lon=' + bounds.getEast().toFixed(2);
+
+    try {
+        var resp = await fetch(url);
+        var data = await resp.json();
+        if (!data.features) return;
+
+        data.features.forEach(function (f) {
+            var coords = f.geometry.coordinates;
+            var props = f.properties;
+            var intensity = props.fishing_intensity_score / 100;
+            var radius = Math.max(4, intensity * 14);
+
+            var marker = L.circleMarker([coords[1], coords[0]], {
+                radius: radius,
+                fillColor: '#ff9f1c',
+                color: '#fff',
+                weight: 1,
+                opacity: 0.8,
+                fillOpacity: Math.min(0.8, intensity * 0.7 + 0.1),
+            });
+            marker.bindPopup(
+                '<div class="catch-popup">' +
+                '<div class="catch-popup__species" style="color:#ff9f1c">Fleet Pressure</div>' +
+                '<div class="catch-popup__grid">' +
+                field('Vessels', props.vessel_count) +
+                field('Fishing', props.fishing_vessel_count) +
+                field('Intensity', props.fishing_intensity_score.toFixed(0) + '%') +
+                field('Dwell', props.dwell_minutes.toFixed(0) + ' min') +
+                '</div></div>'
+            );
+            fleetPressureLayer.addLayer(marker);
+        });
+
+        map.addLayer(fleetPressureLayer);
+        setText('fleet-pressure-status', data.features.length.toLocaleString());
+    } catch (e) {
+        console.error('Fleet pressure load error:', e);
+        setText('fleet-pressure-status', 'ERR');
+    }
+}
+
+function removeFleetPressure() {
+    if (fleetPressureLayer && map.hasLayer(fleetPressureLayer)) {
+        map.removeLayer(fleetPressureLayer);
+    }
+    fleetPressureLayer = null;
+    setText('fleet-pressure-status', '');
 }
 
 function initCityLandmarksToggle() {
