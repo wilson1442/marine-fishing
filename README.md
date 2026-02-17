@@ -2,6 +2,8 @@
 
 A full-stack geospatial data aggregation and visualization system for marine fishing intelligence. Ingests catch records, real-time vessel tracking, and weather observations from federal and international sources, then presents them through interactive mapping, dashboards, and data exploration interfaces.
 
+**Live:** [https://anglersuite.com](https://anglersuite.com)
+
 ---
 
 ## Table of Contents
@@ -527,6 +529,8 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
 The frontend is served at `http://localhost:8000` and the API docs at `http://localhost:8000/api/docs`.
+
+**Production:** The live site is deployed at [https://anglersuite.com](https://anglersuite.com).
 
 ### Systemd Service
 
