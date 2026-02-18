@@ -128,14 +128,16 @@ document.addEventListener('DOMContentLoaded', async function () {
     initPelagicOverlay();
     initFleetPressureOverlay();
 
+    // Marine alerts on both maps
+    loadMarineAlerts();
+    setInterval(loadMarineAlerts, 600000);   // 10 min
+
     // Inshore-specific init
     if (getPageZone() === 'inshore') {
         initBiteIndexPanel();
         loadInshoreTideCache();
         loadSpeciesModelWeights();
-        loadMarineAlerts();
         loadUSGSCurrent();
-        setInterval(loadMarineAlerts, 600000);   // 10 min
         setInterval(loadUSGSCurrent, 900000);     // 15 min
     }
 
@@ -2042,7 +2044,6 @@ function buildLegendTideWind() {
 // ---- Inshore: Marine Alerts Banner ----
 
 async function loadMarineAlerts() {
-    if (getPageZone() !== 'inshore') return;
     try {
         var resp = await fetch(API_ENDPOINTS.marineAlerts, { credentials: 'same-origin' });
         var data = await resp.json();

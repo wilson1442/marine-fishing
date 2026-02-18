@@ -87,6 +87,7 @@ const API_ENDPOINTS = {
     fleetSummary: `${API_BASE}/fleet/summary`,
     pelagicRegions: `${API_BASE}/regions`,
     pelagicTiles: `${API_BASE}/tiles/pelagic`,
+    marineAlerts: `${API_BASE}/alerts/marine`,
 };
 
 // Pelagic Intelligence configuration
