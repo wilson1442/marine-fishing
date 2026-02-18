@@ -231,14 +231,14 @@ async function loadSpecies() {
         var legendItems = document.getElementById('legend-items');
         legendItems.innerHTML = '';
         speciesData.forEach(function (sp) {
-            // Default all species to visible (checked)
-            speciesVisible[sp.species_code] = true;
+            // Default all species to hidden (unchecked)
+            speciesVisible[sp.species_code] = false;
 
             var item = document.createElement('label');
-            item.className = 'legend-item legend-item--active';
+            item.className = 'legend-item legend-item--hidden';
             item.dataset.species = sp.species_code;
             item.innerHTML =
-                '<input type="checkbox" class="legend-checkbox" data-species="' + sp.species_code + '" checked>' +
+                '<input type="checkbox" class="legend-checkbox" data-species="' + sp.species_code + '">' +
                 '<span class="legend-swatch" style="background-color:' + sp.color_hex + '; color:' + sp.color_hex + '"></span>' +
                 '<span class="legend-name">' + sp.common_name + '</span>' +
                 '<span class="legend-code">' + sp.species_code + '</span>';
