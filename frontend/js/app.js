@@ -48,6 +48,7 @@ let pelagicOverlayActive = false;
 let pelagicSelectedSpecies = 'YFT';
 let fleetPressureLayer = null;
 let fleetPressureActive = false;
+let pelagicRefreshInterval = null;
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', async function () {
@@ -1573,12 +1574,14 @@ function initPelagicOverlay() {
 function addPelagicLayer() {
     if (pelagicTileLayer) map.removeLayer(pelagicTileLayer);
 
+    // Append cache-bust timestamp so hourly refreshes pull fresh tiles
     var url = pelagicConfig.tileUrlTemplate
-        .replace('{species}', pelagicSelectedSpecies);
+        .replace('{species}', pelagicSelectedSpecies)
+        + '?_t=' + Math.floor(Date.now() / 1000);
 
     pelagicTileLayer = L.tileLayer(url, {
         transparent: true,
-        opacity: 0.6,
+        opacity: 0.95,
     });
 
     pelagicTileLayer.on('tileerror', function (e) {
@@ -1592,6 +1595,7 @@ function addPelagicLayer() {
     pelagicTileLayer.addTo(map);
     showPelagicLegend();
     setText('pelagic-status', 'ON');
+    startPelagicRefresh();
 }
 
 function removePelagicLayer() {
@@ -1601,6 +1605,27 @@ function removePelagicLayer() {
     }
     hidePelagicLegend();
     setText('pelagic-status', '');
+    stopPelagicRefresh();
+}
+
+function startPelagicRefresh() {
+    stopPelagicRefresh();
+    pelagicRefreshInterval = setInterval(function () {
+        if (pelagicOverlayActive) {
+            console.log('Pelagic auto-refresh: reloading tiles + fleet pressure');
+            addPelagicLayer();
+        }
+        if (fleetPressureActive) {
+            loadFleetPressure();
+        }
+    }, 3600000); // every 60 minutes
+}
+
+function stopPelagicRefresh() {
+    if (pelagicRefreshInterval) {
+        clearInterval(pelagicRefreshInterval);
+        pelagicRefreshInterval = null;
+    }
 }
 
 function showPelagicLegend() {
@@ -1639,8 +1664,11 @@ function initFleetPressureOverlay() {
         fleetPressureActive = this.checked;
         if (fleetPressureActive) {
             loadFleetPressure();
+            startPelagicRefresh();
         } else {
             removeFleetPressure();
+            // Only stop refresh if heatmap is also off
+            if (!pelagicOverlayActive) stopPelagicRefresh();
         }
     });
 }

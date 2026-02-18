@@ -94,12 +94,12 @@ const pelagicConfig = {
     tileUrlTemplate: `${API_BASE}/tiles/pelagic/{species}/{z}/{x}/{y}.png`,
     defaultSpecies: 'YFT',
     colorScale: [
-        { max: 20,  color: '#1e46c8', label: '<20%' },
-        { max: 40,  color: '#1ec8dc', label: '40%' },
-        { max: 55,  color: '#32c850', label: '55%' },
-        { max: 70,  color: '#f0dc28', label: '70%' },
-        { max: 85,  color: '#f0961e', label: '85%' },
-        { max: Infinity, color: '#dc1e1e', label: '>85%' },
+        { max: 15,  color: '#ffc8ff', label: '<15%' },
+        { max: 30,  color: '#ff64dc', label: '30%' },
+        { max: 50,  color: '#32dcff', label: '50%' },
+        { max: 70,  color: '#32ff64', label: '70%' },
+        { max: 85,  color: '#ffff00', label: '85%' },
+        { max: Infinity, color: '#ff0000', label: '>85%' },
     ],
 };
 

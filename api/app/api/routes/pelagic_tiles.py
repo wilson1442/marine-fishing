@@ -13,15 +13,16 @@ from app.api.deps import get_db, require_api_access
 
 router = APIRouter()
 
-# Color ramp: blue(0%) -> cyan(40%) -> green(55%) -> yellow(70%) -> orange(85%) -> red(100%)
+# Maximum contrast ramp — white/hot-pink low end, fully opaque
 _PELAGIC_RAMP = [
-    (0,   (30,  70, 200)),   # dark blue
-    (20,  (50, 130, 220)),   # blue
-    (40,  (30, 200, 220)),   # cyan
-    (55,  (50, 200,  80)),   # green
-    (70,  (240, 220, 40)),   # yellow
-    (85,  (240, 150, 30)),   # orange
-    (100, (220,  30, 30)),   # red
+    (0,   (255, 200, 255)),  # white-pink
+    (12,  (255, 100, 220)),  # hot pink
+    (25,  (180, 100, 255)),  # bright violet
+    (40,  (50,  220, 255)),  # electric cyan
+    (55,  (50,  255, 100)),  # neon green
+    (70,  (255, 255,  0)),   # pure yellow
+    (85,  (255, 130,  0)),   # hot orange
+    (100, (255,  0,    0)),  # pure red
 ]
 
 _EMPTY_TILE = None
@@ -133,7 +134,7 @@ def get_pelagic_tile(
     from scipy.sparse.csgraph import connected_components as cc
     from collections import Counter
 
-    BASE_ALPHA = 160
+    BASE_ALPHA = 255
     FADE_DIST = GRID_STEP * 3.0
 
     tree = cKDTree(points)
