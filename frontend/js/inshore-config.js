@@ -87,6 +87,9 @@ const API_ENDPOINTS = {
     fleetSummary: `${API_BASE}/fleet/summary`,
     pelagicRegions: `${API_BASE}/regions`,
     pelagicTiles: `${API_BASE}/tiles/pelagic`,
+    usgsStations: `${API_BASE}/usgs/stations`,
+    usgsCurrent: `${API_BASE}/usgs/current`,
+    marineAlerts: `${API_BASE}/alerts/marine`,
 };
 
 // Pelagic Intelligence configuration (reused for inshore heatmap tiles)

@@ -50,6 +50,15 @@ let fleetPressureLayer = null;
 let fleetPressureActive = false;
 let pelagicRefreshInterval = null;
 
+// Inshore-specific state
+let biteIndexData = null;
+let biteIndexSelectedSpecies = '';
+let inshoreTideCache = null;
+let inshoreTideRefreshInterval = null;
+let speciesModelWeights = null;
+let usgsDischargeData = null;
+let marineAlertsData = null;
+
 // Initialize the application
 document.addEventListener('DOMContentLoaded', async function () {
     // Auth guard: verify user is logged in before loading map
@@ -118,6 +127,17 @@ document.addEventListener('DOMContentLoaded', async function () {
     loadCityLandmarks();
     initPelagicOverlay();
     initFleetPressureOverlay();
+
+    // Inshore-specific init
+    if (getPageZone() === 'inshore') {
+        initBiteIndexPanel();
+        loadInshoreTideCache();
+        loadSpeciesModelWeights();
+        loadMarineAlerts();
+        loadUSGSCurrent();
+        setInterval(loadMarineAlerts, 600000);   // 10 min
+        setInterval(loadUSGSCurrent, 900000);     // 15 min
+    }
 
     // Run data fetches in parallel, don't let one block another
     await Promise.allSettled([
@@ -270,6 +290,9 @@ async function loadSpecies() {
             pelagicSelect.value = defaultSp;
             pelagicSelectedSpecies = defaultSp;
         }
+
+        // Populate bite index species filter (inshore only, needs speciesData)
+        populateBiteIndexSpeciesFilter();
 
         // Re-apply filter so markers match the default hidden state
         applySpeciesFilter();
@@ -782,7 +805,7 @@ function createPopup(feature) {
     var p = feature.properties;
     var sourceLabel = (p.source || 'unknown').replace(/_/g, ' ');
     var sourceIdStr = p.source_id ? ' \u00B7 ' + p.source_id : '';
-    return '<div class="catch-popup">' +
+    var html = '<div class="catch-popup">' +
         '<div class="catch-popup__source">' + sourceLabel + sourceIdStr + '</div>' +
         '<div class="catch-popup__species" style="color:' + (p.color_hex || '#4cc9f0') + '">' + (p.species_name || 'Unknown') + '</div>' +
         '<div class="catch-popup__grid">' +
@@ -792,9 +815,16 @@ function createPopup(feature) {
         '<div class="catch-popup__field"><div class="catch-popup__label">Method</div><div class="catch-popup__val">' + (p.fishing_method || 'N/A') + '</div></div>' +
         '<div class="catch-popup__field"><div class="catch-popup__label">Water</div><div class="catch-popup__val">' + (p.water_temp_f ? p.water_temp_f + '\u00B0F' : 'N/A') + '</div></div>' +
         '<div class="catch-popup__field"><div class="catch-popup__label">Conditions</div><div class="catch-popup__val">' + (p.conditions || 'N/A') + '</div></div>' +
-        '</div>' +
-        '<div class="catch-popup__disclaimer">Catch data is self-reported. Exact location may be inaccurate.</div>' +
         '</div>';
+
+    // Tide context for inshore popups
+    if (getPageZone() === 'inshore') {
+        html += buildTideContextHtml(p.species_code);
+    }
+
+    html += '<div class="catch-popup__disclaimer">Catch data is self-reported. Exact location may be inaccurate.</div>' +
+        '</div>';
+    return html;
 }
 
 // Update statistics display
@@ -1660,7 +1690,7 @@ function showPelagicLegend() {
     if (!wrap) return;
     var legend = document.createElement('div');
     legend.className = 'pelagic-legend';
-    legend.innerHTML =
+    var html =
         '<div class="pelagic-legend__title">Catch Prob (' + pelagicSelectedSpecies + ')</div>' +
         '<div class="pelagic-legend__bar">' +
         pelagicConfig.colorScale.map(function (s) {
@@ -1672,6 +1702,12 @@ function showPelagicLegend() {
             return '<span>' + s.label + '</span>';
         }).join('') +
         '</div>';
+
+    if (getPageZone() === 'inshore') {
+        html += buildLegendTideWind();
+    }
+
+    legend.innerHTML = html;
     wrap.appendChild(legend);
 }
 
@@ -1765,4 +1801,537 @@ function initCityLandmarksToggle() {
     toggle.addEventListener('change', function () {
         toggleCityLandmarks(this.checked);
     });
+}
+
+// ---- Inshore: Bite Index Panel ----
+
+function initBiteIndexPanel() {
+    var select = document.getElementById('bite-index-species-select');
+    if (!select) return;
+
+    select.addEventListener('change', function () {
+        biteIndexSelectedSpecies = this.value;
+        renderBiteIndex();
+    });
+
+    loadBiteIndex();
+    // Refresh every 15 minutes
+    setInterval(loadBiteIndex, 900000);
+}
+
+async function loadBiteIndex() {
+    try {
+        var resp = await fetch(API_ENDPOINTS.inletsBiteIndex, { credentials: 'same-origin' });
+        var data = await resp.json();
+        biteIndexData = data;
+        populateBiteIndexSpeciesFilter();
+        renderBiteIndex();
+    } catch (e) {
+        console.error('Error loading bite index:', e);
+    }
+}
+
+function populateBiteIndexSpeciesFilter() {
+    var select = document.getElementById('bite-index-species-select');
+    if (!select || !speciesData || select.options.length > 1) return;
+
+    speciesData.forEach(function (sp) {
+        var opt = document.createElement('option');
+        opt.value = sp.species_code;
+        opt.textContent = sp.common_name;
+        select.appendChild(opt);
+    });
+}
+
+function renderBiteIndex() {
+    var list = document.getElementById('bite-index-list');
+    if (!list || !biteIndexData) return;
+
+    // API returns inlets as an object keyed by inlet name, not an array
+    var inletsObj = biteIndexData.inlets || {};
+    var inletNames = Object.keys(inletsObj);
+    if (inletNames.length === 0) {
+        list.innerHTML = '<div class="tide-panel__empty">No bite index data</div>';
+        return;
+    }
+
+    // On inshore map, only show inshore species (not pelagic)
+    var inshoreSpeciesCodes = null;
+    if (getPageZone() === 'inshore' && speciesData && speciesData.length > 0) {
+        inshoreSpeciesCodes = {};
+        speciesData.forEach(function (sp) { inshoreSpeciesCodes[sp.species_code] = true; });
+    }
+
+    var html = '';
+    inletNames.forEach(function (inletName) {
+        var species = inletsObj[inletName] || [];
+        if (inshoreSpeciesCodes) {
+            species = species.filter(function (s) {
+                return inshoreSpeciesCodes[s.species_code] === true;
+            });
+        }
+        if (biteIndexSelectedSpecies) {
+            species = species.filter(function (s) {
+                return s.species_code === biteIndexSelectedSpecies;
+            });
+        }
+        if (species.length === 0) return;
+
+        html += '<div class="bite-index-inlet">' +
+            '<div class="bite-index-inlet__name">' + inletName + '</div>';
+
+        species.forEach(function (sp) {
+            var score = sp.bite_index != null ? Math.round(sp.bite_index) : (sp.score != null ? Math.round(sp.score) : 0);
+            var heatClass = getBiteHeatClass(score);
+            var trend = (sp.trend || 'stable').toLowerCase();
+            var trendArrow = trend === 'up' ? '\u25B2' : (trend === 'down' ? '\u25BC' : '\u25CF');
+            var reason = sp.top_reason || sp.reason || '';
+
+            html += '<div class="bite-index-row">' +
+                '<span class="bite-index-row__swatch bite-heat--' + heatClass + '"></span>' +
+                '<span class="bite-index-row__species">' + (sp.species_name || sp.species_code) + '</span>' +
+                '<span class="bite-index-row__score bite-heat--' + heatClass + '">' + score + '</span>' +
+                '<span class="bite-index-row__trend bite-trend--' + trend + '">' + trendArrow + '</span>' +
+                (reason ? '<span class="bite-index-row__reason">' + reason + '</span>' : '') +
+                '</div>';
+        });
+
+        html += '</div>';
+    });
+
+    if (!html) {
+        html = '<div class="tide-panel__empty">No data for selected species</div>';
+    }
+
+    if (biteIndexData.computed_at) {
+        html += '<div class="bite-index-meta">Updated ' + formatTime(biteIndexData.computed_at) + '</div>';
+    }
+
+    list.innerHTML = html;
+}
+
+function getBiteHeatClass(score) {
+    if (score > 70) return 'hot';
+    if (score > 40) return 'warm';
+    if (score > 15) return 'cool';
+    return 'cold';
+}
+
+// ---- Inshore: Tide Cache & Model Weights ----
+
+async function loadInshoreTideCache() {
+    try {
+        var resp = await fetch(API_ENDPOINTS.tideCurrent, { credentials: 'same-origin' });
+        inshoreTideCache = await resp.json();
+    } catch (e) {
+        console.error('Error loading tide cache:', e);
+    }
+    // Refresh every 10 minutes
+    if (!inshoreTideRefreshInterval) {
+        inshoreTideRefreshInterval = setInterval(loadInshoreTideCache, 600000);
+    }
+}
+
+async function loadSpeciesModelWeights() {
+    try {
+        var resp = await fetch(API_ENDPOINTS.species + '/model-weights?zone=inshore', { credentials: 'same-origin' });
+        var data = await resp.json();
+        speciesModelWeights = data.weights || {};
+        renderSpeciesConditions();
+    } catch (e) {
+        console.error('Error loading species model weights:', e);
+    }
+}
+
+// ---- Inshore: Tide Context in Popups ----
+
+function buildTideContextHtml(speciesCode) {
+    if (!inshoreTideCache) return '';
+
+    var tide = inshoreTideCache;
+    var direction = tide.tide_direction || tide.direction || '';
+    var isRising = direction.toLowerCase().indexOf('ris') >= 0 || direction.toLowerCase() === 'incoming';
+    var phaseIcon = isRising ? '\u25B2' : '\u25BC';
+    var phaseLabel = isRising ? 'Rising' : 'Falling';
+    var phaseColor = isRising ? '#2ecc71' : '#e67e22';
+
+    var html = '<div class="catch-popup__tide-ctx">' +
+        '<div class="catch-popup__tide-header">Tide Context</div>' +
+        '<div class="catch-popup__grid">' +
+        '<div class="catch-popup__field"><div class="catch-popup__label">Phase</div>' +
+        '<div class="catch-popup__val" style="color:' + phaseColor + '">' + phaseIcon + ' ' + phaseLabel + '</div></div>';
+
+    if (tide.next_high) {
+        var nhTime = typeof tide.next_high === 'object' ? tide.next_high.time : tide.next_high;
+        var nhHeight = typeof tide.next_high === 'object' && tide.next_high.height != null
+            ? ' (' + parseFloat(tide.next_high.height).toFixed(1) + ' ft)' : '';
+        html += '<div class="catch-popup__field"><div class="catch-popup__label">Next High</div>' +
+            '<div class="catch-popup__val">' + formatTime(nhTime) + nhHeight + '</div></div>';
+    }
+
+    if (tide.next_low) {
+        var nlTime = typeof tide.next_low === 'object' ? tide.next_low.time : tide.next_low;
+        var nlHeight = typeof tide.next_low === 'object' && tide.next_low.height != null
+            ? ' (' + parseFloat(tide.next_low.height).toFixed(1) + ' ft)' : '';
+        html += '<div class="catch-popup__field"><div class="catch-popup__label">Next Low</div>' +
+            '<div class="catch-popup__val">' + formatTime(nlTime) + nlHeight + '</div></div>';
+    }
+
+    // Tide match quality
+    if (speciesCode && speciesModelWeights && speciesModelWeights[speciesCode]) {
+        var w = speciesModelWeights[speciesCode];
+        var optPhase = (w.optimal_tide_phase || '').toLowerCase();
+        var currentDir = direction.toLowerCase();
+        var match = false;
+        if (optPhase === 'outgoing' && (currentDir === 'falling' || currentDir === 'outgoing')) match = true;
+        if (optPhase === 'incoming' && (currentDir === 'rising' || currentDir === 'incoming')) match = true;
+        if (optPhase === 'any' || optPhase === 'slack') match = true;
+
+        var matchLabel = match ? 'OPTIMAL' : 'suboptimal';
+        var matchColor = match ? '#2ecc71' : '#e67e22';
+        html += '<div class="catch-popup__field"><div class="catch-popup__label">Tide Match</div>' +
+            '<div class="catch-popup__val" style="color:' + matchColor + '">' + matchLabel + '</div></div>';
+    }
+
+    html += '</div></div>';
+    return html;
+}
+
+// ---- Inshore: Legend Tide/Wind Context ----
+
+function buildLegendTideWind() {
+    var html = '<div class="pelagic-legend__inshore-ctx">';
+
+    // Tide phase
+    if (inshoreTideCache) {
+        var direction = inshoreTideCache.tide_direction || inshoreTideCache.direction || '';
+        var isRising = direction.toLowerCase().indexOf('ris') >= 0 || direction.toLowerCase() === 'incoming';
+        var phaseIcon = isRising ? '\u25B2' : '\u25BC';
+        var phaseLabel = isRising ? 'Rising' : 'Falling';
+        var phaseColor = isRising ? '#2ecc71' : '#e67e22';
+        html += '<div class="pelagic-legend__ctx-row">' +
+            '<span class="pelagic-legend__ctx-label">Tide</span>' +
+            '<span style="color:' + phaseColor + '">' + phaseIcon + ' ' + phaseLabel + '</span>' +
+            '</div>';
+    }
+
+    // Wind from weather bar
+    var windEl = document.getElementById('wind-speed');
+    if (windEl && windEl.textContent && windEl.textContent !== '\u2014') {
+        html += '<div class="pelagic-legend__ctx-row">' +
+            '<span class="pelagic-legend__ctx-label">Wind</span>' +
+            '<span>' + windEl.textContent + '</span>' +
+            '</div>';
+    }
+
+    // Species preferred tide
+    if (speciesModelWeights && speciesModelWeights[pelagicSelectedSpecies]) {
+        var w = speciesModelWeights[pelagicSelectedSpecies];
+        if (w.optimal_tide_phase) {
+            html += '<div class="pelagic-legend__ctx-row">' +
+                '<span class="pelagic-legend__ctx-label">Pref Tide</span>' +
+                '<span>' + w.optimal_tide_phase + '</span>' +
+                '</div>';
+        }
+    }
+
+    html += '</div>';
+    return html;
+}
+
+// ---- Inshore: Marine Alerts Banner ----
+
+async function loadMarineAlerts() {
+    if (getPageZone() !== 'inshore') return;
+    try {
+        var resp = await fetch(API_ENDPOINTS.marineAlerts, { credentials: 'same-origin' });
+        var data = await resp.json();
+        marineAlertsData = data.alerts || [];
+        renderMarineAlerts();
+    } catch (e) {
+        console.error('Error loading marine alerts:', e);
+    }
+}
+
+function renderMarineAlerts() {
+    var banner = document.getElementById('marine-alert-banner');
+    if (!banner) return;
+
+    if (!marineAlertsData || marineAlertsData.length === 0) {
+        banner.style.display = 'none';
+        return;
+    }
+
+    // Deduplicate alerts by event + headline (same alert can appear for multiple zones)
+    var seen = {};
+    var uniqueAlerts = [];
+    marineAlertsData.forEach(function (alert) {
+        var key = (alert.event || '') + '||' + (alert.headline || '');
+        if (!seen[key]) {
+            seen[key] = true;
+            uniqueAlerts.push(alert);
+        }
+    });
+
+    var html = '';
+    uniqueAlerts.forEach(function (alert, idx) {
+        var sev = (alert.severity || 'minor').toLowerCase();
+        var sevClass = 'marine-alert-item--' + sev;
+        var icon = sev === 'extreme' ? '\u26A0' : sev === 'severe' ? '\u26A0' : sev === 'moderate' ? '\u26A0' : '\u2139';
+
+        html += '<div class="marine-alert-item ' + sevClass + '" onclick="toggleAlertDetail(' + idx + ')" id="alert-item-' + idx + '">' +
+            '<span class="marine-alert-item__icon">' + icon + '</span>' +
+            '<div class="marine-alert-item__text">' +
+            '<div class="marine-alert-item__event">' + escapeHtml(alert.event) + '</div>' +
+            '<div class="marine-alert-item__headline">' + escapeHtml(alert.headline || '') + '</div>' +
+            '</div>' +
+            '<button class="marine-alert-item__dismiss" onclick="dismissAlert(event,' + idx + ')">&times;</button>' +
+            '</div>' +
+            '<div class="marine-alert-detail ' + sevClass + '" id="alert-detail-' + idx + '">' +
+            escapeHtml(alert.description || 'No additional details.') +
+            '</div>';
+    });
+
+    banner.innerHTML = html;
+    banner.style.display = 'block';
+}
+
+function toggleAlertDetail(idx) {
+    var item = document.getElementById('alert-item-' + idx);
+    if (item) item.classList.toggle('expanded');
+}
+
+function dismissAlert(event, idx) {
+    event.stopPropagation();
+    var item = document.getElementById('alert-item-' + idx);
+    var detail = document.getElementById('alert-detail-' + idx);
+    if (item) item.style.display = 'none';
+    if (detail) detail.style.display = 'none';
+    // Hide banner if all dismissed
+    var banner = document.getElementById('marine-alert-banner');
+    if (banner) {
+        var remaining = banner.querySelectorAll('.marine-alert-item:not([style*="display: none"])');
+        if (remaining.length === 0) {
+            banner.style.display = 'none';
+        }
+    }
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ---- Inshore: USGS Discharge Data ----
+
+async function loadUSGSCurrent() {
+    if (getPageZone() !== 'inshore') return;
+    try {
+        var resp = await fetch(API_ENDPOINTS.usgsCurrent, { credentials: 'same-origin' });
+        var data = await resp.json();
+        usgsDischargeData = data.readings || [];
+        renderSpeciesConditions();
+    } catch (e) {
+        console.error('Error loading USGS data:', e);
+    }
+}
+
+// ---- Inshore: Species Conditions Panel ----
+
+function renderSpeciesConditions() {
+    var panel = document.getElementById('species-conditions-panel');
+    if (!panel) return;
+
+    // Need species data and model weights at minimum
+    if (!speciesData || !speciesModelWeights) {
+        return;
+    }
+
+    // Get current conditions from weather bar
+    var currentWaterTemp = parseWeatherBarValue('water-temp');
+    var currentWindSpeed = parseWeatherBarFloat('wind-speed');
+
+    // Get current tide info
+    var currentTidePhase = '';
+    if (inshoreTideCache) {
+        var dir = inshoreTideCache.tide_direction || inshoreTideCache.direction || '';
+        if (dir.toLowerCase().indexOf('ris') >= 0 || dir.toLowerCase() === 'incoming') {
+            currentTidePhase = 'incoming';
+        } else if (dir.toLowerCase().indexOf('fall') >= 0 || dir.toLowerCase() === 'outgoing') {
+            currentTidePhase = 'outgoing';
+        } else {
+            currentTidePhase = 'slack';
+        }
+    }
+
+    // Compute average discharge
+    var avgDischarge = null;
+    if (usgsDischargeData && usgsDischargeData.length > 0) {
+        var total = 0;
+        var count = 0;
+        usgsDischargeData.forEach(function (r) {
+            if (r.discharge_cfs != null) {
+                total += r.discharge_cfs;
+                count++;
+            }
+        });
+        if (count > 0) avgDischarge = total / count;
+    }
+
+    // Avg USGS water temp
+    var avgUsgsWaterTemp = null;
+    if (usgsDischargeData && usgsDischargeData.length > 0) {
+        var tTotal = 0;
+        var tCount = 0;
+        usgsDischargeData.forEach(function (r) {
+            if (r.water_temp_f != null) {
+                tTotal += r.water_temp_f;
+                tCount++;
+            }
+        });
+        if (tCount > 0) avgUsgsWaterTemp = tTotal / tCount;
+    }
+
+    // Use USGS water temp if weather bar doesn't have it
+    var waterTempF = currentWaterTemp || avgUsgsWaterTemp;
+
+    var html = '';
+    var inshoreSpecies = speciesData.filter(function (sp) {
+        return speciesModelWeights[sp.species_code];
+    });
+
+    if (inshoreSpecies.length === 0) {
+        panel.innerHTML = '<div class="tide-panel__empty">No species data available</div>';
+        return;
+    }
+
+    inshoreSpecies.forEach(function (sp) {
+        var w = speciesModelWeights[sp.species_code];
+        var scores = [];
+
+        // Water temp match
+        var tempMatch = 'unknown';
+        var tempDisplay = '--';
+        if (waterTempF != null && w.optimal_sst_min_f != null && w.optimal_sst_max_f != null) {
+            tempMatch = getConditionMatch(waterTempF, w.optimal_sst_min_f, w.optimal_sst_max_f);
+            tempDisplay = Math.round(waterTempF) + '\u00B0F';
+            scores.push(tempMatch === 'optimal' ? 100 : tempMatch === 'marginal' ? 50 : 10);
+        }
+
+        // Tide phase match
+        var tideMatch = 'unknown';
+        var tideDisplay = currentTidePhase || '--';
+        if (currentTidePhase && w.optimal_tide_phase) {
+            var optTide = w.optimal_tide_phase.toLowerCase();
+            if (optTide === 'any' || optTide === currentTidePhase) {
+                tideMatch = 'optimal';
+            } else if (optTide === 'slack') {
+                tideMatch = 'marginal';
+            } else {
+                tideMatch = 'poor';
+            }
+            scores.push(tideMatch === 'optimal' ? 100 : tideMatch === 'marginal' ? 50 : 10);
+        }
+
+        // Wind match
+        var windMatch = 'unknown';
+        var windDisplay = '--';
+        if (currentWindSpeed != null && w.max_wind_speed != null) {
+            windDisplay = Math.round(currentWindSpeed) + ' kt';
+            if (currentWindSpeed <= w.max_wind_speed * 0.6) {
+                windMatch = 'optimal';
+            } else if (currentWindSpeed <= w.max_wind_speed) {
+                windMatch = 'marginal';
+            } else {
+                windMatch = 'poor';
+            }
+            scores.push(windMatch === 'optimal' ? 100 : windMatch === 'marginal' ? 50 : 10);
+        }
+
+        // Discharge (qualitative)
+        var dischargeDisplay = '--';
+        var dischargeMatch = 'unknown';
+        if (avgDischarge != null) {
+            if (avgDischarge < 50) {
+                dischargeDisplay = 'Low';
+                dischargeMatch = 'marginal';
+            } else if (avgDischarge < 500) {
+                dischargeDisplay = 'Normal';
+                dischargeMatch = 'optimal';
+            } else {
+                dischargeDisplay = 'High';
+                dischargeMatch = 'poor';
+            }
+            scores.push(dischargeMatch === 'optimal' ? 100 : dischargeMatch === 'marginal' ? 50 : 10);
+        }
+
+        // Overall score
+        var overall = 0;
+        if (scores.length > 0) {
+            overall = Math.round(scores.reduce(function (a, b) { return a + b; }, 0) / scores.length);
+        }
+        var overallClass = overall >= 70 ? 'cond-match--optimal' : overall >= 40 ? 'cond-match--marginal' : 'cond-match--poor';
+        var barColor = overall >= 70 ? '#2ecc71' : overall >= 40 ? '#f39c12' : '#e74c3c';
+
+        var speciesColor = (typeof mapConfig !== 'undefined' && mapConfig.speciesColors && mapConfig.speciesColors[sp.species_code])
+            ? mapConfig.speciesColors[sp.species_code] : sp.color || '#6b7da0';
+
+        html += '<div class="species-cond-card">' +
+            '<div class="species-cond-card__header">' +
+            '<span class="species-cond-card__swatch" style="background:' + speciesColor + '"></span>' +
+            '<span class="species-cond-card__name">' + sp.common_name + '</span>' +
+            '<span class="species-cond-card__overall ' + overallClass + '">' + overall + '</span>' +
+            '</div>';
+
+        // Rows
+        html += buildCondRow('Water', tempDisplay, tempMatch);
+        html += buildCondRow('Tide', tideDisplay, tideMatch);
+        html += buildCondRow('Wind', windDisplay, windMatch);
+        html += buildCondRow('Discharge', dischargeDisplay, dischargeMatch);
+
+        // Progress bar
+        html += '<div class="species-cond-card__bar"><div class="species-cond-card__bar-fill" style="width:' + overall + '%;background:' + barColor + '"></div></div>';
+        html += '</div>';
+    });
+
+    panel.innerHTML = html;
+}
+
+function buildCondRow(label, value, match) {
+    var matchIcon = '\u2014';
+    var matchClass = '';
+    if (match === 'optimal') { matchIcon = '\u2713'; matchClass = 'cond-match--optimal'; }
+    else if (match === 'marginal') { matchIcon = '\u25CF'; matchClass = 'cond-match--marginal'; }
+    else if (match === 'poor') { matchIcon = '\u2717'; matchClass = 'cond-match--poor'; }
+
+    return '<div class="species-cond-card__row">' +
+        '<span class="species-cond-card__label">' + label + '</span>' +
+        '<span class="species-cond-card__value">' + value + '</span>' +
+        '<span class="species-cond-card__match ' + matchClass + '">' + matchIcon + '</span>' +
+        '</div>';
+}
+
+function getConditionMatch(current, optMin, optMax) {
+    if (current >= optMin && current <= optMax) return 'optimal';
+    var margin = (optMax - optMin) * 0.25;
+    if (current >= optMin - margin && current <= optMax + margin) return 'marginal';
+    return 'poor';
+}
+
+function parseWeatherBarValue(elementId) {
+    var el = document.getElementById(elementId);
+    if (!el) return null;
+    var text = el.textContent || '';
+    if (text === '\u2014' || text === '--' || text === '') return null;
+    var num = parseFloat(text);
+    return isNaN(num) ? null : num;
+}
+
+function parseWeatherBarFloat(elementId) {
+    var el = document.getElementById(elementId);
+    if (!el) return null;
+    var text = el.textContent || '';
+    if (text === '\u2014' || text === '--' || text === '') return null;
+    var match = text.match(/([\d.]+)/);
+    return match ? parseFloat(match[1]) : null;
 }

@@ -10,6 +10,7 @@ from app.config import get_settings
 from app.api.routes import catches, species, weather, admin, explorer, vessels, tide, leads, auth, preferences, notifications
 from app.api.routes import settings as settings_routes
 from app.api.routes import predictions, bite_windows, inlets, fleet_intel, pelagic_regions, pelagic_tiles
+from app.api.routes import usgs, alerts
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.scheduler import init_scheduler, shutdown_scheduler
 
@@ -73,6 +74,8 @@ app.include_router(inlets.router, prefix="/api/v1/inlets", tags=["inlets"])
 app.include_router(fleet_intel.router, prefix="/api/v1/fleet", tags=["fleet-intel"])
 app.include_router(pelagic_regions.router, prefix="/api/v1/regions", tags=["regions"])
 app.include_router(pelagic_tiles.router, prefix="/api/v1/tiles/pelagic", tags=["pelagic-tiles"])
+app.include_router(usgs.router, prefix="/api/v1/usgs", tags=["usgs"])
+app.include_router(alerts.router, prefix="/api/v1/alerts", tags=["alerts"])
 
 
 # Health check endpoint

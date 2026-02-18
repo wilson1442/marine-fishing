@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="/css/vendor/MarkerCluster.css" />
     <link rel="stylesheet" href="/css/vendor/MarkerCluster.Default.css" />
 
-    <link rel="stylesheet" href="/css/style.css?v=39" />
+    <link rel="stylesheet" href="/css/style.css?v=41" />
 </head>
 <body>
     <div class="scanline-overlay"></div>
@@ -106,11 +106,11 @@
                             </label>
                         </div>
                     </div>
-                    <!-- PI — Pelagic Intelligence -->
+                    <!-- FI — Fishing Intelligence -->
                     <div class="layer-group" data-group="pelagic">
                         <div class="layer-group__header">
-                            <span class="map-layer-toggles__badge" style="background:#dc1e1e">PI</span>
-                            <span class="map-layer-toggles__title">Pelagic Intelligence</span>
+                            <span class="map-layer-toggles__badge" style="background:#dc1e1e">FI</span>
+                            <span class="map-layer-toggles__title">Fishing Intelligence</span>
                             <span class="layer-group__chevron">&#9662;</span>
                         </div>
                         <div class="layer-group__body">
@@ -146,6 +146,35 @@
                                     <option value="">Select Station</option>
                                 </select>
                                 <div class="tide-panel__list" id="tide-predictions-list"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- BI — Bite Index -->
+                    <div class="layer-group" data-group="biteindex">
+                        <div class="layer-group__header">
+                            <span class="map-layer-toggles__badge" style="background:#dc1e1e">BI</span>
+                            <span class="map-layer-toggles__title">Bite Index</span>
+                            <span class="layer-group__chevron">&#9662;</span>
+                        </div>
+                        <div class="layer-group__body">
+                            <div class="bite-index-panel">
+                                <select class="tide-panel__select" id="bite-index-species-select" style="width:100%;margin-bottom:6px">
+                                    <option value="">All Species</option>
+                                </select>
+                                <div class="bite-index-list" id="bite-index-list"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- SC — Species Conditions -->
+                    <div class="layer-group" data-group="species-conditions">
+                        <div class="layer-group__header">
+                            <span class="map-layer-toggles__badge" style="background:#2ecc71">SC</span>
+                            <span class="map-layer-toggles__title">Species Conditions</span>
+                            <span class="layer-group__chevron">&#9662;</span>
+                        </div>
+                        <div class="layer-group__body">
+                            <div class="species-conditions-panel" id="species-conditions-panel">
+                                <div class="tide-panel__empty">Loading conditions&hellip;</div>
                             </div>
                         </div>
                     </div>
@@ -241,6 +270,7 @@
             </header>
 
             <div class="map-wrap">
+                <div class="marine-alert-banner" id="marine-alert-banner" style="display:none"></div>
                 <div id="map"></div>
                 <div class="map-loading" id="map-loading">
                     <div class="map-loading__spinner"></div>
@@ -337,7 +367,7 @@
 
     <script src="/js/vendor/leaflet.js"></script>
     <script src="/js/vendor/leaflet.markercluster.js"></script>
-    <script src="/js/inshore-config.js?v=1"></script>
-    <script src="/js/app.js?v=56"></script>
+    <script src="/js/inshore-config.js?v=2"></script>
+    <script src="/js/app.js?v=61"></script>
 </body>
 </html>

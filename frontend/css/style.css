@@ -1738,6 +1738,122 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     color: var(--text-dim);
 }
 
+/* ---- Bite Index Panel ---- */
+.bite-index-panel {
+    padding: 4px 0;
+}
+.bite-index-list {
+    max-height: 320px;
+    overflow-y: auto;
+}
+.bite-index-inlet {
+    margin-bottom: 8px;
+}
+.bite-index-inlet__name {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text);
+    padding: 4px 0 2px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 3px;
+}
+.bite-index-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 0;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-dim);
+}
+.bite-index-row__swatch {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+.bite-index-row__species {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.bite-index-row__score {
+    font-weight: 600;
+    min-width: 22px;
+    text-align: right;
+}
+.bite-index-row__trend {
+    font-size: 8px;
+    min-width: 10px;
+    text-align: center;
+}
+.bite-index-row__reason {
+    font-size: 8px;
+    color: var(--text-dim);
+    opacity: 0.7;
+    max-width: 60px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.bite-heat--hot { background: #dc1e1e; color: #dc1e1e; }
+.bite-heat--warm { background: #f58220; color: #f58220; }
+.bite-heat--cool { background: #4cc9f0; color: #4cc9f0; }
+.bite-heat--cold { background: #6b7da0; color: #6b7da0; }
+.bite-trend--up { color: #2ecc71; }
+.bite-trend--down { color: #ff6b6b; }
+.bite-trend--stable { color: var(--text-dim); }
+.bite-index-meta {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    color: var(--text-dim);
+    opacity: 0.6;
+    text-align: right;
+    padding-top: 4px;
+}
+
+/* ---- Tide Context in Catch Popups ---- */
+.catch-popup__tide-ctx {
+    border-top: 1px solid rgba(58, 143, 217, 0.15);
+    margin-top: 6px;
+    padding-top: 6px;
+}
+.catch-popup__tide-header {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+}
+
+/* ---- Inshore Heatmap Legend Context ---- */
+.pelagic-legend__inshore-ctx {
+    border-top: 1px solid rgba(58, 143, 217, 0.15);
+    margin-top: 6px;
+    padding-top: 6px;
+}
+.pelagic-legend__ctx-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    padding: 1px 0;
+}
+.pelagic-legend__ctx-label {
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    font-size: 8px;
+}
+
 /* ---- Zone Toggle Pills (Inshore/Offshore) ---- */
 .zone-toggle {
     display: flex;
@@ -1781,4 +1897,174 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 @media (max-width: 768px) {
     .zone-toggle { margin-left: 8px; }
     .zone-pill { padding: 3px 10px; font-size: 9px; }
+}
+
+/* ---- Marine Alert Banner ---- */
+.marine-alert-banner {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 800;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    max-height: 120px;
+    overflow-y: auto;
+}
+.marine-alert-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid rgba(0,0,0,0.15);
+}
+.marine-alert-item--moderate {
+    background: rgba(255, 179, 0, 0.92);
+    color: #1a1a2e;
+}
+.marine-alert-item--severe {
+    background: rgba(255, 120, 0, 0.92);
+    color: #1a1a2e;
+}
+.marine-alert-item--extreme {
+    background: rgba(220, 30, 30, 0.92);
+    color: #fff;
+}
+.marine-alert-item--minor {
+    background: rgba(76, 201, 240, 0.85);
+    color: #1a1a2e;
+}
+.marine-alert-item__icon {
+    font-size: 14px;
+    flex-shrink: 0;
+}
+.marine-alert-item__text {
+    flex: 1;
+    min-width: 0;
+}
+.marine-alert-item__event {
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 10px;
+}
+.marine-alert-item__headline {
+    font-size: 10px;
+    opacity: 0.85;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.marine-alert-item__dismiss {
+    background: none;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    opacity: 0.6;
+    padding: 0 4px;
+    color: inherit;
+    line-height: 1;
+}
+.marine-alert-item__dismiss:hover { opacity: 1; }
+.marine-alert-detail {
+    display: none;
+    padding: 6px 12px 8px 34px;
+    font-size: 10px;
+    line-height: 1.4;
+    opacity: 0.9;
+    max-height: 100px;
+    overflow-y: auto;
+}
+.marine-alert-item.expanded + .marine-alert-detail {
+    display: block;
+}
+
+/* ---- Species Conditions Panel ---- */
+.species-conditions-panel {
+    padding: 4px 0;
+    max-height: 400px;
+    overflow-y: auto;
+}
+.species-cond-card {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 6px 8px;
+    margin-bottom: 6px;
+    background: rgba(255,255,255,0.02);
+}
+.species-cond-card__header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+.species-cond-card__swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+.species-cond-card__name {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text);
+    flex: 1;
+}
+.species-cond-card__overall {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    min-width: 28px;
+    text-align: center;
+    padding: 1px 4px;
+    border-radius: 3px;
+}
+.species-cond-card__row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 1px 0;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-dim);
+}
+.species-cond-card__label {
+    min-width: 58px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    font-size: 8px;
+}
+.species-cond-card__value {
+    flex: 1;
+}
+.species-cond-card__match {
+    font-weight: 600;
+    font-size: 9px;
+    min-width: 12px;
+    text-align: center;
+}
+.cond-match--optimal { color: #2ecc71; }
+.cond-match--marginal { color: #f39c12; }
+.cond-match--poor { color: #e74c3c; }
+.species-cond-card__bar {
+    height: 3px;
+    border-radius: 2px;
+    background: var(--border);
+    margin-top: 4px;
+    overflow: hidden;
+}
+.species-cond-card__bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+.species-cond-meta {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    color: var(--text-dim);
+    opacity: 0.6;
+    text-align: right;
+    padding-top: 4px;
 }
