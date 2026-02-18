@@ -1,10 +1,10 @@
 import hashlib
 import json
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 
 from app.api.deps import get_db, require_api_access, check_etag
 from app.models.species import Species
@@ -14,9 +14,12 @@ router = APIRouter()
 
 
 @router.get("")
-def get_species(request: Request, db: Session = Depends(get_db), _auth: dict = Depends(require_api_access)):
-    """Get all species with their colors for the legend"""
-    species = db.query(Species).order_by(Species.common_name).all()
+def get_species(request: Request, zone: Optional[str] = Query(None), db: Session = Depends(get_db), _auth: dict = Depends(require_api_access)):
+    """Get all species with their colors for the legend. Optionally filter by zone."""
+    query = db.query(Species)
+    if zone:
+        query = query.filter(Species.zone == zone)
+    species = query.order_by(Species.common_name).all()
     data = SpeciesListResponse(
         species=[SpeciesResponse.model_validate(s) for s in species],
         total=len(species)

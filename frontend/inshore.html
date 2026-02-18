@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Angler Suite — Live Map</title>
+    <title>Angler Suite — Inshore Map</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -122,17 +122,7 @@
                             </label>
                             <div class="pelagic-species-selector" style="padding:4px 0 4px 28px">
                                 <select id="pelagic-species-select" class="tide-panel__select" style="width:100%">
-                                    <option value="YFT">Yellowfin Tuna</option>
-                                    <option value="BFT">Bluefin Tuna</option>
-                                    <option value="BET">Bigeye Tuna</option>
-                                    <option value="ALB">Albacore Tuna</option>
-                                    <option value="DOL">Mahi Mahi</option>
-                                    <option value="WAH">Wahoo</option>
-                                    <option value="WHM">White Marlin</option>
-                                    <option value="BUM">Blue Marlin</option>
-                                    <option value="SWO">Swordfish</option>
-                                    <option value="SAI">Sailfish</option>
-                                    <option value="SKJ">Skipjack Tuna</option>
+                                    <option value="STB">Striped Bass</option>
                                 </select>
                             </div>
                             <label class="map-layer-toggle">
@@ -144,7 +134,7 @@
                         </div>
                     </div>
                     <!-- TD — Tide Predictions -->
-                    <div class="layer-group collapsed" data-group="tides">
+                    <div class="layer-group" data-group="tides">
                         <div class="layer-group__header" id="tide-group-header">
                             <span class="map-layer-toggles__badge" style="background:#ffa94d">TD</span>
                             <span class="map-layer-toggles__title">Tide Predictions</span>
@@ -199,8 +189,8 @@
                     <span class="topbar__name">Angler <span>Suite</span></span>
                 </a>
                 <div class="zone-toggle">
-                    <a href="/map" class="zone-pill active">Offshore</a>
-                    <a href="/map/inshore" class="zone-pill">Inshore</a>
+                    <a href="/map" class="zone-pill">Offshore</a>
+                    <a href="/map/inshore" class="zone-pill active">Inshore</a>
                 </div>
                 <a href="/admin" class="topbar__admin-btn" id="admin-btn" style="display:none">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
@@ -347,7 +337,7 @@
 
     <script src="/js/vendor/leaflet.js"></script>
     <script src="/js/vendor/leaflet.markercluster.js"></script>
-    <script src="/js/config.js?v=42"></script>
+    <script src="/js/inshore-config.js?v=1"></script>
     <script src="/js/app.js?v=54"></script>
 </body>
 </html>

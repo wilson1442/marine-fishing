@@ -45,7 +45,7 @@ let chlorophyllOverlayActive = false;
 // Pelagic Intelligence overlay state
 let pelagicTileLayer = null;
 let pelagicOverlayActive = false;
-let pelagicSelectedSpecies = 'YFT';
+let pelagicSelectedSpecies = (typeof pelagicConfig !== 'undefined' && pelagicConfig.defaultSpecies) ? pelagicConfig.defaultSpecies : 'YFT';
 let fleetPressureLayer = null;
 let fleetPressureActive = false;
 let pelagicRefreshInterval = null;
@@ -212,10 +212,19 @@ function initMap() {
     });
 }
 
+// Determine zone from current page path
+function getPageZone() {
+    var path = window.location.pathname;
+    if (path.indexOf('/map/inshore') === 0) return 'inshore';
+    return 'offshore';
+}
+
 // Load species for legend and filter
 async function loadSpecies() {
     try {
-        var response = await fetch(API_ENDPOINTS.species);
+        var zone = getPageZone();
+        var url = API_ENDPOINTS.species + '?zone=' + zone;
+        var response = await fetch(url);
         var data = await response.json();
         speciesData = data.species || [];
 
@@ -244,6 +253,23 @@ async function loadSpecies() {
             });
             legendItems.appendChild(item);
         });
+
+        // Populate pelagic species dropdown dynamically
+        var pelagicSelect = document.getElementById('pelagic-species-select');
+        if (pelagicSelect && speciesData.length > 0) {
+            pelagicSelect.innerHTML = '';
+            speciesData.forEach(function (sp) {
+                var opt = document.createElement('option');
+                opt.value = sp.species_code;
+                opt.textContent = sp.common_name;
+                pelagicSelect.appendChild(opt);
+            });
+            // Set default from config
+            var defaultSp = (typeof pelagicConfig !== 'undefined' && pelagicConfig.defaultSpecies)
+                ? pelagicConfig.defaultSpecies : speciesData[0].species_code;
+            pelagicSelect.value = defaultSp;
+            pelagicSelectedSpecies = defaultSp;
+        }
 
         // Re-apply filter so markers match the default hidden state
         applySpeciesFilter();

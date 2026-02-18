@@ -32,12 +32,14 @@ class SpeciesScoringHarvester(BaseHarvester):
         now = datetime.now(timezone.utc)
         current_month = now.month  # 1-12 -> index 0-11
 
-        # Load model weights for all species
+        # Load model weights for all species (including inshore columns)
         cur.execute("""
             SELECT s.id, s.species_code, smw.env_weight, smw.edge_weight,
                    smw.fleet_weight, smw.season_weight,
                    smw.optimal_sst_min_f, smw.optimal_sst_max_f,
-                   smw.monthly_season
+                   smw.monthly_season,
+                   smw.tide_weight, smw.wind_weight,
+                   smw.optimal_tide_phase, smw.optimal_wind_dir, smw.max_wind_speed
             FROM species_model_weights smw
             JOIN species s ON s.id = smw.species_id
         """)
@@ -54,6 +56,11 @@ class SpeciesScoringHarvester(BaseHarvester):
                 'sst_min_f': float(row[6]) if row[6] else 60,
                 'sst_max_f': float(row[7]) if row[7] else 80,
                 'season_prior': float(monthly[current_month - 1]) if monthly else 0.5,
+                'tide_w': float(row[9]) if row[9] else 0,
+                'wind_w': float(row[10]) if row[10] else 0,
+                'optimal_tide_phase': row[11],
+                'optimal_wind_dir': row[12],
+                'max_wind_speed': float(row[13]) if row[13] else 25,
             }
 
         if not models:
@@ -97,8 +104,27 @@ class SpeciesScoringHarvester(BaseHarvester):
 
         self.logger.info(f"Loaded fleet pressure for {len(fleet)} cells")
 
-        # Get all cells with their region
-        cur.execute("SELECT id, region_id FROM pelagic_grid_cells")
+        # Load current tide phase from nearest tide station
+        tide_phase = self._get_current_tide_phase(cur, now)
+        self.logger.info(f"Current tide phase: {tide_phase}")
+
+        # Load wind data from marine_weather_grid (latest per cell area)
+        cur.execute("""
+            SELECT DISTINCT ON (lat, lon)
+                lat, lon, wind_speed_kts, wind_direction
+            FROM marine_weather_grid
+            ORDER BY lat, lon, fetched_at DESC
+        """)
+        wind_grid = {}
+        for row in cur.fetchall():
+            wind_grid[(round(float(row[0]), 1), round(float(row[1]), 1))] = {
+                'wind_speed_kts': float(row[2]) if row[2] else 0,
+                'wind_direction': row[3] or '',
+            }
+        self.logger.info(f"Loaded wind data for {len(wind_grid)} grid points")
+
+        # Get all cells with their region and lat/lon for wind lookup
+        cur.execute("SELECT id, region_id, lat, lon FROM pelagic_grid_cells")
         cells = cur.fetchall()
 
         # Delete previous scores
@@ -107,7 +133,7 @@ class SpeciesScoringHarvester(BaseHarvester):
 
         # Score each cell x species
         score_batch = []
-        for cell_id, region_id in cells:
+        for cell_id, region_id, cell_lat, cell_lon in cells:
             ocn = ocean.get(cell_id)
             if not ocn or ocn['sst_f'] is None:
                 stats['skipped'] += 1
@@ -115,8 +141,12 @@ class SpeciesScoringHarvester(BaseHarvester):
 
             flt = fleet.get(cell_id, 0)
 
+            # Find nearest wind data for this cell
+            wind_key = (round(float(cell_lat), 1), round(float(cell_lon), 1))
+            wind_data = wind_grid.get(wind_key, {'wind_speed_kts': 0, 'wind_direction': ''})
+
             for sp_id, model in models.items():
-                score_data = self._compute_score(model, ocn, flt)
+                score_data = self._compute_score(model, ocn, flt, tide_phase, wind_data)
 
                 score_batch.append((
                     cell_id, sp_id, now,
@@ -156,10 +186,11 @@ class SpeciesScoringHarvester(BaseHarvester):
         cur.close()
         return stats
 
-    def _compute_score(self, model, ocn, fleet_intensity):
+    def _compute_score(self, model, ocn, fleet_intensity, tide_phase=None, wind_data=None):
         """Compute probability and components for one cell x species."""
         sst_f = ocn['sst_f']
         reasons = []
+        is_inshore = model['tide_w'] > 0
 
         # 1. Environment suitability: Gaussian around optimal SST range
         sst_mid = (model['sst_min_f'] + model['sst_max_f']) / 2
@@ -192,25 +223,68 @@ class SpeciesScoringHarvester(BaseHarvester):
         elif season < 0.2:
             reasons.append('off_season')
 
-        # 5. Sea state penalty
+        # 5. Sea state penalty (lower thresholds for inshore)
         wave_m = ocn['wave_height_m']
         wave_ft = wave_m * 3.281 if wave_m else 0
-        if wave_ft > 10:
-            sea_pen = 0.3
-            reasons.append('rough_seas')
-        elif wave_ft > 6:
-            sea_pen = 0.7
-            reasons.append('moderate_seas')
+        if is_inshore:
+            if wave_ft > 5:
+                sea_pen = 0.3
+                reasons.append('rough_seas')
+            elif wave_ft > 3:
+                sea_pen = 0.7
+                reasons.append('moderate_seas')
+            else:
+                sea_pen = 1.0
         else:
-            sea_pen = 1.0
+            if wave_ft > 10:
+                sea_pen = 0.3
+                reasons.append('rough_seas')
+            elif wave_ft > 6:
+                sea_pen = 0.7
+                reasons.append('moderate_seas')
+            else:
+                sea_pen = 1.0
 
-        # Weighted sum
-        weighted = (
-            model['env_w'] * env_suit +
-            model['edge_w'] * edge +
-            model['fleet_w'] * fleet_sig +
-            model['season_w'] * season
-        )
+        # Inshore-specific: tide and wind influence
+        tide_influence = 0.0
+        wind_factor = 0.0
+
+        if is_inshore:
+            # Tide influence: match current phase to species preference
+            tide_influence = self._compute_tide_influence(
+                tide_phase, model.get('optimal_tide_phase', 'any'))
+            if tide_influence > 0.7:
+                reasons.append('good_tide')
+            elif tide_influence < 0.3:
+                reasons.append('poor_tide')
+
+            # Wind factor: direction match + speed penalty
+            if wind_data:
+                wind_factor = self._compute_wind_factor(
+                    wind_data, model.get('optimal_wind_dir', 'SW'),
+                    model.get('max_wind_speed', 25))
+                if wind_factor > 0.7:
+                    reasons.append('favorable_wind')
+                elif wind_factor < 0.3:
+                    reasons.append('unfavorable_wind')
+
+        # Weighted sum (inshore uses tide + wind weights, offshore uses edge weight)
+        if is_inshore:
+            weighted = (
+                model['env_w'] * env_suit +
+                model['edge_w'] * edge +
+                model['fleet_w'] * fleet_sig +
+                model['season_w'] * season +
+                model['tide_w'] * tide_influence +
+                model['wind_w'] * wind_factor
+            )
+        else:
+            weighted = (
+                model['env_w'] * env_suit +
+                model['edge_w'] * edge +
+                model['fleet_w'] * fleet_sig +
+                model['season_w'] * season
+            )
 
         probability = max(0, min(100, 100 * sigmoid(weighted * 4 - 2) * sea_pen))
 
@@ -229,6 +303,101 @@ class SpeciesScoringHarvester(BaseHarvester):
             'sea_state_pen': round(sea_pen, 3),
             'reason_codes': reasons[:5],  # cap at 5
         }
+
+    def _get_current_tide_phase(self, cur, now):
+        """Determine current tide phase from tide_predictions table."""
+        try:
+            cur.execute("""
+                SELECT type, prediction_time
+                FROM tide_predictions
+                WHERE prediction_time BETWEEN %s - INTERVAL '6 hours' AND %s + INTERVAL '6 hours'
+                ORDER BY ABS(EXTRACT(EPOCH FROM prediction_time - %s))
+                LIMIT 2
+            """, (now, now, now))
+            rows = cur.fetchall()
+            if len(rows) < 2:
+                return 'unknown'
+
+            # Determine phase based on nearest two high/low events
+            nearest = rows[0]
+            second = rows[1]
+            nearest_type = nearest[0]  # 'H' or 'L'
+            nearest_time = nearest[1]
+
+            if nearest_time.replace(tzinfo=None) > now.replace(tzinfo=None):
+                # Nearest event is in the future - we're approaching it
+                if nearest_type == 'H':
+                    return 'incoming'
+                else:
+                    return 'outgoing'
+            else:
+                # Nearest event just passed
+                if nearest_type == 'H':
+                    return 'outgoing'  # just passed high, now going out
+                else:
+                    return 'incoming'  # just passed low, now coming in
+        except Exception as e:
+            self.logger.warning(f"Could not determine tide phase: {e}")
+            return 'unknown'
+
+    def _compute_tide_influence(self, current_phase, optimal_phase):
+        """Score 0-1 for how well current tide matches species preference."""
+        if not current_phase or current_phase == 'unknown':
+            return 0.5  # neutral if no data
+        if not optimal_phase or optimal_phase == 'any':
+            return 0.7  # species doesn't care much, slight positive
+
+        # Slack is near the transition - both incoming/outgoing have some slack
+        if optimal_phase == 'slack':
+            # Near the turn of tide is best for slack species
+            return 0.6  # moderate - real slack detection would need more data
+
+        if current_phase == optimal_phase:
+            return 1.0  # perfect match
+        else:
+            return 0.3  # wrong phase
+
+    def _compute_wind_factor(self, wind_data, optimal_dir, max_speed):
+        """Score 0-1 for wind conditions relative to species preference."""
+        wind_speed = wind_data.get('wind_speed_kts', 0)
+        wind_dir_str = wind_data.get('wind_direction', '')
+
+        # Speed penalty: too much wind is bad
+        if wind_speed > max_speed:
+            speed_factor = max(0, 1.0 - (wind_speed - max_speed) / 15.0)
+        elif wind_speed < 3:
+            speed_factor = 0.6  # dead calm isn't ideal either
+        else:
+            speed_factor = 1.0
+
+        # Direction match
+        dir_map = {
+            'N': 0, 'NNE': 22.5, 'NE': 45, 'ENE': 67.5,
+            'E': 90, 'ESE': 112.5, 'SE': 135, 'SSE': 157.5,
+            'S': 180, 'SSW': 202.5, 'SW': 225, 'WSW': 247.5,
+            'W': 270, 'WNW': 292.5, 'NW': 315, 'NNW': 337.5,
+        }
+
+        current_deg = dir_map.get(wind_dir_str.upper(), None)
+        optimal_deg = dir_map.get(optimal_dir.upper(), None)
+
+        if current_deg is not None and optimal_deg is not None:
+            diff = abs(current_deg - optimal_deg)
+            if diff > 180:
+                diff = 360 - diff
+            # Within 45 degrees is good, within 90 is ok
+            if diff <= 45:
+                dir_factor = 1.0
+            elif diff <= 90:
+                dir_factor = 0.7
+            elif diff <= 135:
+                dir_factor = 0.4
+            else:
+                dir_factor = 0.2
+        else:
+            dir_factor = 0.5  # can't determine
+
+        return speed_factor * 0.5 + dir_factor * 0.5
 
     def _insert_scores(self, cur, batch):
         from psycopg2.extras import execute_values

@@ -11,6 +11,7 @@ class SpeciesResponse(BaseModel):
     category: Optional[str] = None
     color_hex: str = "#808080"
     icon_name: Optional[str] = None
+    zone: Optional[str] = 'offshore'
 
     class Config:
         from_attributes = True

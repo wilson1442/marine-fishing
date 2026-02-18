@@ -1737,3 +1737,48 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     font-size: 8px;
     color: var(--text-dim);
 }
+
+/* ---- Zone Toggle Pills (Inshore/Offshore) ---- */
+.zone-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: rgba(58, 143, 217, 0.08);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 2px;
+    margin-left: 16px;
+    flex-shrink: 0;
+}
+.zone-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 14px;
+    border-radius: 16px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    text-decoration: none;
+    color: var(--text-dim);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all var(--transition);
+    white-space: nowrap;
+}
+.zone-pill:hover {
+    color: var(--text);
+    background: rgba(58, 143, 217, 0.1);
+}
+.zone-pill.active {
+    color: var(--text-bright);
+    background: linear-gradient(135deg, var(--cyan-dim) 0%, var(--cyan) 100%);
+    box-shadow: 0 0 10px var(--cyan-glow);
+    pointer-events: none;
+}
+@media (max-width: 768px) {
+    .zone-toggle { margin-left: 8px; }
+    .zone-pill { padding: 3px 10px; font-size: 9px; }
+}

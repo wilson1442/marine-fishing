@@ -168,6 +168,14 @@ if settings.serve_frontend and os.path.exists(settings.frontend_dir):
             return FileResponse(test_path)
         return {"message": "WMS test page not found."}
 
+    # Inshore fishing map
+    @app.get("/map/inshore")
+    async def serve_inshore_map():
+        path = os.path.join(settings.frontend_dir, "inshore.html")
+        if os.path.exists(path):
+            return FileResponse(path)
+        return {"message": "Inshore map not found."}
+
     # Map UI design variants
     @app.get("/map{variant}")
     async def serve_map_variant(variant: int):

@@ -13,4 +13,5 @@ class Species(Base):
     category = Column(String(50))
     color_hex = Column(String(7), default="#808080")
     icon_name = Column(String(50))
+    zone = Column(String(20), default='offshore')
     created_at = Column(DateTime, server_default=func.now())
