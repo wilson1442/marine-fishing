@@ -744,8 +744,8 @@ function renderFilteredMarkers() {
         var coords = feature.geometry.coordinates;
         var props = feature.properties;
 
-        // Skip species that are toggled off
-        if (props.species_code && speciesVisible[props.species_code] === false) {
+        // Skip species that are toggled off (or not yet loaded)
+        if (props.species_code && speciesVisible[props.species_code] !== true) {
             return;
         }
 
